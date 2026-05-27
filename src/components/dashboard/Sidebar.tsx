@@ -83,9 +83,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
             title: "Communication",
             url: "/dashboard/messages",
             icon: MessageSquare,
-            comingSoon: true,
           },
-          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles, comingSoon: true },
+          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -129,6 +128,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
           { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
+          { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -149,6 +150,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
             url: "/dashboard/student/study-logs",
             icon: LayoutDashboard,
           },
+          { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -182,7 +185,7 @@ export function DashboardSidebar({
   const { institute, user } = useAuthStore();
 
   const role = (user?.role ?? "student") as UserRole;
-  const instituteName = institute?.name ?? "EduOS";
+  const instituteName = institute?.name ?? "EliteClass";
   const instituteInitials = getInitials(instituteName);
   const groups = getNavGroups(role);
 
@@ -197,7 +200,7 @@ export function DashboardSidebar({
             <span className="max-w-40 truncate text-sm font-semibold" title={instituteName}>
               {instituteName}
             </span>
-            <span className="text-[10px] text-muted-foreground">EduOS Platform</span>
+            <span className="text-[10px] text-muted-foreground">EliteClass Platform</span>
           </div>
         )}
       </div>
@@ -256,6 +259,7 @@ export function DashboardSidebar({
                   <li key={item.url}>
                     <Link
                       to={item.url}
+                      preload="intent"
                       title={collapsed ? item.title : undefined}
                       onClick={() => onMobileOpenChange(false)}
                       className={cn(

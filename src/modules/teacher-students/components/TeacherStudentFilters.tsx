@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — TeacherStudentFilters
+// EliteClass — TeacherStudentFilters
 // ---------------------------------------------------------------------------
 
 import { SearchInput } from "@/components/ui/SearchInput";

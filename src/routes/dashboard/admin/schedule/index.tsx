@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Schedule Management (/dashboard/admin/schedule)
+// EliteClass — Admin: Schedule Management (/dashboard/admin/schedule)
 // ---------------------------------------------------------------------------
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -45,7 +45,7 @@ import type { ScheduleSlotSchema } from "@/modules/schedule/validations";
 import type { Batch, Room, Schedule, ScheduleException, Section, Staff, Subject } from "@/types";
 
 export const Route = createFileRoute("/dashboard/admin/schedule/")({
-  head: () => ({ meta: [{ title: "Schedule — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Schedule — EliteClass" }] }),
   component: AdminSchedulePage,
 });
 
@@ -283,7 +283,7 @@ function AdminSchedulePage() {
     <ProtectedRoute allowedRoles={["admin", "staff", "super_admin"]}>
       <PageHeader
         title="Schedule Management"
-        description="Create timetables, assign teachers and rooms, detect conflicts, and publish schedules."
+        subtitle="Create timetables, assign teachers and rooms, detect conflicts, and publish schedules."
       />
 
       {!canManageSchedule && (

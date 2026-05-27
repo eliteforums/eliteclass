@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Schedule / Timetable Service
+// EliteClass — Schedule / Timetable Service
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";
@@ -45,7 +45,7 @@ export async function checkScheduleConflicts(
 ): Promise<ApiResponse<ScheduleConflict[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc("check_schedule_conflicts", {
+  const { data, error } = await supabase!.rpc("check_schedule_conflicts", {
     p_institute_id: payload.institute_id,
     p_batch_id: payload.batch_id,
     p_section_id: payload.section_id ?? null,
@@ -73,7 +73,7 @@ export async function getSchedules(
 
   return runService("getSchedules", async () => {
     const items = await cachedQuery(cacheKey, 20_000, async () => {
-      let query = supabase
+      let query = supabase!
         .from("schedules")
         .select(SCHEDULE_SELECT)
         .eq("institute_id", instituteId)
@@ -127,7 +127,7 @@ export async function getSchedulesByBatch(
 
   return runService("getSchedulesByBatch", async () => {
     const data = await cachedQuery(cacheKey, 45_000, async () => {
-      let query = supabase
+      let query = supabase!
         .from("schedules")
         .select(SCHEDULE_SELECT)
         .eq("batch_id", batchId)
@@ -150,7 +150,7 @@ export async function getSchedulesByTeacher(
 ): Promise<ApiResponse<Schedule[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  let query = supabase
+  let query = supabase!
     .from("schedules")
     .select(SCHEDULE_SELECT)
     .eq("teacher_id", teacherId)
@@ -179,7 +179,7 @@ export async function createSchedule(
     };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("schedules")
     .insert({
       institute_id: payload.institute_id,
@@ -212,7 +212,7 @@ export async function updateSchedule(
 ): Promise<ApiResponse<Schedule>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data: existing, error: fetchError } = await supabase
+  const { data: existing, error: fetchError } = await supabase!
     .from("schedules")
     .select("*")
     .eq("id", id)
@@ -245,7 +245,7 @@ export async function updateSchedule(
     };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("schedules")
     .update(payload)
     .eq("id", id)
@@ -260,7 +260,7 @@ export async function updateSchedule(
 export async function deleteSchedule(id: string): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase.from("schedules").delete().eq("id", id);
+  const { error } = await supabase!.from("schedules").delete().eq("id", id);
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   invalidateQueryCache("schedules:");
   return { data: null, error: null, success: true };
@@ -272,7 +272,7 @@ export async function publishBatchSchedule(
 ): Promise<ApiResponse<{ published: number }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc("publish_batch_schedule", {
+  const { data, error } = await supabase!.rpc("publish_batch_schedule", {
     p_institute_id: instituteId,
     p_batch_id: batchId,
   });
@@ -289,7 +289,7 @@ export async function duplicateWeekSchedules(
 ): Promise<ApiResponse<{ duplicated: number }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc("duplicate_week_schedules", {
+  const { data, error } = await supabase!.rpc("duplicate_week_schedules", {
     p_institute_id: instituteId,
     p_source_batch_id: sourceBatchId,
     p_target_batch_id: targetBatchId ?? null,
@@ -307,7 +307,7 @@ export async function getSubjects(instituteId: string): Promise<ApiResponse<Subj
 
   return runService("getSubjects", async () => {
     const data = await cachedQuery(`subjects:${instituteId}`, 120_000, async () => {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await supabase!
         .from("subjects")
         .select("id, institute_id, name, code, is_active")
         .eq("institute_id", instituteId)
@@ -323,7 +323,7 @@ export async function getSubjects(instituteId: string): Promise<ApiResponse<Subj
 export async function createSubject(payload: CreateSubjectPayload): Promise<ApiResponse<Subject>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.from("subjects").insert(payload).select().single();
+  const { data, error } = await supabase!.from("subjects").insert(payload).select().single();
   if (error) return { data: null, error: error.message, success: false };
   return { data: data as Subject, error: null, success: true };
 }
@@ -335,7 +335,7 @@ export async function getRooms(instituteId: string): Promise<ApiResponse<Room[]>
 
   return runService("getRooms", async () => {
     const data = await cachedQuery(`rooms:${instituteId}`, 120_000, async () => {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await supabase!
         .from("rooms")
         .select("id, institute_id, room_name, capacity, building, floor, is_active")
         .eq("institute_id", instituteId)
@@ -351,7 +351,7 @@ export async function getRooms(instituteId: string): Promise<ApiResponse<Room[]>
 export async function createRoom(payload: CreateRoomPayload): Promise<ApiResponse<Room>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.from("rooms").insert(payload).select().single();
+  const { data, error } = await supabase!.from("rooms").insert(payload).select().single();
   if (error) return { data: null, error: error.message, success: false };
   return { data: data as Room, error: null, success: true };
 }
@@ -361,7 +361,7 @@ export async function createRoom(payload: CreateRoomPayload): Promise<ApiRespons
 export async function getSectionsByBatch(batchId: string): Promise<ApiResponse<Section[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("sections")
     .select("*")
     .eq("batch_id", batchId)
@@ -375,7 +375,7 @@ export async function getSectionsByBatch(batchId: string): Promise<ApiResponse<S
 export async function createSection(payload: CreateSectionPayload): Promise<ApiResponse<Section>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.from("sections").insert(payload).select().single();
+  const { data, error } = await supabase!.from("sections").insert(payload).select().single();
   if (error) return { data: null, error: error.message, success: false };
   return { data: data as Section, error: null, success: true };
 }
@@ -388,7 +388,7 @@ export async function getScheduleExceptions(
 ): Promise<ApiResponse<ScheduleException[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  let query = supabase
+  let query = supabase!
     .from("schedule_exceptions")
     .select("*")
     .eq("institute_id", instituteId)
@@ -406,7 +406,7 @@ export async function createScheduleException(
 ): Promise<ApiResponse<ScheduleException>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("schedule_exceptions")
     .insert({
       institute_id: payload.institute_id,
@@ -430,7 +430,7 @@ export async function createScheduleException(
 export async function deleteScheduleException(id: string): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase.from("schedule_exceptions").delete().eq("id", id);
+  const { error } = await supabase!.from("schedule_exceptions").delete().eq("id", id);
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
 }

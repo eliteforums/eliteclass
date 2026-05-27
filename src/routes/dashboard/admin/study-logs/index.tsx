@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin/study-logs/")({
-  head: () => ({ meta: [{ title: "Progress Tracker — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Progress Tracker — EliteClass" }] }),
   component: StudyLogsPage,
 });
 

@@ -65,7 +65,7 @@ export function StaffCredentialsCard({ staffName, credentials }: StaffCredential
   const [allCopied, setAllCopied] = useState(false);
 
   const handleCopyAll = async () => {
-    const text = `EduOS Staff Credentials\nName: ${staffName}\nRole: ${credentials.role_name}\nEmail: ${credentials.email}\nPassword: ${credentials.temporary_password}`;
+    const text = `EliteClass Staff Credentials\nName: ${staffName}\nRole: ${credentials.role_name}\nEmail: ${credentials.email}\nPassword: ${credentials.temporary_password}`;
     if (await copyToClipboard(text)) {
       setAllCopied(true);
       window.setTimeout(() => setAllCopied(false), 2000);

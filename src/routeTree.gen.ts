@@ -13,6 +13,8 @@ import { Route as UnauthorizedRouteImport } from './routes/unauthorized'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardIndexRouteImport } from './routes/dashboard/index'
+import { Route as DashboardMessagesRouteImport } from './routes/dashboard/messages'
+import { Route as DashboardAiRouteImport } from './routes/dashboard/ai'
 import { Route as AuthUpdatePasswordRouteImport } from './routes/auth/update-password'
 import { Route as AuthRegisterInstituteRouteImport } from './routes/auth/register-institute'
 import { Route as AuthLoginRouteImport } from './routes/auth/login'
@@ -68,6 +70,16 @@ const IndexRoute = IndexRouteImport.update({
 const DashboardIndexRoute = DashboardIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardMessagesRoute = DashboardMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => DashboardRoute,
+} as any)
+const DashboardAiRoute = DashboardAiRouteImport.update({
+  id: '/ai',
+  path: '/ai',
   getParentRoute: () => DashboardRoute,
 } as any)
 const AuthUpdatePasswordRoute = AuthUpdatePasswordRouteImport.update({
@@ -285,6 +297,8 @@ export interface FileRoutesByFullPath {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register-institute': typeof AuthRegisterInstituteRoute
   '/auth/update-password': typeof AuthUpdatePasswordRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/messages': typeof DashboardMessagesRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/student/my-learning': typeof DashboardStudentMyLearningRoute
   '/dashboard/student/study-logs': typeof DashboardStudentStudyLogsRoute
@@ -326,6 +340,8 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register-institute': typeof AuthRegisterInstituteRoute
   '/auth/update-password': typeof AuthUpdatePasswordRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/messages': typeof DashboardMessagesRoute
   '/dashboard': typeof DashboardIndexRoute
   '/dashboard/student/my-learning': typeof DashboardStudentMyLearningRoute
   '/dashboard/student/study-logs': typeof DashboardStudentStudyLogsRoute
@@ -369,6 +385,8 @@ export interface FileRoutesById {
   '/auth/login': typeof AuthLoginRoute
   '/auth/register-institute': typeof AuthRegisterInstituteRoute
   '/auth/update-password': typeof AuthUpdatePasswordRoute
+  '/dashboard/ai': typeof DashboardAiRoute
+  '/dashboard/messages': typeof DashboardMessagesRoute
   '/dashboard/': typeof DashboardIndexRoute
   '/dashboard/student/my-learning': typeof DashboardStudentMyLearningRoute
   '/dashboard/student/study-logs': typeof DashboardStudentStudyLogsRoute
@@ -413,6 +431,8 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register-institute'
     | '/auth/update-password'
+    | '/dashboard/ai'
+    | '/dashboard/messages'
     | '/dashboard/'
     | '/dashboard/student/my-learning'
     | '/dashboard/student/study-logs'
@@ -454,6 +474,8 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register-institute'
     | '/auth/update-password'
+    | '/dashboard/ai'
+    | '/dashboard/messages'
     | '/dashboard'
     | '/dashboard/student/my-learning'
     | '/dashboard/student/study-logs'
@@ -496,6 +518,8 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/auth/register-institute'
     | '/auth/update-password'
+    | '/dashboard/ai'
+    | '/dashboard/messages'
     | '/dashboard/'
     | '/dashboard/student/my-learning'
     | '/dashboard/student/study-logs'
@@ -569,6 +593,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/messages': {
+      id: '/dashboard/messages'
+      path: '/messages'
+      fullPath: '/dashboard/messages'
+      preLoaderRoute: typeof DashboardMessagesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/ai': {
+      id: '/dashboard/ai'
+      path: '/ai'
+      fullPath: '/dashboard/ai'
+      preLoaderRoute: typeof DashboardAiRouteImport
       parentRoute: typeof DashboardRoute
     }
     '/auth/update-password': {
@@ -827,6 +865,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteChildren {
+  DashboardAiRoute: typeof DashboardAiRoute
+  DashboardMessagesRoute: typeof DashboardMessagesRoute
   DashboardIndexRoute: typeof DashboardIndexRoute
   DashboardStudentMyLearningRoute: typeof DashboardStudentMyLearningRoute
   DashboardStudentStudyLogsRoute: typeof DashboardStudentStudyLogsRoute
@@ -863,6 +903,8 @@ interface DashboardRouteChildren {
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
+  DashboardAiRoute: DashboardAiRoute,
+  DashboardMessagesRoute: DashboardMessagesRoute,
   DashboardIndexRoute: DashboardIndexRoute,
   DashboardStudentMyLearningRoute: DashboardStudentMyLearningRoute,
   DashboardStudentStudyLogsRoute: DashboardStudentStudyLogsRoute,

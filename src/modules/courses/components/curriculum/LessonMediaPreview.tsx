@@ -205,7 +205,7 @@ function PdfPreview({
 
   return (
     <div className={`overflow-hidden rounded-lg border border-border bg-muted ${className ?? ""}`}>
-      <iframe src={pdfUrl} title={pdf.title} className="aspect-[4/3] w-full min-h-[280px]" />
+      <iframe src={pdfUrl} title={pdf?.title ?? "PDF"} className="aspect-[4/3] w-full min-h-[280px]" />
     </div>
   );
 }

@@ -83,6 +83,6 @@ export const useInstituteStore = create<InstituteState>()(
           "institute/removeInstitute",
         ),
     }),
-    { name: "EduOS Institute Store" },
+    { name: "EliteClass Institute Store" },
   ),
 );

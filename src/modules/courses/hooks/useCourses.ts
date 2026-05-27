@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Course Hooks
+// EliteClass — LMS Course Hooks
 //
 // React Query v5 hooks for course creation, updates, publishing, and
 // curriculum loading. All queries use the `courseKeys` factory for consistent

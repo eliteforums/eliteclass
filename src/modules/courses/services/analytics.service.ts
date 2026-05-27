@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Analytics Service
+// EliteClass — LMS Analytics Service
 // Wraps get_lms_course_analytics RPC (migration 011).
 // ---------------------------------------------------------------------------
 

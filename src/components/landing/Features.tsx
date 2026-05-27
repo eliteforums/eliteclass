@@ -83,7 +83,7 @@ export function Features() {
             One platform. <span className="text-gradient">Every workflow.</span>
           </h2>
           <p className="mt-4 text-muted-foreground">
-            Stop juggling spreadsheets, WhatsApp groups and disconnected tools. EduOS unifies your
+            Stop juggling spreadsheets, WhatsApp groups and disconnected tools. EliteClass unifies your
             entire institute.
           </p>
         </div>

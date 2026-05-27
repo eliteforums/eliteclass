@@ -35,13 +35,14 @@ export function useRealtimeExamTimer({
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [isSynced, setIsSynced] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
-  const timerIntervalRef = useRef<NodeJS.Timeout>();
+  const timerIntervalRef = useRef<NodeJS.Timeout>(undefined);
   const lastServerTimeRef = useRef<number>(0);
   const clientStartTimeRef = useRef<number>(0);
   const expiryTimeRef = useRef<number>(0);
 
   // Sync with server time
   const syncWithServerTime = useCallback(async () => {
+    if (!supabase) return false;
     try {
       // Use database NOW() function via RPC or direct query
       const { data, error } = await supabase
@@ -143,6 +144,7 @@ export function useRealtimeExamTimer({
  * Hook to get current server time for validation
  */
 export async function getServerTime(): Promise<number> {
+  if (!supabase) return Date.now();
   try {
     // Get current server time from database
     const { data, error } = await supabase

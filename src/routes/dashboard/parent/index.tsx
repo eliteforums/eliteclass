@@ -40,7 +40,7 @@ import {
 const PARENT_DASHBOARD_TIMEOUT_MS = 15_000;
 
 export const Route = createFileRoute("/dashboard/parent/")({
-  head: () => ({ meta: [{ title: "Parent Dashboard — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Parent Dashboard — EliteClass" }] }),
   component: ParentDashboard,
 });
 
@@ -84,7 +84,7 @@ function ParentDashboard() {
 
       try {
         const bootstrapResult = await Promise.race([
-          getParentPortalBootstrap(user.id, user.institute_id),
+          getParentPortalBootstrap(user!.id, user!.institute_id),
           new Promise<never>((_, reject) => {
             setTimeout(() => reject(new Error("Parent portal load timed out.")), PARENT_DASHBOARD_TIMEOUT_MS);
           }),

@@ -8,7 +8,7 @@ export function CTA() {
         <div className="glass relative overflow-hidden rounded-3xl p-12 text-center shadow-elegant sm:p-16">
           <div className="absolute inset-0 -z-10 bg-gradient-primary opacity-20" />
           <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-            Ready to run your institute on <span className="text-gradient">EduOS?</span>
+            Ready to run your institute on <span className="text-gradient">EliteClass?</span>
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
             Book a 30-minute demo and see how leading institutes are saving 20+ hours every week.

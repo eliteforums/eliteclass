@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — AttendanceSummaryCard
+// EliteClass — AttendanceSummaryCard
 //
 // Displays aggregate attendance statistics for a single student.
 //

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — StudentProfileSheet
+// EliteClass — StudentProfileSheet
 //
 // A fixed right-side slide-in panel that displays a student's full profile.
 // Opens with a backdrop overlay and closes via the X button or backdrop click.

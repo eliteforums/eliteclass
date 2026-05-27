@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — /dashboard/student/learn/$courseId
+// EliteClass — /dashboard/student/learn/$courseId
 // Full-screen course learning page (wraps CoursePlayer).
 // Uses position:fixed to overlay the dashboard layout completely.
 // ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ export const Route = createFileRoute("/dashboard/student/learn/$courseId")({
   validateSearch: (search: Record<string, unknown>): LearnSearch => ({
     lessonId: (search.lessonId as string) || undefined,
   }),
-  head: () => ({ meta: [{ title: "Learn — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Learn — EliteClass" }] }),
   component: LearnPageWrapper,
 });
 
@@ -99,7 +99,7 @@ function LearnPage() {
       const res = await getStudentCourseCurriculum({
         data: {
           courseId,
-          enrollmentId: enrollment.id,
+          enrollmentId: enrollment?.id ?? "",
           studentId,
           instituteId,
         },

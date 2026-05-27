@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Curriculum Editor
+// EliteClass — LMS Curriculum Editor
 //
 // Drag-and-drop curriculum builder using native HTML5 Drag Events.
 // Features: module/lesson reordering, inline editing, add/delete dialogs,

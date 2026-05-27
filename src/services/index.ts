@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Services barrel
+// EliteClass — Services barrel
 //
 // Import services like:
 //   import { signIn, signOut } from '@/services';
@@ -26,6 +26,7 @@ export * from "./staff.service";
 export * from "./schedule.service";
 export * from "./analytics.service";
 export * from "./teacherStudents.service";
+export * from "./message.service";
 // student.service re-exports getBatchesByInstitute from batch.service.
 // Export only the unique symbols from student.service to avoid collision.
 export {

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — StudentRemarkModal
+// EliteClass — StudentRemarkModal
 //
 // A focused modal for adding a freeform remark to a student's history log.
 // Delegates persistence to the `addStudentRemark` service which calls the

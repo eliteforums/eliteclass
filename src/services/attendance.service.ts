@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Attendance Service
+// EliteClass — Attendance Service
 // Every function returns ApiResponse<T> — never throws.
 // ---------------------------------------------------------------------------
 
@@ -79,7 +79,7 @@ export async function createAttendanceSession(payload: {
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const session = data as AttendanceSession;
+  const session = data as unknown as AttendanceSession;
   if (!session.batch_id && session.batch?.id) {
     session.batch_id = session.batch.id;
   }
@@ -105,10 +105,10 @@ export async function getAttendanceSessions(
   if (filters?.dateTo) query = query.lte("session_date", filters.dateTo);
 
   try {
-    const { data, error } = await query.abortSignal(abortSignal);
+    const { data, error } = await query.abortSignal(abortSignal!);
     if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-    const sessions = ((data ?? []) as AttendanceSession[]).map((session) => {
+    const sessions = ((data ?? []) as unknown as AttendanceSession[]).map((session) => {
       if (!session.batch_id && session.batch?.id) {
         return { ...session, batch_id: session.batch.id };
       }
@@ -333,7 +333,7 @@ export async function lockAttendanceSession(
     .single();
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as AttendanceSession, error: null, success: true };
+  return { data: data as unknown as AttendanceSession, error: null, success: true };
 }
 
 // ── Reporting ─────────────────────────────────────────────────────────────────
@@ -530,7 +530,7 @@ export async function getStudentAttendanceHistory(
       .order("marked_at", { ascending: false });
 
     if (error) return { data: null, error: error.message, success: false };
-    return { data: data as StudentAttendanceRecord[], error: null, success: true };
+    return { data: data as unknown as StudentAttendanceRecord[], error: null, success: true };
   }
 
   const { data, error } = await supabase
@@ -540,7 +540,7 @@ export async function getStudentAttendanceHistory(
     .order("marked_at", { ascending: false });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as StudentAttendanceRecord[], error: null, success: true };
+  return { data: data as unknown as StudentAttendanceRecord[], error: null, success: true };
 }
 
 export async function getStudentAttendanceStats(

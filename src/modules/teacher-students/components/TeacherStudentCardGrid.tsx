@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — TeacherStudentCardGrid
+// EliteClass — TeacherStudentCardGrid
 // ---------------------------------------------------------------------------
 
 import { Link } from "@tanstack/react-router";

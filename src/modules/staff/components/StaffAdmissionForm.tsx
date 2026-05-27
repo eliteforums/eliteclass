@@ -149,7 +149,7 @@ export function StaffAdmissionForm({ instituteId, mode = "create", staff = null,
       
       if (isRemoving) {
         // If removing, optionally clean up empty assignments for this course
-        const currentAssignments = watch("assignments");
+        const currentAssignments = watch("assignments") ?? [];
         const indexToRemove = currentAssignments.findIndex(a => a.course_name === course.name && !a.batch_id && !a.subject_name);
         if (indexToRemove !== -1) {
           remove(indexToRemove);
@@ -157,7 +157,7 @@ export function StaffAdmissionForm({ instituteId, mode = "create", staff = null,
         return current.filter((id) => id !== courseId);
       } else {
         // If adding, and no assignment exists for this course, add a row
-        const currentAssignments = watch("assignments");
+        const currentAssignments = watch("assignments") ?? [];
         const alreadyHas = currentAssignments.some(a => a.course_name === course.name);
         
         if (!alreadyHas) {

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Dashboard Overview (/dashboard/)
+// EliteClass — Dashboard Overview (/dashboard/)
 //
 // This is the index (home) page for the /dashboard layout.
 // It renders inside the parent layout's <Outlet /> so it gets the
@@ -11,6 +11,7 @@ import { useState, useEffect } from "react";
 import { StatCards } from "@/components/dashboard/StatCards";
 import { RecentTable } from "@/components/dashboard/RecentTable";
 import { AIPanel } from "@/components/dashboard/AIPanel";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { useAuthStore } from "@/store/authStore";
 import { getStudentsByInstitute } from "@/services/student.service";
 import { getStaffByInstitute } from "@/services/staff.service";
@@ -19,10 +20,11 @@ import type { Student } from "@/types";
 export const Route = createFileRoute("/dashboard/")({
   head: () => ({
     meta: [
-      { title: "Dashboard — EduOS" },
+      { title: "Dashboard — EliteClass" },
       { name: "description", content: "Premium control center for your institute." },
     ],
   }),
+  pendingComponent: DashboardSkeleton,
   component: DashboardOverview,
 });
 

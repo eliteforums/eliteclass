@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useStudentDetail
+// EliteClass — useStudentDetail
 //
 // Aggregates all data needed to render the full student detail page.
 // Fires five parallel requests on mount so the page shows all sections

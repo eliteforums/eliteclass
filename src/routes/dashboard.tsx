@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — /dashboard Layout Route
+// EliteClass — /dashboard Layout Route
 //
 // This file is a LAYOUT-ONLY route. It renders the persistent shell
 // (DashboardSidebar + Topbar) and a single <Outlet /> where all child
@@ -28,12 +28,14 @@ import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
+import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
-    meta: [{ title: "Dashboard — EduOS" }],
+    meta: [{ title: "Dashboard — EliteClass" }],
   }),
+  pendingComponent: DashboardSkeleton,
   component: DashboardLayoutPage,
 });
 

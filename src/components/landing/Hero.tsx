@@ -75,7 +75,7 @@ export function Hero() {
         <div className="overflow-hidden rounded-2xl border border-border shadow-elegant">
           <img
             src={dashboardImg}
-            alt="EduOS dashboard preview"
+            alt="EliteClass dashboard preview"
             width={1920}
             height={1080}
             className="w-full"

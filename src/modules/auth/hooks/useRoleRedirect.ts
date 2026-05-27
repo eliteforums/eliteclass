@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useRoleRedirect
+// EliteClass — useRoleRedirect
 //
 // Guards auth pages (login, register, forgot-password) against users who
 // are already authenticated. Call `redirectIfAuthenticated()` at the top of

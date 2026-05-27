@@ -326,7 +326,7 @@ export function CoursePlayer({
 
   // Notes are persisted in localStorage per lesson
   const [note, setNote] = useState<string>("");
-  const noteKey = `eduos-note-${enrollment.id}-${currentLesson?.id ?? ""}`;
+  const noteKey = `eliteclass-note-${enrollment.id}-${currentLesson?.id ?? ""}`;
 
   // Ref to track previous lesson id for "mark accessed" on switch
   const prevLessonIdRef = useRef<string | null>(null);

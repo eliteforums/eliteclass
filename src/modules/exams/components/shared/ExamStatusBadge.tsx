@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { ExamStatus, ExamAttemptStatus } from "../../types";
 
-type AnyStatus = ExamStatus | ExamAttemptStatus;
+type AnyStatus = ExamStatus | ExamAttemptStatus | "not_started";
 
 interface StatusConfig {
   badge: string;
@@ -59,7 +59,7 @@ const STATUS_CONFIG: Record<AnyStatus, StatusConfig> = {
 };
 
 interface ExamStatusBadgeProps {
-  status: AnyStatus | "not_started";
+  status: AnyStatus;
   size?: "sm" | "md";
 }
 

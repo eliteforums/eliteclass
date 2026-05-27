@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Student Detail Page
+// EliteClass — Admin: Student Detail Page
 //
 // Full profile page for a single student, accessible at:
 //   /dashboard/admin/students/:studentId
@@ -57,7 +57,7 @@ import type { LifecycleAction } from "@/types";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/students/$studentId")({
-  head: () => ({ meta: [{ title: "Student Detail — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Student Detail — EliteClass" }] }),
   component: StudentDetailPage,
 });
 
@@ -471,7 +471,7 @@ function StudentDetailPage() {
           {/* ID Card */}
           <StudentIDCard
             student={student}
-            instituteName={institute?.name ?? "EduOS Institute"}
+            instituteName={institute?.name ?? "EliteClass Institute"}
             instituteLogo={institute?.logo ?? undefined}
             isOpen={idCardOpen}
             onClose={() => setIdCardOpen(false)}

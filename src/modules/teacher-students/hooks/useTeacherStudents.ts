@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useTeacherStudents (staff-scoped list + filters + pagination)
+// EliteClass — useTeacherStudents (staff-scoped list + filters + pagination)
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useRef, useState } from "react";

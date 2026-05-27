@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Progress Hooks
+// EliteClass — LMS Progress Hooks
 //
 // React Query v5 hooks for tracking lesson and course progress.
 // Provides:

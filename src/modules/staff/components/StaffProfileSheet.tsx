@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — StaffProfileSheet
+// EliteClass — StaffProfileSheet
 //
 // A fixed right-side slide-in panel that displays a staff member's full profile.
 // Opens with a backdrop overlay and closes via the X button or backdrop click.
@@ -733,11 +733,11 @@ export function StaffProfileSheet({
                         <div className="flex items-center gap-2 mb-1">
                           <BookOpen className="h-3.5 w-3.5 text-primary shrink-0" />
                           <p className="text-sm font-semibold text-foreground truncate">
-                            {assignment.course?.name ?? "Unknown course"}
+                            {assignment.course?.title ?? "Unknown course"}
                           </p>
                         </div>
                         <p className="text-xs text-muted-foreground pl-5.5">
-                          {assignment.course?.code ?? "No code"}
+                          {assignment.course?.slug ?? "No code"}
                         </p>
                       </div>
                       {canManageCourseAssignments && (

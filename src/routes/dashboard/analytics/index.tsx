@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
-// EduOS — Analytics & Reporting (/dashboard/analytics)
+// EliteClass — Analytics & Reporting (/dashboard/analytics)
 // ---------------------------------------------------------------------------
 
 import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Download, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,26 +22,15 @@ import { AnalyticsFiltersBar } from "@/modules/analytics/components/AnalyticsFil
 import { AnalyticsSkeleton } from "@/modules/analytics/components/AnalyticsSkeleton";
 import { InstituteOverviewSection } from "@/modules/analytics/components/InstituteOverviewSection";
 import { exportAnalyticsCsv } from "@/modules/analytics/utils/exportAnalytics";
+import {
+  AttendanceAnalyticsChartsLazy,
+  FeeAnalyticsChartsLazy,
+  ScheduleStaffAnalyticsLazy,
+} from "@/lib/lazy-routes";
 import type { Batch, InstituteAnalyticsBundle } from "@/types";
 
-const AttendanceAnalyticsCharts = lazy(() =>
-  import("@/modules/analytics/components/AttendanceAnalyticsCharts").then((m) => ({
-    default: m.AttendanceAnalyticsCharts,
-  })),
-);
-const FeeAnalyticsCharts = lazy(() =>
-  import("@/modules/analytics/components/FeeAnalyticsCharts").then((m) => ({
-    default: m.FeeAnalyticsCharts,
-  })),
-);
-const ScheduleStaffAnalytics = lazy(() =>
-  import("@/modules/analytics/components/ScheduleStaffAnalytics").then((m) => ({
-    default: m.ScheduleStaffAnalytics,
-  })),
-);
-
 export const Route = createFileRoute("/dashboard/analytics/")({
-  head: () => ({ meta: [{ title: "Analytics — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Analytics — EliteClass" }] }),
   component: AnalyticsPage,
 });
 
@@ -50,10 +39,6 @@ function defaultRange() {
   const from = new Date();
   from.setDate(from.getDate() - 30);
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
-}
-
-function ChartFallback() {
-  return <div className="h-[320px] animate-pulse rounded-xl bg-muted/40" />;
 }
 
 function AnalyticsPage() {
@@ -221,19 +206,13 @@ function AnalyticsPage() {
               <TabsTrigger value="schedule">Schedule & staff</TabsTrigger>
             </TabsList>
             <TabsContent value="attendance" className="mt-4">
-              <Suspense fallback={<ChartFallback />}>
-                <AttendanceAnalyticsCharts data={bundle.attendance} />
-              </Suspense>
+              <AttendanceAnalyticsChartsLazy data={bundle.attendance} />
             </TabsContent>
             <TabsContent value="fees" className="mt-4">
-              <Suspense fallback={<ChartFallback />}>
-                <FeeAnalyticsCharts data={bundle.fees} />
-              </Suspense>
+              <FeeAnalyticsChartsLazy data={bundle.fees} />
             </TabsContent>
             <TabsContent value="schedule" className="mt-4">
-              <Suspense fallback={<ChartFallback />}>
-                <ScheduleStaffAnalytics data={bundle.schedule} />
-              </Suspense>
+              <ScheduleStaffAnalyticsLazy data={bundle.schedule} />
             </TabsContent>
           </Tabs>
         </div>

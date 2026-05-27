@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — TeacherStudentProfileView (staff read-only student detail)
+// EliteClass — TeacherStudentProfileView (staff read-only student detail)
 // ---------------------------------------------------------------------------
 
 import { useCallback, useEffect, useState } from "react";
@@ -299,7 +299,7 @@ export function TeacherStudentProfileView({ studentId, staffId }: TeacherStudent
               <tbody>
                 {(attendanceRecords ?? []).map((rec) => (
                   <tr key={rec.id} className="border-t border-border">
-                    <td className="px-4 py-2">{formatDate(rec.session?.session_date ?? rec.created_at)}</td>
+                    <td className="px-4 py-2">{formatDate(rec.session?.session_date ?? rec.marked_at)}</td>
                     <td className="px-4 py-2 capitalize">{rec.status}</td>
                   </tr>
                 ))}

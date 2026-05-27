@@ -1,5 +1,19 @@
 import React from "react";
 
+export function downloadSimplifiedCSVTemplate() {
+  const headers = "Full Name,Mail ID,Phone No";
+  const example = "John Doe,john@example.com,9876543210";
+  const content = `${headers}\n${example}\n`;
+
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "student-upload-template.csv";
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export function TemplateDownloader() {
   const downloadXML = () => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<students>\n  <student>\n    <full_name>Ravi Sharma</full_name>\n    <contact_email>ravi@example.com</contact_email>\n    <phone>9876543210</phone>\n    <admission_number>2024-001</admission_number>\n    <batch></batch>\n    <emergency_contact_name></emergency_contact_name>\n    <emergency_contact_phone></emergency_contact_phone>\n    <emergency_relationship></emergency_relationship>\n    <parent_name></parent_name>\n    <parent_email></parent_email>\n    <parent_phone></parent_phone>\n    <occupation></occupation>\n    <relationship_type></relationship_type>\n  </student>\n</students>`;
@@ -75,6 +89,7 @@ export function TemplateDownloader() {
 
   return (
     <div className="flex gap-2">
+      <button onClick={downloadSimplifiedCSVTemplate} className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-muted">Download CSV Template</button>
       <button onClick={downloadXML} className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-muted">Download XML Template</button>
       <button onClick={downloadExcel} className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm hover:bg-muted">Download Excel Template</button>
     </div>

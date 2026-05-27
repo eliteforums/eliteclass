@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Course Zod Schemas
+// EliteClass — LMS Course Zod Schemas
 //
 // Validation schemas for course creation wizard forms.
 // Inferred TypeScript types are exported alongside each schema.

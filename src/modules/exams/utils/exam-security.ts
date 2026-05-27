@@ -87,7 +87,7 @@ function getCanvasFingerprint(): string {
     const ctx = canvas.getContext('2d');
     if (!ctx) return 'N/A';
     
-    const text = 'EduOS Exam Security';
+    const text = 'EliteClass Exam Security';
     ctx.font = '16px Arial';
     ctx.fillStyle = '#000';
     ctx.fillText(text, 2, 2);
@@ -104,7 +104,7 @@ function getCanvasFingerprint(): string {
  * Persists across sessions
  */
 export function getOrCreateDeviceId(): string {
-  const DEVICE_ID_KEY = 'eduos_exam_device_id';
+  const DEVICE_ID_KEY = 'eliteclass_exam_device_id';
   
   let deviceId = localStorage.getItem(DEVICE_ID_KEY);
   if (!deviceId) {
@@ -325,7 +325,7 @@ export function preventPageNavigation(message: string = "Are you sure you want t
   window.addEventListener('beforeunload', handler);
   
   // Cleanup function
-  window.preventPageNavigationCleanup = () => {
+  (window as any).preventPageNavigationCleanup = () => {
     window.removeEventListener('beforeunload', handler);
   };
 }

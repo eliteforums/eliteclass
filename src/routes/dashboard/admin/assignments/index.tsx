@@ -30,10 +30,11 @@ import {
   useAssignToStudents 
 } from "@/modules/assignments/hooks/useAssignments";
 import { AssignmentFormModal } from "@/modules/assignments/components/admin/AssignmentFormModal";
-import CanvasModal from "@/modules/assignments/components/admin/CanvasModal";
+import { CanvasModalLazy } from "@/lib/lazy-routes";
 import { AssigneeSelector } from "@/modules/assignments/components/admin/AssigneeSelector";
 import { SubmissionList } from "@/modules/assignments/components/admin/SubmissionList";
-import type { Assignment, AssignmentSchema, AssignmentResourceSchema } from "@/types";
+import type { Assignment, AssignmentResourceSchema } from "@/types";
+import type { AssignmentSchema } from "@/modules/assignments/validations";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/authStore";
 
@@ -258,7 +259,7 @@ function AdminAssignmentsPage() {
           mode={selectedAssignment ? "edit" : "create"}
         />
 
-        <CanvasModal isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
+        <CanvasModalLazy isOpen={isCanvasOpen} onClose={() => setIsCanvasOpen(false)} />
 
         {selectedAssignment && (
           <AssigneeSelector

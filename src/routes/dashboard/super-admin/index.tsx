@@ -3,7 +3,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuthStore } from "@/store/authStore";
 
 export const Route = createFileRoute("/dashboard/super-admin/")({
-  head: () => ({ meta: [{ title: "Super Admin — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Super Admin — EliteClass" }] }),
   component: SuperAdminDashboard,
 });
 

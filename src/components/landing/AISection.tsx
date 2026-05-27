@@ -37,7 +37,7 @@ export function AISection() {
               An <span className="text-gradient">intelligent core</span> for your institute
             </h2>
             <p className="mt-4 text-muted-foreground">
-              EduOS embeds AI throughout — from spotting at-risk students to drafting question
+              EliteClass embeds AI throughout — from spotting at-risk students to drafting question
               papers and recovering pending fees. Less busywork. Better decisions.
             </p>
           </div>

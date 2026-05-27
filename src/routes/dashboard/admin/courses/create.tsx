@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Course Creation / Editing Route
+// EliteClass — Course Creation / Editing Route
 //
 // Route: /dashboard/admin/courses/create
 //
@@ -19,7 +19,7 @@ import { CourseWizard } from "@/modules/courses/components/wizard/CourseWizard";
 
 export const Route = createFileRoute("/dashboard/admin/courses/create")({
   head: () => ({
-    meta: [{ title: "Create Course — EduOS" }],
+    meta: [{ title: "Create Course — EliteClass" }],
   }),
   validateSearch: (search: Record<string, unknown>) => ({
     edit: typeof search.edit === "string" ? search.edit : undefined,

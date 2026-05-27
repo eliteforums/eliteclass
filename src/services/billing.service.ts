@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Billing Service
+// EliteClass — Billing Service
 //
 // Aggregated billing and analytics helpers used by dashboards and admin UI.
 // The implementation delegates to fee.service.ts so fee logic remains in one

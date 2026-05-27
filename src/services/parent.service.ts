@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Parent Service
+// EliteClass — Parent Service
 //
 // All database operations for the `parents` table and the
 // `student_parents` junction table live here.
@@ -71,7 +71,7 @@ export async function getParentsByInstitute(instituteId: string): Promise<ApiRes
       .eq("institute_id", instituteId);
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Parent[], error: null, success: true };
+    return { data: data as unknown as Parent[], error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to load parents.");
     console.error("[getParentsByInstitute] exception:", err);
@@ -123,7 +123,7 @@ export async function searchParentsByEmail(
     .limit(10);
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as Parent[], error: null, success: true };
+  return { data: data as unknown as Parent[], error: null, success: true };
 }
 
 /**

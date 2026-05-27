@@ -26,8 +26,10 @@ import {
 import {
   assignmentSchema as assignmentFormSchema,
   type AssignmentSchema,
+  type AssignmentResourceSchema,
 } from "@/modules/assignments/validations";
-import type { Assignment, AssignmentResourceSchema } from "@/types";
+import type { Assignment } from "@/types";
+import type { Resolver } from "react-hook-form";
 import { uploadAssignmentFile } from "@/modules/assignments/services/assignment.service";
 import { useAuthStore } from "@/store/authStore";
 import { toast } from "sonner";
@@ -49,12 +51,20 @@ export function AssignmentFormModal({
 }: AssignmentFormModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
-  const [resources, setResources] = useState<AssignmentResourceSchema[]>(initialData?.resources ?? []);
+  const [resources, setResources] = useState<AssignmentResourceSchema[]>(
+    (initialData?.resources ?? []).map(({ file_name, file_url, storage_path, file_type, file_size }) => ({
+      file_name,
+      file_url,
+      storage_path,
+      file_type: file_type ?? undefined,
+      file_size: file_size ?? undefined,
+    }))
+  );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuthStore();
 
   const form = useForm<AssignmentSchema>({
-    resolver: zodResolver(assignmentFormSchema),
+    resolver: zodResolver(assignmentFormSchema) as Resolver<AssignmentSchema>,
     defaultValues: {
       title: initialData?.title ?? "",
       description: initialData?.description ?? "",

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Analytics Service (aggregated RPCs + caching)
+// EliteClass — Analytics Service (aggregated RPCs + caching)
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";
@@ -52,7 +52,7 @@ export async function getInstituteAnalyticsOverview(
       cacheKey("analytics:overview", { ...filters, dateFrom, dateTo }),
       45_000,
       async () => {
-        const { data: row, error } = await supabase.rpc("get_institute_analytics_overview", {
+        const { data: row, error } = await supabase!.rpc("get_institute_analytics_overview", {
           p_institute_id: filters.instituteId,
           p_batch_id: filters.batchId ?? null,
           p_date_from: dateFrom,
@@ -79,7 +79,7 @@ export async function getInstituteAttendanceAnalytics(
       cacheKey("analytics:attendance", { ...filters, dateFrom, dateTo }),
       45_000,
       async () => {
-        const { data: row, error } = await supabase.rpc("get_institute_attendance_analytics", {
+        const { data: row, error } = await supabase!.rpc("get_institute_attendance_analytics", {
           p_institute_id: filters.instituteId,
           p_batch_id: filters.batchId ?? null,
           p_date_from: dateFrom,
@@ -106,7 +106,7 @@ export async function getInstituteFeeAnalytics(
       cacheKey("analytics:fees", { ...filters, dateFrom, dateTo }),
       60_000,
       async () => {
-        const { data: row, error } = await supabase.rpc("get_institute_fee_analytics", {
+        const { data: row, error } = await supabase!.rpc("get_institute_fee_analytics", {
           p_institute_id: filters.instituteId,
           p_batch_id: filters.batchId ?? null,
           p_date_from: dateFrom,
@@ -127,7 +127,7 @@ export async function getInstituteScheduleAnalytics(
 
   return runService("getInstituteScheduleAnalytics", async () => {
     const data = await cachedQuery(cacheKey("analytics:schedule", filters), 90_000, async () => {
-      const { data: row, error } = await supabase.rpc("get_institute_schedule_analytics", {
+      const { data: row, error } = await supabase!.rpc("get_institute_schedule_analytics", {
         p_institute_id: filters.instituteId,
         p_batch_id: filters.batchId ?? null,
       });
@@ -186,7 +186,7 @@ export async function getStudentAnalytics(
       `analytics:student:${studentId}:${dateFrom ?? range.dateFrom}:${dateTo ?? range.dateTo}`,
       60_000,
       async () => {
-        const { data: row, error } = await supabase.rpc("get_student_analytics", {
+        const { data: row, error } = await supabase!.rpc("get_student_analytics", {
           p_student_id: studentId,
           p_date_from: dateFrom ?? range.dateFrom,
           p_date_to: dateTo ?? range.dateTo,

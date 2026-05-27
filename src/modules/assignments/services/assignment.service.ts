@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Assignment Management Service
+// EliteClass — Assignment Management Service
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";
@@ -52,11 +52,14 @@ async function resolveStudentResourceDownloadUrls(
 ): Promise<AssignmentResource[]> {
   if (!resources?.length || !supabase) return resources ?? [];
 
+  // Local const so TypeScript narrows inside the async closure
+  const client = supabase;
+
   const resolved = await Promise.all(
     resources.map(async (resource) => {
       if (!resource.storage_path) return resource;
 
-      const { data, error } = await supabase.storage
+      const { data, error } = await client.storage
         .from("assignment-resources")
         .createSignedUrl(resource.storage_path, ASSIGNMENT_RESOURCE_SIGNED_URL_TTL);
 

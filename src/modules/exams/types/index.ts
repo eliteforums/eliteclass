@@ -66,6 +66,7 @@ export interface ExamAttempt {
   submitted_at: string | null;
   last_violation_at: string | null;
   auto_submit_reason: string | null;
+  is_locked?: boolean;
   score: number;
   total_questions: number;
   correct_answers: number;

@@ -4,7 +4,7 @@ import { useAuthStore } from "@/store/authStore";
 import { Building2, GraduationCap, UserCheck, Users, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard/admin/")({
-  head: () => ({ meta: [{ title: "Admin Dashboard — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Admin Dashboard — EliteClass" }] }),
   component: AdminDashboard,
 });
 

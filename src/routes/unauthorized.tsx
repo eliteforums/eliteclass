@@ -4,7 +4,7 @@ import { ShieldOff } from "lucide-react";
 
 export const Route = createFileRoute("/unauthorized")({
   head: () => ({
-    meta: [{ title: "Access Denied — EduOS" }],
+    meta: [{ title: "Access Denied — EliteClass" }],
   }),
   component: UnauthorizedPage,
 });

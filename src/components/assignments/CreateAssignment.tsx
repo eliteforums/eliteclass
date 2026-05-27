@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import CanvasEditor from '../canvas/CanvasEditor';
 import generateAssignmentPdf from '../../services/pdf/generateAssignmentPdf';
 import driveService from '../../services/drive/driveService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 export default function CreateAssignment() {
   const [title, setTitle] = useState('');
@@ -12,7 +12,7 @@ export default function CreateAssignment() {
 
   const handleSend = async () => {
     try {
-      const blob = await generateAssignmentPdf(pages, { returnBlob: true });
+      const blob = await generateAssignmentPdf(pages, { returnBlob: true }) as Blob;
       const res = await fetch('/api/assignments/upload-pdf', { method: 'POST', body: (() => { const f = new FormData(); f.append('file', blob, 'assignment.pdf'); f.append('title', title); return f; })() });
       const data = await res.json();
       toast.success('Assignment sent');

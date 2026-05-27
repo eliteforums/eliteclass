@@ -1,11 +1,11 @@
 // ---------------------------------------------------------------------------
-// EduOS — StudentIDCard
+// EliteClass — StudentIDCard
 //
 // A printable student ID card rendered inside a modal dialog.
 //
 // Card layout (top → bottom):
 //   ┌──────────────────────────────────────────┐
-//   │  [Institute Logo]   EduOS Platform        │
+//   │  [Institute Logo]   EliteClass Platform        │
 //   │  ──────────────────────────────────────── │
 //   │  [Avatar initials]                        │
 //   │  STUDENT NAME                             │
@@ -132,7 +132,7 @@ export function StudentIDCard({
             )}
             <div className="min-w-0">
               <p className="text-xs font-medium text-primary-foreground/80 leading-tight">
-                EduOS Platform
+                EliteClass Platform
               </p>
               <p className="text-sm font-bold text-primary-foreground leading-tight truncate">
                 {instituteName}

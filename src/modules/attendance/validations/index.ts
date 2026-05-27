@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Attendance Module Validations
+// EliteClass — Attendance Module Validations
 //
 // Zod schemas for all attendance-related forms.
 //

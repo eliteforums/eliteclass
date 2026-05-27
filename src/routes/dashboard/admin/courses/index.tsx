@@ -54,7 +54,7 @@ import type { LmsCourse, LmsCourseStatus, LmsDifficulty } from "@/types";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/courses/")({
-  head: () => ({ meta: [{ title: "Courses \u2014 EduOS" }] }),
+  head: () => ({ meta: [{ title: "Courses \u2014 EliteClass" }] }),
   component: AdminCoursesPage,
 });
 

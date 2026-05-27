@@ -2,7 +2,7 @@ import type { InstituteAnalyticsBundle } from "@/types";
 
 export function exportAnalyticsCsv(bundle: InstituteAnalyticsBundle, instituteName: string) {
   const lines: string[] = [
-    `EduOS Analytics Report — ${instituteName}`,
+    `EliteClass Analytics Report — ${instituteName}`,
     `Generated,${new Date().toISOString()}`,
     "",
     "OVERVIEW",

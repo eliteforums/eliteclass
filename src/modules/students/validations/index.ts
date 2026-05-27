@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Student Module Validations
+// EliteClass — Student Module Validations
 //
 // Zod schemas for all student-related forms.
 //

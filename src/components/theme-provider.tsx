@@ -4,7 +4,7 @@ type Theme = "light" | "dark" | "system";
 type Ctx = { theme: Theme; resolved: "light" | "dark"; setTheme: (t: Theme) => void };
 
 const ThemeCtx = createContext<Ctx | null>(null);
-const STORAGE_KEY = "eduos-theme";
+const STORAGE_KEY = "eliteclass-theme";
 
 function applyTheme(t: "light" | "dark") {
   if (typeof document === "undefined") return;

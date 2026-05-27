@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Enrollment Hooks
+// EliteClass — LMS Enrollment Hooks
 //
 // React Query v5 hooks for student enrollment management. Covers student-
 // facing queries (my enrollments, enrollment check) and admin/staff mutations

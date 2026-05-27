@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Attendance Management Page
+// EliteClass — Admin: Attendance Management Page
 //
 // Full attendance management interface for institute admins and staff.
 //
@@ -65,7 +65,7 @@ import type {
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/attendance/")({
-  head: () => ({ meta: [{ title: "Attendance — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Attendance — EliteClass" }] }),
   component: AttendancePage,
 });
 

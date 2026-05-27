@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 import { updatePassword } from "@/services/auth.service";
+import { supabase } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // Schema
@@ -35,6 +36,18 @@ export function UpdatePasswordForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isForceChange, setIsForceChange] = useState(false);
+
+  // Detect if the user was redirected here due to force_password_change
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getSession().then(({ data }) => {
+      const metadata = data?.session?.user?.user_metadata;
+      if (metadata?.force_password_change === true) {
+        setIsForceChange(true);
+      }
+    });
+  }, []);
 
   const {
     register,
@@ -53,12 +66,19 @@ export function UpdatePasswordForm() {
       return;
     }
 
-    // Navigate to login after successful update
-    navigate({ to: "/auth/login" });
+    // Navigate to dashboard after successful update
+    navigate({ to: "/dashboard" });
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+      {isForceChange && (
+        <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-foreground">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span>Please set a new password to secure your account.</span>
+        </div>
+      )}
+
       {serverError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {serverError}

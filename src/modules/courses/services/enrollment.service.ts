@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Enrollment Service
+// EliteClass — LMS Enrollment Service
 //
 // Handles student enrollment into courses — individually, by batch, and
 // via direct lookup. Duplicate enrollments are handled gracefully via

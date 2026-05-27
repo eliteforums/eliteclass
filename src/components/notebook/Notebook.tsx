@@ -5,7 +5,7 @@ import Toolbar from './Toolbar';
 import useAutosave from '../../hooks/useAutosave';
 import exportPdf from '../../services/pdf/exportPdf';
 import driveService from '../../services/drive/driveService';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 type NotePage = { id: string; html: string };
 
@@ -47,7 +47,7 @@ export default function Notebook() {
 
   const upload = async () => {
     try {
-      const blob = await exportPdf(pages.map((p, i) => ({ id: `page-${i}`, html: p.html })), { returnBlob: true });
+      const blob = await exportPdf(pages.map((p, i) => ({ id: `page-${i}`, html: p.html })), { returnBlob: true }) as Blob;
       const res = await driveService.uploadPdf(blob, 'notebook.pdf', (progress) => {
         // Could show progress
       });

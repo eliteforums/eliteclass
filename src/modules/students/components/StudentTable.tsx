@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — StudentTable
+// EliteClass — StudentTable
 //
 // Renders the student list using the generic DataTable component.
 // Each column is typed to Student so `render` functions have full autocomplete.

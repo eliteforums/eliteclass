@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — RecordPaymentModal
+// EliteClass — RecordPaymentModal
 //
 // A focused modal for recording a payment against a student fee assignment.
 // Delegates persistence to the `recordPayment` service which calls the

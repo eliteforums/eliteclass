@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Assignment Service
+// EliteClass — LMS Assignment Service
 // All functions return ApiResponse<T> — never throws.
 // ---------------------------------------------------------------------------
 

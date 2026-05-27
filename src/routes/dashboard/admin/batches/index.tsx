@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Eye, Plus, RotateCcw, Trash2 } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
@@ -24,7 +25,7 @@ import { BatchFormModal } from "@/modules/batches/components/BatchFormModal";
 import { formatDate } from "@/utils/helpers";
 
 export const Route = createFileRoute("/dashboard/admin/batches/")({
-  head: () => ({ meta: [{ title: "Batches - EduOS" }] }),
+  head: () => ({ meta: [{ title: "Batches - EliteClass" }] }),
   component: BatchesPage,
 });
 
@@ -40,14 +41,7 @@ function BatchesPage() {
   const { user } = useAuthStore();
   const instituteId = user?.institute_id ?? "";
 
-  const [items, setItems] = useState<Batch[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<BatchStatus | "all">("all");
 
@@ -57,37 +51,48 @@ function BatchesPage() {
 
   const [detailBatch, setDetailBatch] = useState<Batch | null>(null);
   const [assignBatch, setAssignBatch] = useState<Batch | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const fetchBatches = useCallback(async () => {
-    if (!instituteId) return;
+  // ── Paginated query using useInfiniteQuery ────────────────────────────────
+  // Batches are typically <100 items, so we fetch page-by-page with standard
+  // pagination UI rather than infinite scroll / virtualization.
+  const {
+    data: batchData,
+    isLoading,
+    error: queryError,
+    refetch: refetchBatches,
+  } = useInfiniteQuery({
+    queryKey: ["batches", instituteId, search, status, page],
+    queryFn: async () => {
+      const result = await getBatchesByInstitute(instituteId, {
+        page,
+        pageSize: 10,
+        search,
+        status,
+      });
+      if (!result.success || !result.data) {
+        throw new Error(result.error ?? "Failed to load batches");
+      }
+      return result.data;
+    },
+    getNextPageParam: (lastPage) => {
+      const { page: p, totalPages } = lastPage.meta;
+      return p < totalPages ? p + 1 : undefined;
+    },
+    initialPageParam: 1,
+    enabled: !!instituteId,
+  });
 
-    setIsLoading(true);
-    setError(null);
+  // Extract items from the first (and only) page since we use manual pagination
+  const currentPageData = batchData?.pages[0];
+  const items = currentPageData?.items ?? [];
+  const totalPages = currentPageData?.meta.totalPages ?? 1;
+  const total = currentPageData?.meta.total ?? 0;
+  const error = queryError?.message ?? mutationError;
 
-    const result = await getBatchesByInstitute(instituteId, {
-      page,
-      pageSize: 10,
-      search,
-      status,
-    });
-
-    if (result.success && result.data) {
-      setItems(result.data.items);
-      setTotalPages(result.data.meta.totalPages);
-      setTotal(result.data.meta.total);
-    } else {
-      setItems([]);
-      setTotalPages(1);
-      setTotal(0);
-      setError(result.error ?? "Failed to load batches");
-    }
-
-    setIsLoading(false);
-  }, [instituteId, page, search, status]);
-
-  useEffect(() => {
-    fetchBatches();
-  }, [fetchBatches]);
+  const fetchBatches = useCallback(() => {
+    refetchBatches();
+  }, [refetchBatches]);
 
   async function handleCreateOrUpdate(
     payload: CreateBatchPayload | Partial<CreateBatchPayload>,
@@ -105,7 +110,7 @@ function BatchesPage() {
       const result = await createBatch(createPayload);
       if (!result.success) return { success: false, error: result.error };
 
-      await fetchBatches();
+      await refetchBatches();
       return { success: true, error: null };
     }
 
@@ -116,35 +121,35 @@ function BatchesPage() {
     const updateResult = await updateBatch(editingBatch.id, payload);
     if (!updateResult.success) return { success: false, error: updateResult.error };
 
-    await fetchBatches();
+    await refetchBatches();
     return { success: true, error: null };
   }
 
   async function handleArchive(batch: Batch) {
     const result = await archiveBatch(batch.id);
     if (!result.success) {
-      setError(result.error ?? "Failed to archive batch");
+      setMutationError(result.error ?? "Failed to archive batch");
       return;
     }
-    fetchBatches();
+    refetchBatches();
   }
 
   async function handleSoftDelete(batch: Batch) {
     const result = await softDeleteBatch(batch.id);
     if (!result.success) {
-      setError(result.error ?? "Failed to set inactive status");
+      setMutationError(result.error ?? "Failed to set inactive status");
       return;
     }
-    fetchBatches();
+    refetchBatches();
   }
 
   async function handleRestore(batch: Batch) {
     const result = await restoreBatch(batch.id);
     if (!result.success) {
-      setError(result.error ?? "Failed to restore batch");
+      setMutationError(result.error ?? "Failed to restore batch");
       return;
     }
-    fetchBatches();
+    refetchBatches();
   }
 
   const columns: DataTableColumn<Batch>[] = [
@@ -165,7 +170,7 @@ function BatchesPage() {
       header: "Schedule",
       render: (batch) => (
         <span className="text-sm text-muted-foreground">
-          {formatDate(batch.start_date)} - {formatDate(batch.end_date)}
+          {formatDate(batch.start_date ?? "")} - {formatDate(batch.end_date ?? "")}
         </span>
       ),
     },
@@ -183,7 +188,7 @@ function BatchesPage() {
       header: "Status",
       render: (batch) => (
         <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusTone(batch.status)}`}
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize ${statusTone((batch.status ?? "active") as BatchStatus)}`}
         >
           {batch.status}
         </span>
@@ -391,7 +396,7 @@ function BatchesPage() {
         onAssignStudents={() => {
           if (detailBatch) setAssignBatch(detailBatch);
         }}
-        onRefreshRequested={fetchBatches}
+        onRefreshRequested={() => refetchBatches()}
       />
 
       <AssignStudentsModal
@@ -409,7 +414,7 @@ function BatchesPage() {
             return { success: false, error: result.error ?? "Failed to assign students" };
           }
 
-          await fetchBatches();
+          await refetchBatches();
           return { success: true, error: null };
         }}
       />

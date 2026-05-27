@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Course Service
+// EliteClass — LMS Course Service
 //
 // All database operations for lms_courses and lms_categories tables.
 // Follows the same null-safe Supabase pattern as student.service.ts.
@@ -229,7 +229,7 @@ function mergeLessonsIntoModules(
         ? nested
         : (byModule.get(mod.id) ?? []).sort((a, b) => a.position - b.position);
 
-    merged.forEach((lesson) => matchedLessonIds.add(lesson.id));
+    merged.forEach((lesson: { id: string }) => matchedLessonIds.add(lesson.id));
 
     return { ...mod, lessons: merged };
   });
@@ -362,7 +362,7 @@ export async function getStudentEnrollment(
   // Check student record to get the internal student ID
   const { data: student, error: studentError } = await supabase
     .from("students")
-    .select("id")
+    .select("id, batch_id")
     .eq("user_id", studentId)
     .single();
 

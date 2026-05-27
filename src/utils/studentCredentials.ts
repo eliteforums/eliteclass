@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Student Credential Generator
+// EliteClass — Student Credential Generator
 //
 // Generates login IDs, virtual email addresses, and temporary passwords
 // for newly admitted students — all in pure TypeScript, zero SQL extensions.

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — CreateSessionModal
+// EliteClass — CreateSessionModal
 //
 // Fixed-overlay modal for creating a new attendance session.
 // Uses React Hook Form + Zod for validation and calls

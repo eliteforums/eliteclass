@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — TeacherStudentTable (read-only list for staff)
+// EliteClass — TeacherStudentTable (read-only list for staff)
 // ---------------------------------------------------------------------------
 
 import { Link } from "@tanstack/react-router";

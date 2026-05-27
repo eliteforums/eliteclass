@@ -13,7 +13,7 @@ import { StaffProfileSheet } from "@/modules/staff/components/StaffProfileSheet"
 import type { Staff } from "@/types";
 
 export const Route = createFileRoute("/dashboard/admin/staff/")({
-  head: () => ({ meta: [{ title: "Staff Management — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Staff Management — EliteClass" }] }),
   component: StaffPage,
 });
 

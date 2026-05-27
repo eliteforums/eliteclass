@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS API helpers
+// EliteClass — LMS API helpers
 // Unwrap ApiResponse<T> for React Query mutations (throw on failure).
 // ---------------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Fee Service
+// EliteClass — Fee Service
 //
 // All database operations for fee management live here.
 // Tables: fee_categories, fee_structures, student_fees, fee_payments
@@ -54,7 +54,7 @@ export async function getFeeStructures(instituteId: string): Promise<ApiResponse
     .order("created_at", { ascending: false });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as FeeStructure[], error: null, success: true };
+  return { data: data as unknown as FeeStructure[], error: null, success: true };
 }
 
 /**
@@ -348,7 +348,7 @@ export async function getStudentFees(studentId: string): Promise<ApiResponse<Stu
     return { ...fee, paid_so_far };
   });
 
-  return { data: fees as StudentFee[], error: null, success: true };
+  return { data: fees as unknown as StudentFee[], error: null, success: true };
 }
 
 /**
@@ -386,7 +386,7 @@ export async function getInstituteStudentFees(
   const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as StudentFee[], error: null, success: true };
+  return { data: data as unknown as StudentFee[], error: null, success: true };
 }
 
 // ── Payments ─────────────────────────────────────────────────────────────────
@@ -581,7 +581,7 @@ export async function getPendingDues(instituteId: string): Promise<ApiResponse<S
     .order("due_date", { ascending: true });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as StudentFee[], error: null, success: true };
+  return { data: data as unknown as StudentFee[], error: null, success: true };
 }
 
 /**
@@ -633,7 +633,7 @@ export async function getParentFeeSummary(
   let totalDue = 0;
   let totalPaid = 0;
 
-  for (const fee of (studentFees ?? []) as StudentFee[]) {
+  for (const fee of (studentFees ?? []) as unknown as StudentFee[]) {
     if (!fee.student) continue;
 
     // Compute paid_so_far client-side since column was removed

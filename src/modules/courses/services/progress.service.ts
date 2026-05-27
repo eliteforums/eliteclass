@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Progress Service
+// EliteClass — LMS Progress Service
 // Handles lesson progress upserts and course progress view queries.
 // All functions return ApiResponse<T> — never throws.
 // ---------------------------------------------------------------------------

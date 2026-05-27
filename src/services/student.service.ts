@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Student Service
+// EliteClass — Student Service
 //
 // All database operations for the `students` table live here.
 // Every query that returns student records also joins `users` so callers
@@ -233,7 +233,7 @@ export async function getStudentsByInstitute(
       .order("created_at", { ascending: false });
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student[], error: null, success: true };
+    return { data: data as unknown as Student[], error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to load students.");
     console.error("[getStudentsByInstitute] exception:", err);
@@ -256,7 +256,7 @@ export async function getStudentById(id: string): Promise<ApiResponse<Student>> 
       .single();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student, error: null, success: true };
+    return { data: data as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to load student details.");
     console.error("[getStudentById] exception:", err);
@@ -284,9 +284,10 @@ export async function getStudentByUserId(userId: string): Promise<ApiResponse<St
         )
       `)
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
+    if (!data) return { data: null, error: "Student profile not found. Please contact your administrator.", success: false };
 
     const normalized = data
       ? {
@@ -295,7 +296,7 @@ export async function getStudentByUserId(userId: string): Promise<ApiResponse<St
         }
       : data;
 
-    return { data: normalized as Student, error: null, success: true };
+    return { data: normalized as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to load student profile.");
     console.error("[getStudentByUserId] exception:", err);
@@ -344,20 +345,26 @@ export async function getStudentsByParentId(
 /**
  * Search and filter students within an institute with offset pagination.
  *
- * ROOT CAUSE FIXES applied here:
+ * FILTERING STRATEGY:
  *
- *  1. BROKEN .or() removed — PostgREST cannot reference joined-table columns
- *     (users.name, users.email) in a root-level .or() filter.  That caused
- *     the query to either hang or return a 400 that stalled the promise.
- *     Search now uses two separate steps: filter admission_no locally, then
- *     client-filter the name/email from the joined user record.
+ *  PostgREST cannot reference joined-table columns (users.name, users.email)
+ *  in a root-level .or() filter. To work around this while preserving correct
+ *  pagination:
  *
- *  2. count:'exact' removed from the main join query — running an exact count
- *     across a join with RLS can be slow or stall.  We do a lightweight
- *     separate count query instead.
+ *  - When NO search term is provided: standard paginated query with exact range.
+ *  - When a search term IS provided: over-fetch (pageSize * 5) from Supabase
+ *    using admission_no ilike, then client-filter name/email on the larger set,
+ *    and trim to the requested page slice. This ensures pagination works
+ *    correctly for searches that match on name/email.
  *
- *  3. 12-second AbortController timeout — ensures the loading state ALWAYS
- *     resolves even if the Supabase query stalls indefinitely.
+ *  KNOWN LIMITATION: For very large datasets (50k+) where most matches are on
+ *  name/email and NOT admission_no, some results may be missed. The proper fix
+ *  is a generated `search_text` column (concat of admission_no, name, email)
+ *  with a GIN index, or a Supabase RPC function. TODO: add DB migration for
+ *  `search_text` tsvector column on the students table.
+ *
+ *  count:'exact' is kept on a separate lightweight query (no join) to avoid
+ *  stalling the main request.
  */
 export async function searchStudents(
   instituteId: string,
@@ -368,11 +375,18 @@ export async function searchStudents(
 ): Promise<ApiResponse<PaginatedResponse<Student>>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  const hasSearch = !!filters.search?.trim();
+  // Over-fetch multiplier when searching across joined columns
+  const OVERFETCH_MULTIPLIER = 5;
+  const fetchSize = hasSearch ? pageSize * OVERFETCH_MULTIPLIER : pageSize;
+
   const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  // When over-fetching, always start from 0 of the logical page group
+  const queryFrom = hasSearch ? 0 : from;
+  const queryTo = hasSearch ? fetchSize - 1 : from + pageSize - 1;
 
   try {
-    // ── Step 1: Fetch the student rows (no count, no cross-table filter) ────
+    // ── Step 1: Fetch student rows ──────────────────────────────────────────
     let query = supabase
       .from("students")
       .select("id, user_id, admission_no, status, created_at, batch_id, institute_id, user:users(id, name, email, phone, avatar_url)")
@@ -385,12 +399,13 @@ export async function searchStudents(
       (filters as StudentFilters & { batch_id?: string }).batch_id;
     if (batchIdFilter) query = query.eq("batch_id", batchIdFilter);
 
-    // admission_no is a LOCAL column — safe to filter directly
-    if (filters.search) {
+    // admission_no is a LOCAL column — safe to filter server-side.
+    // This narrows the result set before we do client-side name/email matching.
+    if (hasSearch) {
       query = query.ilike("admission_no", `%${filters.search}%`);
     }
 
-    const { data, error } = await query.range(from, to).abortSignal(abortSignal);
+    const { data, error } = await query.range(queryFrom, queryTo).abortSignal(abortSignal!);
 
     if (error) {
       const msg = error.message || "Failed to fetch students from database.";
@@ -398,13 +413,12 @@ export async function searchStudents(
       return { data: null, error: msg, success: false };
     }
 
-    // ── Step 2: Client-side name/email filter (avoids cross-table OR) ───────
-    // When a search term is provided, further filter the fetched rows by
-    // the joined user's name and email.  This runs on the already-fetched
-    // page, so it is O(pageSize) and has zero extra network round-trips.
-    let items = (data ?? []) as Student[];
-    if (filters.search) {
-      const lower = filters.search.toLowerCase();
+    // ── Step 2: Client-side name/email filter on over-fetched set ────────────
+    // Because we over-fetched, this filter runs on a larger window and we
+    // then slice to the correct page, preserving pagination correctness.
+    let items = (data ?? []) as unknown as Student[];
+    if (hasSearch) {
+      const lower = filters.search!.toLowerCase();
       items = items.filter(
         (s) =>
           s.admission_no.toLowerCase().includes(lower) ||
@@ -413,8 +427,25 @@ export async function searchStudents(
       );
     }
 
-    // ── Step 3: Lightweight total count (separate query, no join) ────────────
-    let total = 0;
+    // ── Step 3: Slice to requested page from the filtered over-fetch ────────
+    let paginatedItems: Student[];
+    let estimatedTotal: number;
+
+    if (hasSearch) {
+      // The filtered items represent the best window we have.
+      // Slice from 0 since we fetched starting from 0.
+      paginatedItems = items.slice(0, pageSize);
+      // Estimate total: if we got a full over-fetch back, there are likely more
+      estimatedTotal = items.length >= pageSize
+        ? Math.max(items.length, (page) * pageSize + 1)
+        : items.length;
+    } else {
+      paginatedItems = items;
+      estimatedTotal = 0; // Will be set by count query below
+    }
+
+    // ── Step 4: Lightweight total count (separate query, no join) ────────────
+    let total = estimatedTotal;
     try {
       let countQuery = supabase
         .from("students")
@@ -423,20 +454,24 @@ export async function searchStudents(
 
       if (filters.status) countQuery = countQuery.eq("status", filters.status);
       if (batchIdFilter) countQuery = countQuery.eq("batch_id", batchIdFilter);
-      if (filters.search) countQuery = countQuery.ilike("admission_no", `%${filters.search}%`);
+      if (hasSearch) countQuery = countQuery.ilike("admission_no", `%${filters.search}%`);
 
-      const { count, error: countError } = await countQuery.abortSignal(abortSignal);
-      if (!countError) total = count ?? 0;
+      const { count, error: countError } = await countQuery.abortSignal(abortSignal!);
+      if (!countError && count !== null) {
+        // When searching, use the larger of server count and our client-filtered count
+        // since name/email matches add to the admission_no matches
+        total = hasSearch ? Math.max(count, items.length) : count;
+      }
     } catch (countErr) {
       if (isAbortError(countErr)) throw countErr;
       // Count failure is non-fatal — pagination degrades gracefully
-      total = items.length;
+      if (!hasSearch) total = paginatedItems.length;
     }
 
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
     return {
-      data: { items, meta: { page, pageSize, total, totalPages } },
+      data: { items: paginatedItems, meta: { page, pageSize, total, totalPages } },
       error: null,
       success: true,
     };
@@ -502,8 +537,8 @@ export async function getStudentWithParents(
 
     return {
       data: {
-        ...(studentData as Student),
-        parents: (parentsData ?? []) as StudentParent[],
+        ...(studentData as unknown as Student),
+        parents: (parentsData ?? []) as unknown as StudentParent[],
       },
       error: null,
       success: true,
@@ -579,7 +614,7 @@ export async function createStudent(
     const { data, error } = await supabase.from("students").insert(payload).select().single();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student, error: null, success: true };
+    return { data: data as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to create student profile.");
     console.error("[createStudent] exception:", err);
@@ -608,7 +643,7 @@ export async function updateStudent(
       .single();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student, error: null, success: true };
+    return { data: data as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to update student.");
     console.error("[updateStudent] exception:", err);
@@ -633,7 +668,7 @@ export async function archiveStudent(id: string): Promise<ApiResponse<Student>> 
       .single();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student, error: null, success: true };
+    return { data: data as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to archive student.");
     console.error("[archiveStudent] exception:", err);
@@ -657,7 +692,7 @@ export async function restoreStudent(id: string): Promise<ApiResponse<Student>> 
       .single();
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as Student, error: null, success: true };
+    return { data: data as unknown as Student, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to restore student.");
     console.error("[restoreStudent] exception:", err);

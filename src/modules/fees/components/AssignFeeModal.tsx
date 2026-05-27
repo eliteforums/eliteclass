@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — AssignFeeModal
+// EliteClass — AssignFeeModal
 //
 // Modal for assigning a fee structure to a specific student.
 // Shows a live amount preview as the admin selects a structure and enters

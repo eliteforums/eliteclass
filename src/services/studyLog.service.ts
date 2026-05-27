@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Daily Study Log Service
+// EliteClass — Daily Study Log Service
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";

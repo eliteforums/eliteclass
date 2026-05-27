@@ -65,7 +65,7 @@ export const useStudentDashboardStore = create<StudentDashboardState>()(
         setParentSelectedChildId: (childId) => set({ parentSelectedChildId: childId }),
       }),
       {
-        name: "eduos-student-dashboard",
+        name: "eliteclass-student-dashboard",
         partialize: (state) => ({
           dashboard: state.dashboard,
           studentId: state.studentId,
@@ -75,6 +75,6 @@ export const useStudentDashboardStore = create<StudentDashboardState>()(
         }),
       },
     ),
-    { name: "EduOS Student Dashboard Store" },
+    { name: "EliteClass Student Dashboard Store" },
   ),
 );

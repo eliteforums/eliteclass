@@ -7,7 +7,7 @@ import {
 
 const faqs = [
   {
-    q: "Is EduOS suitable for small coaching institutes?",
+    q: "Is EliteClass suitable for small coaching institutes?",
     a: "Yes. The Starter plan is designed for institutes with up to 200 students and includes everything you need to digitize daily operations.",
   },
   {
@@ -16,7 +16,7 @@ const faqs = [
   },
   {
     q: "How does the AI layer work?",
-    a: "EduOS uses AI for risk prediction, auto-generated remarks, paper generation and intelligent fee recovery — built into your normal workflows.",
+    a: "EliteClass uses AI for risk prediction, auto-generated remarks, paper generation and intelligent fee recovery — built into your normal workflows.",
   },
   {
     q: "Is my institute's data isolated and secure?",
@@ -24,7 +24,7 @@ const faqs = [
   },
   {
     q: "Does it work offline?",
-    a: "EduOS is a Progressive Web App with offline support for attendance and key workflows. It installs like a native app on phones and tablets.",
+    a: "EliteClass is a Progressive Web App with offline support for attendance and key workflows. It installs like a native app on phones and tablets.",
   },
 ];
 

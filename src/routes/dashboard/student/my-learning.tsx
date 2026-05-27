@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — /dashboard/student/my-learning
+// EliteClass — /dashboard/student/my-learning
 // Student "My Learning" dashboard — course catalogue + progress stats
 // ---------------------------------------------------------------------------
 
@@ -36,7 +36,7 @@ import type { LmsEnrollmentWithProgress } from "@/types";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/student/my-learning")({
-  head: () => ({ meta: [{ title: "My Learning — EduOS" }] }),
+  head: () => ({ meta: [{ title: "My Learning — EliteClass" }] }),
   component: MyLearningPage,
 });
 

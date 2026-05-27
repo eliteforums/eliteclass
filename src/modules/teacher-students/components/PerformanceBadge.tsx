@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — PerformanceBadge (teacher student list)
+// EliteClass — PerformanceBadge (teacher student list)
 // ---------------------------------------------------------------------------
 
 import type { TeacherStudentPerformanceStatus } from "@/types";

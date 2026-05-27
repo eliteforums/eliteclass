@@ -1,10 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AuthLayout } from "@/layouts/AuthLayout";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import { UpdatePasswordForm } from "@/modules/auth/components/UpdatePasswordForm";
+import { z } from "zod";
+
+const updatePasswordSearchSchema = z.object({
+  force: z.boolean().optional(),
+  type: z.string().optional(),
+});
 
 export const Route = createFileRoute("/auth/update-password")({
+  validateSearch: updatePasswordSearchSchema,
   head: () => ({
-    meta: [{ title: "Update Password — EduOS" }],
+    meta: [{ title: "Update Password — EliteClass" }],
   }),
   component: UpdatePasswordPage,
 });

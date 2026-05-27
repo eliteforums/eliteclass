@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Fee Module Validations
+// EliteClass — Fee Module Validations
 //
 // Zod schemas for all fee-related forms:
 //  - createFeeStructureSchema  — "Add Fee Structure" modal

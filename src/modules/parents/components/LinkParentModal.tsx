@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LinkParentModal
+// EliteClass — LinkParentModal
 //
 // Modal dialog for linking an existing parent account to a student.
 //
@@ -9,7 +9,7 @@
 //  3. If not found:  "not found" message with guidance is shown
 //  4. Success state: confirmation banner, then auto-close
 //
-// The parent must already have an account in EduOS (registered as a parent)
+// The parent must already have an account in EliteClass (registered as a parent)
 // before they can be linked — this modal does NOT create parent accounts.
 // ---------------------------------------------------------------------------
 
@@ -305,7 +305,7 @@ export function LinkParentModal({
                           <p className="text-sm font-medium text-foreground">Parent not found</p>
                           <p className="text-xs text-muted-foreground leading-relaxed">
                             No parent account exists with that email address. The parent must first
-                            sign into EduOS and complete their profile before they can be linked to
+                            sign into EliteClass and complete their profile before they can be linked to
                             a student.
                           </p>
                         </div>

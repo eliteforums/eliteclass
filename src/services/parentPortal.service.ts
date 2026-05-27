@@ -66,19 +66,18 @@ async function getStudentCourses(studentId: string): Promise<ApiResponse<Student
 
   if (error) return { data: null, error: error.message, success: false };
 
-  const normalized = (data ?? []).map((row) =>
+  const normalized = (data ?? []).map((row: any) =>
     row.course
       ? {
           ...row,
-          course: {
-            ...row.course,
-            name: row.course.title,
-          },
+          course: Array.isArray(row.course)
+            ? { ...row.course[0], name: row.course[0]?.title }
+            : { ...row.course, name: row.course.title },
         }
       : row,
   );
 
-  return { data: normalized as StudentCourse[], error: null, success: true };
+  return { data: normalized as unknown as StudentCourse[], error: null, success: true };
 }
 
 export async function getParentChildSnapshot(studentId: string): Promise<ApiResponse<ParentPortalChildSnapshot>> {

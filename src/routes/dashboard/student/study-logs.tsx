@@ -8,7 +8,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/dashboard/student/study-logs")({
-  head: () => ({ meta: [{ title: "My Progress Tracker — EduOS" }] }),
+  head: () => ({ meta: [{ title: "My Progress Tracker — EliteClass" }] }),
   component: StudentStudyLogsPage,
 });
 

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Auth Service
+// EliteClass — Auth Service
 //
 // All authentication operations go through this module:
 //   - Email/password sign-in & sign-up
@@ -20,6 +20,13 @@
 
 import { supabase } from "@/lib/supabase";
 import { runService } from "@/lib/service-runner";
+import {
+  checkRateLimit,
+  LOGIN_RATE_LIMIT,
+  REGISTER_RATE_LIMIT,
+  type RateLimitConfig,
+  type RateLimitResult,
+} from "@/lib/rate-limiter";
 import type { User, Institute, ApiResponse, UserRole } from "@/types";
 import { getErrorMessage } from "@/utils/helpers";
 
@@ -38,17 +45,35 @@ const SUPABASE_NOT_CONFIGURED = {
   success: false,
 } as const;
 
+// ── Rate Limiting ────────────────────────────────────────────────────────────
+
+/**
+ * Creates a rate-limit-aware checker for server functions.
+ *
+ * Usage in server wrappers:
+ *   const limiter = withRateLimit('login');
+ *   const result = await limiter(clientIp);
+ *   if (!result.allowed) { return 429 response with retryAfterSeconds }
+ */
+export function withRateLimit(action: 'login' | 'register') {
+  return async function (ip: string): Promise<RateLimitResult> {
+    const config: RateLimitConfig =
+      action === 'login' ? LOGIN_RATE_LIMIT : REGISTER_RATE_LIMIT;
+    return checkRateLimit(ip, action, config);
+  };
+}
+
 // ── Private helpers ──────────────────────────────────────────────────────────
 
 /**
- * Fetch the EduOS user profile from the `users` table.
+ * Fetch the EliteClass user profile from the `users` table.
  * Called after a successful Supabase auth operation.
  */
 async function fetchUserProfile(userId: string): Promise<ApiResponse<User>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   return runService("fetchUserProfile", async () => {
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from("users")
       .select("id, institute_id, role, name, email, phone, avatar_url, is_active")
       .eq("id", userId)
@@ -67,7 +92,7 @@ async function fetchInstitute(instituteId: string): Promise<ApiResponse<Institut
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   return runService("fetchInstitute", async () => {
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from("institutes")
       .select("id, name, logo, subscription_plan, is_active")
       .eq("id", instituteId)
@@ -85,18 +110,36 @@ async function fetchInstitute(instituteId: string): Promise<ApiResponse<Institut
  *
  * On success returns both the enriched `User` profile and its `Institute`
  * so the calling store can hydrate state in a single round-trip.
+ *
+ * When `clientIp` is provided (server-side call), rate limiting is enforced.
+ * If the rate limit is exceeded, returns a structured error with `retryAfterSeconds`.
+ * If no IP is provided (client-side call), rate limiting is skipped — it should
+ * be enforced at the server wrapper layer instead.
  */
 export async function signIn(
   email: string,
   password: string,
+  clientIp?: string,
 ): Promise<ApiResponse<{ user: User; institute: Institute; passwordChangeRequired: boolean }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // ── Rate limit check (when called from server with IP) ─────────────────────
+  if (clientIp) {
+    const rateLimitResult = await checkRateLimit(clientIp, 'login', LOGIN_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      return {
+        data: null,
+        error: `Too many login attempts. Please try again in ${rateLimitResult.retryAfterSeconds} seconds.`,
+        success: false,
+      };
+    }
+  }
 
   // Handle student login ID (e.g. "ocmsarvesh4831") by converting it to virtual email.
   // If the input doesn't contain an '@', we assume it's a student login ID.
   const authEmail = email.includes("@") ? email.trim() : `${email.trim()}@eduos.student`;
 
-  const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+  const { data: authData, error: authError } = await supabase!.auth.signInWithPassword({
     email: authEmail,
     password,
   });
@@ -138,15 +181,32 @@ export async function signIn(
  * `metadata` is stored in `auth.users.raw_user_meta_data` and used by the
  * `handle_new_user` trigger when institute_id is present (admin-created users).
  * For self-registration, use the `register_institute` RPC instead.
+ *
+ * When `clientIp` is provided (server-side call), rate limiting is enforced.
+ * If the rate limit is exceeded, returns a structured error with `retryAfterSeconds`.
+ * If no IP is provided (client-side call), rate limiting is skipped.
  */
 export async function signUp(
   email: string,
   password: string,
   metadata: { name: string; role: UserRole; institute_id?: string },
+  clientIp?: string,
 ): Promise<ApiResponse<{ userId: string }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.auth.signUp({
+  // ── Rate limit check (when called from server with IP) ─────────────────────
+  if (clientIp) {
+    const rateLimitResult = await checkRateLimit(clientIp, 'register', REGISTER_RATE_LIMIT);
+    if (!rateLimitResult.allowed) {
+      return {
+        data: null,
+        error: `Too many registration attempts. Please try again in ${rateLimitResult.retryAfterSeconds} seconds.`,
+        success: false,
+      };
+    }
+  }
+
+  const { data, error } = await supabase!.auth.signUp({
     email,
     password,
     options: { data: metadata },
@@ -165,7 +225,7 @@ export async function signUp(
 export async function signOut(): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase.auth.signOut();
+  const { error } = await supabase!.auth.signOut();
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
 }
@@ -179,7 +239,7 @@ export async function signOut(): Promise<ApiResponse<null>> {
 export async function requestPasswordReset(email: string): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  const { error } = await supabase!.auth.resetPasswordForEmail(email, {
     redirectTo: `${import.meta.env.VITE_APP_URL}/auth/update-password`,
   });
   if (error) return { data: null, error: error.message, success: false };
@@ -194,7 +254,7 @@ export async function updatePassword(password: string): Promise<ApiResponse<null
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // Update password AND clear the force_password_change flag if it exists.
-  const { error } = await supabase.auth.updateUser({
+  const { error } = await supabase!.auth.updateUser({
     password,
     data: { force_password_change: false },
   });
@@ -215,7 +275,7 @@ export async function getCurrentSession() {
   if (!supabase) return null;
 
   try {
-    const { data, error } = await supabase.auth.getSession();
+    const { data, error } = await supabase!.auth.getSession();
     if (error || !data.session) return null;
     return data.session;
   } catch {

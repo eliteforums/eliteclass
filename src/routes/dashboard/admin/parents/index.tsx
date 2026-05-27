@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Parent Management Page
+// EliteClass — Admin: Parent Management Page
 //
 // Displays all parents registered under the admin's institute.
 // Features:
@@ -45,7 +45,7 @@ import { toast } from "sonner";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/parents/")({
-  head: () => ({ meta: [{ title: "Parents — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Parents — EliteClass" }] }),
   component: ParentsPage,
 });
 
@@ -254,7 +254,7 @@ function ParentProfilePanel({ parent, isOpen, onClose }: ParentProfilePanelProps
             <InfoRow icon={<Mail />} label="Email" value={parent.user?.email ?? "—"} />
             <InfoRow icon={<Phone />} label="Phone" value={parent.user?.phone ?? "—"} />
             <InfoRow icon={<Briefcase />} label="Occupation" value={parent.occupation ?? "—"} />
-            <InfoRow icon={<Calendar />} label="Joined" value={formatDate(parent.created_at)} />
+            <InfoRow icon={<Calendar />} label="Joined" value={formatDate(parent.created_at ?? "")} />
           </div>
 
           {/* Account Credentials Section */}
@@ -462,7 +462,7 @@ function ParentsPage() {
       header: "Joined",
       render: (parent) => (
         <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {formatDate(parent.created_at)}
+          {formatDate(parent.created_at ?? "")}
         </span>
       ),
     },

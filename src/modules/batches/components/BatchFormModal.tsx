@@ -8,6 +8,7 @@ import {
   type BatchSchema as BatchFormSchema,
 } from "@/modules/batches/validations";
 import type { Batch, Course, CreateBatchPayload } from "@/types";
+import type { Resolver } from "react-hook-form";
 import { getCoursesByInstitute } from "@/services/course.service";
 
 interface BatchFormModalProps {
@@ -50,7 +51,7 @@ function defaultValues(batch?: Batch | null): BatchFormSchema {
     end_date: batch?.end_date ?? start,
     capacity: batch?.capacity ?? 60,
     academic_year: batch?.academic_year ?? deriveAcademicYear(start),
-    status: batch?.status ?? "active",
+    status: (batch?.status as "active" | "inactive" | "archived") ?? "active",
   };
 }
 
@@ -89,7 +90,7 @@ export function BatchFormModal({
     reset,
     formState: { errors, isSubmitting },
   } = useForm<BatchFormSchema>({
-    resolver: zodResolver(batchFormSchema),
+    resolver: zodResolver(batchFormSchema) as Resolver<BatchFormSchema>,
     defaultValues: defaults,
   });
 

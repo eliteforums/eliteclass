@@ -12,7 +12,7 @@ export function Nav() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
               <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-lg font-semibold tracking-tight">EduOS</span>
+            <span className="text-lg font-semibold tracking-tight">EliteClass</span>
           </Link>
           <div className="hidden items-center gap-8 md:flex">
             <a

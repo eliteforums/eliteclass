@@ -52,6 +52,7 @@ export function LiveExamMonitoring({ examId }: LiveExamMonitoringProps) {
   });
 
   const fetchInitialData = useCallback(async () => {
+    if (!supabase) return;
     // Fetch active attempts via the shared summary API
     const { data: attempts } = await getExamAttemptViolations(examId);
 
@@ -117,6 +118,7 @@ export function LiveExamMonitoring({ examId }: LiveExamMonitoringProps) {
   }, [examId]);
 
   useEffect(() => {
+    if (!supabase) return;
     fetchInitialData();
 
     // Subscribe to realtime violations
@@ -131,7 +133,7 @@ export function LiveExamMonitoring({ examId }: LiveExamMonitoringProps) {
         },
         async (payload) => {
           // Fetch student name for the violation
-          const { data: attemptData } = await supabase
+          const { data: attemptData } = await supabase!
             .from('exam_attempts')
             .select('student:students(user:users(name))')
             .eq('id', payload.new.attempt_id)
@@ -172,8 +174,8 @@ export function LiveExamMonitoring({ examId }: LiveExamMonitoringProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(violationSubscription);
-      supabase.removeChannel(attemptSubscription);
+      supabase!.removeChannel(violationSubscription);
+      supabase!.removeChannel(attemptSubscription);
     };
   }, [examId, fetchInitialData]);
 

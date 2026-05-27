@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Fee Management Page
+// EliteClass — Admin: Fee Management Page
 //
 // Full fee management interface for institute admins.
 // Features:
@@ -61,7 +61,7 @@ import { formatDate } from "@/utils/helpers";
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/fees/")({
-  head: () => ({ meta: [{ title: "Fees — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Fees — EliteClass" }] }),
   component: FeesPage,
 });
 

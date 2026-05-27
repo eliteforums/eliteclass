@@ -1,14 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { AuthLayout } from "@/layouts/AuthLayout";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { LoginForm } from "@/modules/auth/components/LoginForm";
 
 export const Route = createFileRoute("/auth/login")({
   head: () => ({
     meta: [
-      { title: "Sign in — EduOS" },
-      { name: "description", content: "Sign in to your EduOS account" },
+      { title: "Sign in — EliteClass" },
+      { name: "description", content: "Sign in to your EliteClass account" },
     ],
   }),
   component: LoginPage,

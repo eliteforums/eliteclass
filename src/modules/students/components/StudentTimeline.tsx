@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — StudentTimeline
+// EliteClass — StudentTimeline
 //
 // Unified chronological timeline that merges StudentHistory audit entries
 // with StudentPromotion lifecycle records.

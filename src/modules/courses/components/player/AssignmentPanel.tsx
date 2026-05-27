@@ -132,10 +132,10 @@ export function AssignmentPanel({
       // Upload files
       for (const file of selectedFiles) {
         const uploadRes = await uploadSubmissionFile(
-          file,
-          studentId,
-          assignment.id,
           instituteId,
+          assignment.id,
+          studentId,
+          file,
         );
         if (!uploadRes.success || !uploadRes.data) {
           throw new Error(uploadRes.error ?? `Failed to upload ${file.name}`);

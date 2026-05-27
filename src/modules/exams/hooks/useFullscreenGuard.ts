@@ -19,7 +19,7 @@ export function useFullscreenGuard({
   shouldIgnoreViolation,
 }: UseFullscreenGuardProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const requestTimeoutRef = useRef<NodeJS.Timeout>();
+  const requestTimeoutRef = useRef<NodeJS.Timeout>(undefined);
   const isEnabledRef = useRef(enabled);
 
   // Keep ref in sync to avoid stale closures in event listeners

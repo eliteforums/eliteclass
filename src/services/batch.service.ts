@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Batch Service
+// EliteClass — Batch Service
 //
 // Batch management APIs used by:
 //   - Admin Batch Management page
@@ -163,7 +163,6 @@ export async function getStudentBatch(
   return {
     data: {
       ...batch,
-      timing: null,
       student_count: studentsData?.length ?? batch.student_count ?? 0,
     },
     error: null,
@@ -338,22 +337,35 @@ export async function getBatchStudents(
   return { data: (data ?? []) as Student[], error: null, success: true };
 }
 
+/**
+ * Return students assignable to a batch, with optional search.
+ *
+ * Uses an over-fetch strategy for name/email search since PostgREST cannot
+ * filter on joined columns in .or(). Fetches a larger window server-side
+ * (filtered by admission_no), then trims by name/email client-side.
+ *
+ * TODO: Replace with a `search_text` generated column + GIN index for
+ * fully server-side search across admission_no, name, and email.
+ */
 export async function getAssignableStudents(
   instituteId: string,
   search = "",
 ): Promise<ApiResponse<Student[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  const hasSearch = !!search.trim();
+  // Over-fetch when searching to compensate for client-side name/email filter
+  const limit = hasSearch ? 500 : 300;
+
   let query = supabase
     .from("students")
     .select("*, user:users(*)")
     .eq("institute_id", instituteId)
     .order("created_at", { ascending: false })
-    .limit(300);
+    .limit(limit);
 
-  if (search.trim()) {
-    const q = search.trim();
-    query = query.ilike("admission_no", `%${q}%`);
+  if (hasSearch) {
+    query = query.ilike("admission_no", `%${search.trim()}%`);
   }
 
   const { data, error } = await query;
@@ -361,7 +373,7 @@ export async function getAssignableStudents(
   if (error) return { data: null, error: error.message, success: false };
 
   let rows = (data ?? []) as Student[];
-  if (search.trim()) {
+  if (hasSearch) {
     const q = search.trim().toLowerCase();
     rows = rows.filter(
       (student) =>
@@ -369,6 +381,8 @@ export async function getAssignableStudents(
         (student.user?.name ?? "").toLowerCase().includes(q) ||
         (student.user?.email ?? "").toLowerCase().includes(q),
     );
+    // Cap results to a reasonable size for the UI
+    rows = rows.slice(0, 300);
   }
 
   return { data: rows, error: null, success: true };

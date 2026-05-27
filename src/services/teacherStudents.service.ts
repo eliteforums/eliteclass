@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Teacher Students Service (staff-scoped RPCs + caching)
+// EliteClass — Teacher Students Service (staff-scoped RPCs + caching)
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";
@@ -54,7 +54,7 @@ export async function getTeacherStudents(
       filtersCacheKey(staffId, filters, page, pageSize),
       30_000,
       async () => {
-        const { data: row, error } = await supabase.rpc("get_teacher_students", {
+        const { data: row, error } = await supabase!.rpc("get_teacher_students", {
           p_staff_id: staffId,
           p_search: filters.search?.trim() || null,
           p_batch_id: filters.batchId ?? null,

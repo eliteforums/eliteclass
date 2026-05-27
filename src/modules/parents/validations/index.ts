@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Parent Module Validations
+// EliteClass — Parent Module Validations
 //
 // Zod schemas for all parent-related forms.
 //

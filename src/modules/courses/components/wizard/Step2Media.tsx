@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Wizard Step 2: Media & Intro
+// EliteClass — LMS Wizard Step 2: Media & Intro
 //
 // Thumbnail upload with drag-and-drop + preview.
 // Intro video: two-tab approach (file upload | external URL).

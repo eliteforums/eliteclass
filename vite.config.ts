@@ -7,6 +7,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
 import { visualizer } from "rollup-plugin-visualizer";
+import { VitePWA } from "vite-plugin-pwa";
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
@@ -16,12 +17,31 @@ export default defineConfig({
   },
   vite: {
     plugins: [
-      nitro({ preset: "vercel" }),
+      nitro({
+        preset: "vercel",
+        rollupConfig: {
+          external: ["@opentelemetry/api"],
+        },
+      }),
       visualizer({
         open: false,
         gzipSize: true,
         brotliSize: true,
         filename: "dist/stats.html",
+      }),
+      VitePWA({
+        strategies: "injectManifest",
+        srcDir: "src",
+        filename: "sw.ts",
+        registerType: "prompt",
+        injectRegister: false,
+        manifest: false,
+        devOptions: { enabled: false },
+        injectManifest: {
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
+          globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico}'],
+          globIgnores: ['**/stats.html'],
+        },
       }),
     ],
     build: {

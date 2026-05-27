@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — /dashboard/student/courses
+// EliteClass — /dashboard/student/courses
 // Browse published institute courses and self-enroll
 // ---------------------------------------------------------------------------
 
@@ -15,7 +15,7 @@ import { useStudentCourseCatalog } from "@/modules/courses/hooks/useEnrollment";
 import type { CourseListFilters } from "@/modules/courses/services/course.service";
 
 export const Route = createFileRoute("/dashboard/student/courses/")({
-  head: () => ({ meta: [{ title: "Browse Courses — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Browse Courses — EliteClass" }] }),
   component: StudentCoursesPage,
 });
 

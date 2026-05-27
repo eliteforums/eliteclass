@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AuthLayout } from "@/layouts/AuthLayout";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { RegisterInstituteForm } from "@/modules/auth/components/RegisterInstituteForm";
 
 export const Route = createFileRoute("/auth/register-institute")({
   head: () => ({
-    meta: [{ title: "Register Institute — EduOS" }],
+    meta: [{ title: "Register Institute — EliteClass" }],
   }),
   component: RegisterInstitutePage,
 });

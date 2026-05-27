@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useStudentProfile
+// EliteClass — useStudentProfile
 //
 // Fetches a single student profile and their linked parents in parallel.
 // Designed for the StudentProfileSheet and any detail page that needs

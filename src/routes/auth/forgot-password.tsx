@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
-import { AuthLayout } from "@/layouts/AuthLayout";
+import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { ForgotPasswordForm } from "@/modules/auth/components/ForgotPasswordForm";
 
 export const Route = createFileRoute("/auth/forgot-password")({
   head: () => ({
-    meta: [{ title: "Reset Password — EduOS" }],
+    meta: [{ title: "Reset Password — EliteClass" }],
   }),
   component: ForgotPasswordPage,
 });

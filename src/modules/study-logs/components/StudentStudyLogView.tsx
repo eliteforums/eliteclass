@@ -13,7 +13,7 @@ import {
 import { StudyLogForm } from "./StudyLogForm";
 import { StudyLogTimeline } from "./StudyLogTimeline";
 import { getMyStudyLogs } from "@/services/studyLog.service";
-import type { DailyStudyLog, Batch } from "@/types";
+import type { DailyStudyLog, Batch, StudentBatchAssignment } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { 

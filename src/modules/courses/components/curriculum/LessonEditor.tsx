@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Lesson Editor
+// EliteClass — Lesson Editor
 //
 // A right-side Sheet drawer for editing all lesson details.
 // Adapts its content based on lesson_type:

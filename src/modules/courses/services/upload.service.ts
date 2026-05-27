@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Upload / Storage Service
+// EliteClass — LMS Upload / Storage Service
 // Signed URL generation and file upload for course content & submissions.
 // Bucket names align with migration 011 (lms-course-videos, etc.).
 // All functions return ApiResponse<T> — never throws.

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Shared Domain Types
+// EliteClass — Shared Domain Types
 // Every Supabase table row and every shared enum lives here.
 // Services, stores, and components all import from '@/types'.
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ export interface Student {
   contact_email?: string | null;
   emergency_contact?: EmergencyContact | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 
   // Joined relations (populated when select includes `user:users(*)`)
   user?: User;
@@ -106,11 +106,11 @@ export interface Student {
 /** Row in the `parents` table. */
 export interface Parent {
   id: string;
-  institute_id: string;
+  institute_id?: string;
   user_id: string;
   occupation: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 
   // Joined relations
   user?: User;
@@ -121,11 +121,11 @@ export interface Parent {
  * Tracks which parent is linked to which student and the relationship type.
  */
 export interface StudentParent {
-  id: string;
-  student_id: string;
-  parent_id: string;
+  id?: string;
+  student_id?: string;
+  parent_id?: string;
   relation_type: RelationType;
-  created_at: string;
+  created_at?: string;
 
   // Joined relations
   student?: Student;
@@ -173,10 +173,13 @@ export interface StaffAssignment {
   batch_id: string | null;
   course_name: string | null;
   subject_name: string | null;
-  created_at: string;
-  
-  // Joined
+  assigned_at?: string;
+  assigned_by?: string | null;
+  created_at?: string;
+
+  // Joined relations
   batch?: Batch;
+  assigned_by_user?: Pick<User, "id" | "name" | "role">;
 }
 
 export interface StaffBatchAssignment {
@@ -186,6 +189,8 @@ export interface StaffBatchAssignment {
   batch_id: string;
   assigned_at: string;
   assigned_by: string | null;
+  course_name?: string | null;
+  subject_name?: string | null;
   batch?: Batch;
 }
 
@@ -260,75 +265,7 @@ export interface UpdateStaffPayload {
   assigned_course_ids?: string[];
 }
 
-/** Row in the `staff_assignments` table. */
-export interface StaffAssignment {
-  id: string;
-  institute_id: string;
-  staff_id: string;
-  batch_id: string | null;
-  course_name: string | null;
-  subject_name: string | null;
-  assigned_at: string;
-  assigned_by: string | null;
-  created_at?: string;
 
-  // Joined relations
-  batch?: Batch;
-  assigned_by_user?: Pick<User, "id" | "name" | "role">;
-}
-
-/** Batch-specific staff assignment row. */
-export interface StaffBatchAssignment extends StaffAssignment {
-  batch_id: string;
-  batch?: Batch;
-}
-
-export interface StaffCourseAssignment {
-  id: string;
-  institute_id: string;
-  staff_id: string;
-  course_id: string;
-  assigned_at: string;
-  assigned_by: string | null;
-  course?: Course;
-}
-
-/** Batch option used by the staff management UI. */
-export type StaffBatchOption = Batch;
-
-/** Payload accepted when admitting a new staff member. */
-export interface AdmitStaffPayload {
-  institute_id: string;
-  name: string;
-  email: string;
-  phone: string;
-  designation: string;
-  department: string;
-  qualification: string;
-  joining_date: string;
-  role_name: string;
-  assigned_course_ids?: string[];
-  assignments?: Array<{
-    batch_id?: string;
-    course_name?: string;
-    subject_name?: string;
-  }>;
-}
-
-/** Result returned after admitting or resetting a staff credential. */
-export interface AdmitStaffResult {
-  staff_id: string;
-  user_id: string;
-  email: string;
-  temporary_password: string;
-  role_name: string;
-  assigned_course_ids?: string[];
-  assignments?: Array<{
-    batch_id?: string;
-    course_name?: string;
-    subject_name?: string;
-  }>;
-}
 
 // ── Auth ───────────────────────────────────────────────────────────────────
 
@@ -708,15 +645,15 @@ export interface AttendanceSession {
   id: string;
   institute_id: string;
   batch_id: string | null;
-  course_id: string | null;
-  conducted_by: string;
+  course_id?: string | null;
+  conducted_by?: string;
   session_date: string;
   session_type: AttendanceSessionType;
   topic: string | null;
   is_locked: boolean;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
   batch?: Batch;
   course?: Course;
   conductor?: Pick<User, "id" | "name">;
@@ -727,11 +664,11 @@ export interface AttendanceRecord {
   id: string;
   session_id: string;
   student_id: string;
-  institute_id: string;
+  institute_id?: string;
   batch_id?: string | null;
   status: AttendanceStatus;
   notes: string | null;
-  marked_by: string;
+  marked_by?: string;
   marked_at: string;
   student?: Student;
   marker?: Pick<User, "id" | "name">;
@@ -1455,6 +1392,7 @@ export interface CreateCoursePayload {
   subtitle?: string;
   description?: string;
   category_id?: string;
+  course_id?: string;
   difficulty: LmsDifficulty;
   language: string;
   tags: string[];
@@ -1889,6 +1827,7 @@ export interface Assignment {
   resources?: AssignmentResource[];
   assignees_count?: number;
   submissions_count?: number;
+  submission?: AssignmentSubmission | null;
 }
 
 export interface AssignmentResource {
@@ -1944,5 +1883,17 @@ export interface CreateAssignmentPayload {
   due_date?: string | null;
   status?: AssignmentStatus;
   allow_late?: boolean;
+}
+
+/**
+ * Shape used when attaching resources to an assignment (create/submit flows).
+ * Mirrors the Zod `assignmentResourceSchema` in assignments/validations.
+ */
+export interface AssignmentResourceSchema {
+  file_name: string;
+  file_url: string;
+  storage_path: string;
+  file_type?: string;
+  file_size?: number;
 }
 

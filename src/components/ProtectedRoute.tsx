@@ -2,6 +2,7 @@ import { type ReactNode } from "react";
 import { Navigate } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/authStore";
 import { isRoleAllowed } from "@/utils/rbac";
+import { ForcePasswordChangeGuard } from "@/components/ForcePasswordChangeGuard";
 import type { UserRole } from "@/types";
 
 interface ProtectedRouteProps {
@@ -46,5 +47,9 @@ export function ProtectedRoute({
     return <Navigate to="/unauthorized" />;
   }
 
-  return <>{children}</>;
+  return (
+    <ForcePasswordChangeGuard>
+      {children}
+    </ForcePasswordChangeGuard>
+  );
 }

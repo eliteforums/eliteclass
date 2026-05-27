@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Course Store (Zustand v5)
+// EliteClass — Course Store (Zustand v5)
 //
 // LMS module-wide state: course catalogue, curriculum editor, categories,
 // enrollments, and per-lesson progress for the course player.
@@ -194,6 +194,6 @@ export const useCourseStore = create<CourseState>()(
 
       reset: () => set(initialState, false, "course/reset"),
     }),
-    { name: "EduOS Course Store" },
+    { name: "EliteClass Course Store" },
   ),
 );

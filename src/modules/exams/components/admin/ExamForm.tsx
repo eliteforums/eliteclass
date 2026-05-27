@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { examSchema, type ExamFormData } from "../../validations/exam.schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Resolver } from "react-hook-form";
 
 interface ExamFormProps {
   initialData?: Partial<ExamFormData>;
@@ -49,7 +50,7 @@ const formatDateForInput = (dateString?: string | null) => {
 
 export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
   const form = useForm<ExamFormData>({
-    resolver: zodResolver(examSchema),
+    resolver: zodResolver(examSchema) as Resolver<ExamFormData>,
     defaultValues: {
       title: "",
       description: "",
@@ -65,7 +66,7 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       ...initialData,
       start_time: formatDateForInput(initialData?.start_time),
       end_time: formatDateForInput(initialData?.end_time),
-    },
+    } as ExamFormData,
   });
 
   return (

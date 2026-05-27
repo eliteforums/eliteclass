@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useStudents
+// EliteClass — useStudents
 //
 // Local-state hook for the student management list page.
 //

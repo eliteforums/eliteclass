@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Auth Module Validations
+// EliteClass — Auth Module Validations
 //
 // Zod schemas for every auth form in this module.
 // The global `src/lib/validations.ts` holds the app-wide base schemas;

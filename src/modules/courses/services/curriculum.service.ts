@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Curriculum Service
+// EliteClass — LMS Curriculum Service
 //
 // Database operations for: modules, lessons, lesson materials, and quizzes.
 // Every function returns ApiResponse<T> — never throws.

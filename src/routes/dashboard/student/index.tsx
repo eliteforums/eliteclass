@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AttendanceCalendar } from "@/components/dashboard/student/AttendanceCalendar";
-import { AttendanceChart } from "@/components/dashboard/student/AttendanceChart";
+import { AttendanceChartLazy } from "@/lib/lazy-routes";
 import { AttendanceHistoryTable } from "@/components/dashboard/student/AttendanceHistoryTable";
 import { AttendanceStatsCard } from "@/components/dashboard/student/AttendanceStatsCard";
 import { BatchInfoCard } from "@/components/dashboard/student/BatchInfoCard";
@@ -20,7 +20,7 @@ import { StudentLearningSection } from "@/modules/courses/components/student/Stu
 const STUDENT_DASHBOARD_TIMEOUT_MS = 15_000;
 
 export const Route = createFileRoute("/dashboard/student/")({
-  head: () => ({ meta: [{ title: "Student Dashboard — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Student Dashboard — EliteClass" }] }),
   component: StudentDashboard,
 });
 
@@ -270,7 +270,7 @@ function StudentDashboard() {
 
             <AttendanceStatsCard stats={activeDashboard.stats} />
 
-            <AttendanceChart
+            <AttendanceChartLazy
               monthlyTrend={activeDashboard.stats.monthly_trend}
               weeklyTrend={activeDashboard.stats.weekly_trend}
             />

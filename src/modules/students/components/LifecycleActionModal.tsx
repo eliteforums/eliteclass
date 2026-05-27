@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LifecycleActionModal
+// EliteClass — LifecycleActionModal
 //
 // Modal for performing a lifecycle action on a student: graduate, suspend,
 // reactivate, or promote/transfer to another batch.

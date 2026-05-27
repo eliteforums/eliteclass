@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Security Service
+// EliteClass — Security Service
 //
 // Activity logging and session validation utilities.
 //

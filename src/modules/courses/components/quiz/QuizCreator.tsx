@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Quiz Creator
+// EliteClass — Quiz Creator
 //
 // Interactive quiz builder with settings, question management, and choices.
 // Supports: MCQ, True/False, Short Answer question types.

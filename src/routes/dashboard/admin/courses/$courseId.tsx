@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/dashboard/admin/courses/$courseId")({
-  head: () => ({ meta: [{ title: "Course Details — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Course Details — EliteClass" }] }),
   component: CourseDetailPage,
 });
 

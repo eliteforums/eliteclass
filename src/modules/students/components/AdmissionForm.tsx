@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — AdmissionForm
+// EliteClass — AdmissionForm
 //
 // Multi-section student admission form.
 // Uses React Hook Form + Zod for validation and the admitStudent service

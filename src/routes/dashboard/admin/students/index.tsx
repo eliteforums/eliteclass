@@ -1,36 +1,40 @@
 import { createFileRoute } from '@tanstack/react-router'
 // ---------------------------------------------------------------------------
-// EduOS — Admin: Student Management Page
+// EliteClass — Admin: Student Management Page
 //
 // Full student management interface for institute admins.
 // Features:
-//  - Paginated, searchable, filterable student table
+//  - Virtualized infinite scroll for large datasets (50k+ students)
+//  - Searchable, filterable student table
 //  - Admission modal with AdmissionForm (fixed overlay)
 //  - StudentProfileSheet slide-in panel for per-student actions
-//  - Optimistic archive / restore via useStudents hook
+//  - Optimistic archive / restore
 //  - Error banner on fetch failure
 // ---------------------------------------------------------------------------
 
-import React, { useState, useCallback, useEffect } from "react";
-import { Plus, AlertCircle, ChevronLeft, ChevronRight, X, RefreshCw, Loader2 } from "lucide-react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
+import { Plus, AlertCircle, X, RefreshCw, Loader2 } from "lucide-react";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SearchInput } from "@/components/ui/SearchInput";
+import { VirtualDataTable, type ColumnDef } from "@/components/ui/VirtualDataTable";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuthStore } from "@/store/authStore";
-import { useStudents } from "@/modules/students/hooks/useStudents";
-import { StudentTable } from "@/modules/students/components/StudentTable";
+import { useInfiniteStudents } from "@/modules/students/hooks/useInfiniteStudents";
+import { updateStudent } from "@/services/student.service";
 import { StudentProfileSheet } from "@/modules/students/components/StudentProfileSheet";
 import { AdmissionForm } from "@/modules/students/components/AdmissionForm";
 import BulkImportModal from "@/modules/students/components/BulkImportModal";
 import { AssignFeeModal } from "@/modules/fees/components/AssignFeeModal";
 import { getFeeStructures } from "@/services/fee.service";
-import type { Student, StudentStatus, FeeStructure } from "@/types";
+import { getInitials, formatDate } from "@/utils/helpers";
+import type { Student, StudentStatus, StudentFilters, FeeStructure } from "@/types";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export const Route = createFileRoute("/dashboard/admin/students/")({
-  head: () => ({ meta: [{ title: "Students — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Students — EliteClass" }] }),
   component: StudentsPage,
 });
 
@@ -40,111 +44,198 @@ function StudentsPage() {
   const { user, isLoading: authLoading } = useAuthStore();
   const instituteId = user?.institute_id ?? null;
 
-  // ── Data hook ────────────────────────────────────────────────────────────
+  // ── Filter state ──────────────────────────────────────────────────────────
+  const [searchValue, setSearchValue] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StudentStatus | undefined>(undefined);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchValue), 300);
+    return () => clearTimeout(timer);
+  }, [searchValue]);
+
+  const filters: StudentFilters = useMemo(
+    () => ({
+      search: debouncedSearch || undefined,
+      status: statusFilter,
+    }),
+    [debouncedSearch, statusFilter],
+  );
+
+  // ── Infinite query for students ───────────────────────────────────────────
   const {
     students,
+    total,
     isLoading,
+    isFetchingNextPage,
     error,
-    pagination,
+    hasNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteStudents({
+    instituteId,
     filters,
-    setSearch,
-    setStatusFilter,
-    archiveStudent,
-    restoreStudent,
-    fetchStudents,
-  } = useStudents({ instituteId });
+    pageSize: 50,
+    enabled: !authLoading,
+  });
 
   // ── Local UI state ────────────────────────────────────────────────────────
-  /** Currently viewed student — null means the profile sheet is closed. */
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  /** Controls the per-student fee assignment modal. */
   const [isAssignFeeModalOpen, setIsAssignFeeModalOpen] = useState(false);
-  /** Controls visibility of the Admit Student modal. */
   const [isAdmitModalOpen, setIsAdmitModalOpen] = useState(false);
   const [admitMode, setAdmitMode] = useState<"manual" | "import">("manual");
-  /** Tracks the raw SearchInput value (synced with hook's filters.search). */
-  const [searchValue, setSearchValue] = useState("");
-  /** Fee structures available for assignment in the current institute. */
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
 
   useEffect(() => {
     if (!instituteId) return;
-
     let cancelled = false;
 
     async function loadFeeStructures() {
-      // OPTIMIZATION: Only fetch if the modal is about to be used or on mount
-      const result = await getFeeStructures(instituteId);
+      const result = await getFeeStructures(instituteId ?? "");
       if (!cancelled && result.success && result.data) {
         setFeeStructures(result.data);
       }
     }
 
     loadFeeStructures();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [instituteId]);
 
-  // ── Table callbacks ───────────────────────────────────────────────────────
+  // ── VirtualDataTable columns ──────────────────────────────────────────────
+  const columns: ColumnDef<Student>[] = useMemo(
+    () => [
+      {
+        key: "student",
+        header: "Student",
+        width: "30%",
+        render: (student) => (
+          <div className="flex items-center gap-3 min-w-0">
+            <div
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground select-none"
+              aria-hidden="true"
+            >
+              {getInitials(student.user?.name ?? "?")}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-foreground">
+                {student.user?.name ?? "—"}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{student.user?.email ?? "—"}</p>
+            </div>
+          </div>
+        ),
+      },
+      {
+        key: "admissionNo",
+        header: "Admission No",
+        width: "15%",
+        render: (student) => (
+          <span className="font-mono text-sm text-foreground">{student.admission_no}</span>
+        ),
+      },
+      {
+        key: "status",
+        header: "Status",
+        width: "12%",
+        render: (student) => <StatusBadge status={student.status} />,
+      },
+      {
+        key: "joined",
+        header: "Joined",
+        width: "15%",
+        render: (student) => (
+          <span className="text-sm text-muted-foreground whitespace-nowrap">
+            {formatDate(student.created_at)}
+          </span>
+        ),
+      },
+      {
+        key: "actions",
+        header: "",
+        width: "120px",
+        render: (student) => (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedStudent(student);
+              }}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              View
+            </button>
+            {student.status !== "inactive" ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleArchive(student);
+                }}
+                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                Archive
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRestore(student);
+                }}
+                className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950 dark:hover:text-green-400"
+              >
+                Restore
+              </button>
+            )}
+          </div>
+        ),
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
-  const handleView = useCallback((student: Student) => {
-    setSelectedStudent(student);
-  }, []);
-
+  // ── Mutations ─────────────────────────────────────────────────────────────
   const handleArchive = useCallback(
     async (student: Student) => {
-      await archiveStudent(student.id);
+      await updateStudent(student.id, { status: "inactive" });
+      refetch();
     },
-    [archiveStudent],
+    [refetch],
   );
 
   const handleRestore = useCallback(
     async (student: Student) => {
-      await restoreStudent(student.id);
+      await updateStudent(student.id, { status: "active" });
+      refetch();
     },
-    [restoreStudent],
-  );
-
-  // ── Search ────────────────────────────────────────────────────────────────
-
-  const handleSearchChange = useCallback(
-    (value: string) => {
-      setSearchValue(value);
-      setSearch(value);
-    },
-    [setSearch],
+    [refetch],
   );
 
   // ── Profile sheet archive / restore toggle ────────────────────────────────
-
-  /** Toggles archive ↔ restore for the currently selected student, then closes the sheet. */
   const handleSheetArchiveToggle = useCallback(async () => {
     if (!selectedStudent) return;
 
     if (selectedStudent.status !== "inactive") {
-      await archiveStudent(selectedStudent.id);
+      await updateStudent(selectedStudent.id, { status: "inactive" });
     } else {
-      await restoreStudent(selectedStudent.id);
+      await updateStudent(selectedStudent.id, { status: "active" });
     }
 
     setSelectedStudent(null);
-  }, [selectedStudent, archiveStudent, restoreStudent]);
+    refetch();
+  }, [selectedStudent, refetch]);
 
   const handleAssignFee = useCallback(() => {
     setIsAssignFeeModalOpen(true);
   }, []);
 
   // ── Admission success ─────────────────────────────────────────────────────
-
   const handleAdmissionSuccess = useCallback(() => {
-    // Refresh from page 1 so the new student appears immediately.
-    // NOTE: We don't close the modal here because the AdmissionForm
-    // needs to display the generated credentials. The user will
-    // close it via the "Done" button on the success screen.
-    fetchStudents(1);
-  }, [fetchStudents]);
+    refetch();
+  }, [refetch]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -154,7 +245,7 @@ function StudentsPage() {
       <PageHeader
         title="Students"
         subtitle="Manage student admissions and records"
-        badge={isLoading ? "— students" : `${pagination.total} students`}
+        badge={isLoading ? "— students" : `${total} students`}
         actions={
           <button
             type="button"
@@ -183,7 +274,7 @@ function StudentsPage() {
             <span className="flex-1">{error}</span>
             <button
               type="button"
-              onClick={() => fetchStudents(1)}
+              onClick={() => refetch()}
               className="inline-flex items-center gap-1.5 rounded-md border border-destructive/40 px-2.5 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10"
             >
               <RefreshCw className="h-3 w-3" />
@@ -197,12 +288,12 @@ function StudentsPage() {
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SearchInput
           value={searchValue}
-          onChange={handleSearchChange}
+          onChange={setSearchValue}
           placeholder="Search students…"
           className="w-full sm:max-w-xs"
         />
         <select
-          value={filters.status ?? ""}
+          value={statusFilter ?? ""}
           onChange={(e) =>
             setStatusFilter((e.target.value as StudentStatus | undefined) || undefined)
           }
@@ -216,45 +307,32 @@ function StudentsPage() {
         </select>
       </div>
 
-      {/* ── Student table ─────────────────────────────────────────────── */}
+      {/* ── Student table with virtual scrolling ──────────────────────── */}
       <div className="mt-4">
-        <StudentTable
-          students={students}
-          isLoading={isLoading}
-          onView={handleView}
-          onArchive={handleArchive}
-          onRestore={handleRestore}
-        />
+        {isLoading && students.length === 0 ? (
+          <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading students…
+          </div>
+        ) : students.length === 0 && !isLoading ? (
+          <div className="rounded-xl border border-border bg-card p-8 text-center">
+            <p className="text-sm font-medium text-foreground">No students found</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Try adjusting your search or filters, or admit a new student.
+            </p>
+          </div>
+        ) : (
+          <VirtualDataTable
+            data={students}
+            columns={columns}
+            rowHeight={56}
+            overscan={8}
+            onLoadMore={() => fetchNextPage()}
+            hasNextPage={hasNextPage}
+            isLoading={isFetchingNextPage}
+          />
+        )}
       </div>
-
-      {/* ── Pagination ────────────────────────────────────────────────── */}
-      {pagination.totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={() => fetchStudents(pagination.page - 1)}
-            disabled={pagination.page <= 1 || isLoading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Prev
-          </button>
-
-          <span className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => fetchStudents(pagination.page + 1)}
-            disabled={pagination.page >= pagination.totalPages || isLoading}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
-        </div>
-      )}
 
       {/* ── Student Profile Sheet ─────────────────────────────────────── */}
       <StudentProfileSheet
@@ -288,7 +366,6 @@ function StudentsPage() {
           role="dialog"
           aria-label="Admit Student"
           onClick={(e) => {
-            // Close when clicking the backdrop, not the card itself.
             if (e.target === e.currentTarget) setIsAdmitModalOpen(false);
           }}
         >
@@ -314,17 +391,16 @@ function StudentsPage() {
               {admitMode === "manual" ? (
                 <AdmissionForm
                   instituteId={instituteId ?? ""}
-                  onSuccess={() => { handleAdmissionSuccess(); /* keep modal open for credentials */ }}
+                  onSuccess={() => { handleAdmissionSuccess(); }}
                   onCancel={() => setIsAdmitModalOpen(false)}
                 />
               ) : (
-                // Lazy import BulkImportModal component
                 <React.Suspense fallback={<div className="p-6">Loading…</div>}>
                   <BulkImportModal
                     instituteId={instituteId ?? ""}
                     instituteName={user?.institute_id ?? undefined}
                     onClose={() => setIsAdmitModalOpen(false)}
-                    onComplete={() => fetchStudents(1)}
+                    onComplete={() => refetch()}
                   />
                 </React.Suspense>
               )}

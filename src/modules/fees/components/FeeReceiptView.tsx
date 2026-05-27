@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — FeeReceiptView
+// EliteClass — FeeReceiptView
 //
 // A printable fee payment receipt component.
 // Designed for both screen display (inside a modal) and physical printing.

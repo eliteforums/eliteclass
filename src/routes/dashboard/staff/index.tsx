@@ -14,7 +14,7 @@ import type { Staff, StaffAssignment, StaffBatchAssignment } from "@/types";
 const STAFF_DASHBOARD_TIMEOUT_MS = 15_000;
 
 export const Route = createFileRoute("/dashboard/staff/")({
-  head: () => ({ meta: [{ title: "Staff Dashboard — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Staff Dashboard — EliteClass" }] }),
   component: StaffDashboard,
 });
 
@@ -288,7 +288,7 @@ function StaffDashboard() {
                       key={assignment.id}
                       className="inline-flex rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-foreground"
                     >
-                      {assignment.course?.name ?? "Unknown course"}
+                      {assignment.course?.title ?? "Unknown course"}
                     </span>
                   ))}
                 </div>

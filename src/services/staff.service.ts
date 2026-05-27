@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Staff Service
+// EliteClass — Staff Service
 //
 // All database operations for the `staff` table live here.
 // "Staff" covers teachers, coordinators, and any other non-student employee
@@ -89,7 +89,7 @@ async function syncStaffCourseAssignments(
 
   const uniqueCourseIds = Array.from(new Set(assignedCourseIds.filter(Boolean)));
 
-  const { data: existingRows, error: existingError } = await supabase
+  const { data: existingRows, error: existingError } = await supabase!
     .from("staff_courses")
     .select("id, course_id")
     .eq("staff_id", staffId)
@@ -107,7 +107,7 @@ async function syncStaffCourseAssignments(
     .filter((courseId) => !desiredCourseIds.has(courseId));
 
   if (courseIdsToAdd.length > 0) {
-    const { data: validCourses, error: courseError } = await supabase
+    const { data: validCourses, error: courseError } = await supabase!
       .from("lms_courses")
       .select("id")
       .eq("institute_id", instituteId)
@@ -145,7 +145,7 @@ async function syncStaffCourseAssignments(
   }
 
   if (courseIdsToRemove.length > 0) {
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await supabase!
       .from("staff_courses")
       .delete()
       .eq("staff_id", staffId)
@@ -159,7 +159,7 @@ async function syncStaffCourseAssignments(
 
   invalidateStaffCourseAssignmentsCache(staffId);
 
-  const { data: finalRows, error: finalError } = await supabase
+  const { data: finalRows, error: finalError } = await supabase!
     .from("staff_courses")
     .select(
       "id, institute_id, staff_id, course_id, assigned_at, assigned_by, course:lms_courses(id, title, status, created_at, updated_at)",
@@ -172,7 +172,7 @@ async function syncStaffCourseAssignments(
     return { data: null, error: finalError.message, success: false };
   }
 
-  return { data: (finalRows ?? []) as StaffCourseAssignment[], error: null, success: true };
+  return { data: (finalRows ?? []) as unknown as StaffCourseAssignment[], error: null, success: true };
 }
 
 // ── Queries ──────────────────────────────────────────────────────────────────
@@ -184,14 +184,14 @@ async function syncStaffCourseAssignments(
 export async function getStaffByInstitute(instituteId: string): Promise<ApiResponse<Staff[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff")
     .select(STAFF_DETAIL_SELECT)
     .eq("institute_id", instituteId)
     .order("created_at", { ascending: false });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as Staff[], error: null, success: true };
+  return { data: data as unknown as Staff[], error: null, success: true };
 }
 
 /**
@@ -201,14 +201,14 @@ export async function getStaffByInstitute(instituteId: string): Promise<ApiRespo
 export async function getStaffByUserId(userId: string): Promise<ApiResponse<Staff>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff")
     .select(STAFF_DETAIL_SELECT)
     .eq("user_id", userId)
     .single();
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as Staff, error: null, success: true };
+  return { data: data as unknown as Staff, error: null, success: true };
 }
 
 /**
@@ -219,10 +219,10 @@ export async function getStaffByUserId(userId: string): Promise<ApiResponse<Staf
 export async function admitStaff(
   payload: AdmitStaffPayload,
 ): Promise<ApiResponse<AdmitStaffResult>> {
-  if (!supabase || !supabaseAdmin) return SUPABASE_NOT_CONFIGURED;
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // ── Step 0: Pre-check if email already exists in the system ──────────────
-  const { data: existingUser, error: checkError } = await supabase
+  const { data: existingUser, error: checkError } = await supabase!
     .from("users")
     .select("id, institute_id, role")
     .eq("email", payload.email)
@@ -246,7 +246,7 @@ export async function admitStaff(
     }
 
     // Check if they are already staff in this institute
-    const { data: existingStaff } = await supabase
+    const { data: existingStaff } = await supabase!
       .from("staff")
       .select("id")
       .eq("user_id", existingUser.id)
@@ -270,15 +270,24 @@ export async function admitStaff(
 
   // ── Step 2: Create Auth User (only if they don't exist yet) ──────────────
   if (!isExistingUser) {
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    // Use a disposable client to avoid overwriting the admin's session
+    const { createClient } = await import("@supabase/supabase-js");
+    const signUpClient = createClient(
+      import.meta.env.VITE_SUPABASE_URL,
+      import.meta.env.VITE_SUPABASE_ANON_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+    );
+
+    const { data: authData, error: authError } = await signUpClient.auth.signUp({
       email: payload.email,
       password: temporaryPassword,
-      email_confirm: true,
-      user_metadata: {
-        name: payload.name,
-        role: "staff",
-        institute_id: payload.institute_id,
-        force_password_change: true,
+      options: {
+        data: {
+          name: payload.name,
+          role: "staff",
+          institute_id: payload.institute_id,
+          force_password_change: true,
+        },
       },
     });
 
@@ -362,7 +371,7 @@ export async function admitStaff(
 export async function getStaffAssignments(staffId: string): Promise<ApiResponse<StaffAssignment[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff_assignments")
     .select("*, batch:batches(*)")
     .eq("staff_id", staffId);
@@ -388,7 +397,7 @@ export async function getStaffBatchAssignments(
 
   try {
     const data = await cachedQuery(cacheKey, 30_000, async () => {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await supabase!
         .from("staff_assignments")
         .select(
           "id, institute_id, staff_id, batch_id, assigned_at, assigned_by, batch:batches(id, institute_id, name, academic_year, batch_code, course_name, start_date, end_date, capacity, is_active, status, archived_at, created_at, updated_at)",
@@ -400,7 +409,7 @@ export async function getStaffBatchAssignments(
         .order("assigned_at", { ascending: false });
 
       if (error) throw error;
-      return (rows ?? []) as StaffBatchAssignment[];
+      return (rows ?? []) as unknown as StaffBatchAssignment[];
     });
 
     return { data, error: null, success: true };
@@ -421,7 +430,7 @@ export async function getAssignableBatchOptions(
     return { data: null, error: "Invalid institute id.", success: false };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("batches")
     .select("id, name, academic_year, course_name, is_active, status")
     .eq("institute_id", instituteId)
@@ -459,7 +468,7 @@ export async function assignBatchToStaff(payload: {
     return { data: null, error: "Invalid assignment payload.", success: false };
   }
 
-  const { data: activeBatch, error: batchError } = await supabase
+  const { data: activeBatch, error: batchError } = await supabase!
     .from("batches")
     .select("id")
     .eq("id", payload.batch_id)
@@ -477,7 +486,7 @@ export async function assignBatchToStaff(payload: {
     };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff_assignments")
     .insert({
       institute_id: payload.institute_id,
@@ -501,7 +510,7 @@ export async function assignBatchToStaff(payload: {
   }
 
   invalidateStaffBatchAssignmentsCache(payload.staff_id);
-  return { data: data as StaffBatchAssignment, error: null, success: true };
+  return { data: data as unknown as StaffBatchAssignment, error: null, success: true };
 }
 
 /**
@@ -517,7 +526,7 @@ export async function removeStaffBatchAssignment(payload: {
     return { data: null, error: "Invalid assignment id.", success: false };
   }
 
-  const { error } = await supabase
+  const { error } = await supabase!
     .from("staff_assignments")
     .delete()
     .eq("id", payload.assignment_id)
@@ -545,7 +554,7 @@ export async function getStaffCourses(staffId: string): Promise<ApiResponse<Staf
 
   try {
     const data = await cachedQuery(cacheKey, 30_000, async () => {
-      const { data: rows, error } = await supabase
+      const { data: rows, error } = await supabase!
         .from("staff_courses")
         .select(
           "id, institute_id, staff_id, course_id, assigned_at, assigned_by, course:lms_courses(id, title, status, created_at, updated_at)",
@@ -554,7 +563,7 @@ export async function getStaffCourses(staffId: string): Promise<ApiResponse<Staf
         .order("assigned_at", { ascending: false });
 
       if (error) throw error;
-      return (rows ?? []) as StaffCourseAssignment[];
+      return (rows ?? []) as unknown as StaffCourseAssignment[];
     });
 
     return { data, error: null, success: true };
@@ -575,7 +584,7 @@ export async function getAssignableCourseOptions(
     return { data: null, error: "Invalid institute id.", success: false };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("lms_courses")
     .select("id, title, status")
     .eq("institute_id", instituteId)
@@ -614,7 +623,7 @@ export async function assignCourseToStaff(payload: {
     return { data: null, error: "Invalid assignment payload.", success: false };
   }
 
-  const { data: staffRow, error: staffError } = await supabase
+  const { data: staffRow, error: staffError } = await supabase!
     .from("staff")
     .select("id")
     .eq("id", payload.staff_id)
@@ -626,7 +635,7 @@ export async function assignCourseToStaff(payload: {
     return { data: null, error: "Staff member not found for this institute.", success: false };
   }
 
-  const { data: linkedCourse, error: courseError } = await supabase
+  const { data: linkedCourse, error: courseError } = await supabase!
     .from("lms_courses")
     .select("id, status")
     .eq("id", payload.course_id)
@@ -643,7 +652,7 @@ export async function assignCourseToStaff(payload: {
     };
   }
 
-  const { data: existingAssignment, error: existingError } = await supabase
+  const { data: existingAssignment, error: existingError } = await supabase!
     .from("staff_courses")
     .select("id")
     .eq("staff_id", payload.staff_id)
@@ -655,7 +664,7 @@ export async function assignCourseToStaff(payload: {
     return { data: null, error: "Course already assigned to this staff member.", success: false };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff_courses")
     .insert({
       institute_id: payload.institute_id,
@@ -677,7 +686,7 @@ export async function assignCourseToStaff(payload: {
   }
 
   invalidateStaffCourseAssignmentsCache(payload.staff_id);
-  return { data: data as StaffCourseAssignment, error: null, success: true };
+  return { data: data as unknown as StaffCourseAssignment, error: null, success: true };
 }
 
 /**
@@ -693,7 +702,7 @@ export async function removeStaffCourse(payload: {
     return { data: null, error: "Invalid assignment id.", success: false };
   }
 
-  const { error } = await supabase
+  const { error } = await supabase!
     .from("staff_courses")
     .delete()
     .eq("id", payload.assignment_id)
@@ -722,7 +731,7 @@ export async function createStaff(
   const { data, error } = await supabase.from("staff").insert(payload).select().single();
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as Staff, error: null, success: true };
+  return { data: data as unknown as Staff, error: null, success: true };
 }
 
 /**
@@ -739,7 +748,7 @@ export async function updateStaff(
 
   const { assigned_course_ids, fullName, email, phone, ...staffPayload } = payload;
 
-  const { data: existingStaff, error: staffLookupError } = await supabase
+  const { data: existingStaff, error: staffLookupError } = await supabase!
     .from("staff")
     .select("id, user_id, institute_id")
     .eq("id", id)
@@ -749,7 +758,7 @@ export async function updateStaff(
     return { data: null, error: staffLookupError?.message ?? "Staff record not found.", success: false };
   }
 
-  const authUpdate = await supabaseAdmin.auth.admin.updateUserById(existingStaff.user_id, {
+  const authUpdate = await supabaseAdmin!.auth.admin.updateUserById(existingStaff.user_id, {
     email,
     user_metadata: { name: fullName },
   });
@@ -758,7 +767,7 @@ export async function updateStaff(
     return { data: null, error: authUpdate.error.message, success: false };
   }
 
-  const { error: userUpdateError } = await supabase
+  const { error: userUpdateError } = await supabase!
     .from("users")
     .update({ name: fullName, email, phone })
     .eq("id", existingStaff.user_id);
@@ -767,7 +776,7 @@ export async function updateStaff(
     return { data: null, error: userUpdateError.message, success: false };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabase!
     .from("staff")
     .update(staffPayload)
     .eq("id", id)
@@ -791,10 +800,10 @@ export async function updateStaff(
       };
     }
 
-    (data as Staff).assigned_courses = syncResult.data ?? [];
+    ((data as unknown) as Staff).assigned_courses = syncResult.data ?? [];
   }
 
-  return { data: data as Staff, error: null, success: true };
+  return { data: data as unknown as Staff, error: null, success: true };
 }
 
 /**
@@ -819,21 +828,29 @@ export async function removeStaff(id: string): Promise<ApiResponse<null>> {
 export async function resetStaffPassword(
   userId: string,
 ): Promise<ApiResponse<{ temporary_password: string }>> {
-  if (!supabase || !supabaseAdmin) return SUPABASE_NOT_CONFIGURED;
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const newPassword = generateTempPassword();
 
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: newPassword,
-  });
-
-  if (error) {
-    return { data: null, error: error.message, success: false };
+  // If supabaseAdmin is available (server-side), use it directly
+  if (supabaseAdmin) {
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: newPassword,
+    });
+    if (error) {
+      return { data: null, error: error.message, success: false };
+    }
+    return { data: { temporary_password: newPassword }, error: null, success: true };
   }
 
-  return {
-    data: { temporary_password: newPassword },
-    error: null,
-    success: true,
-  };
+  // Browser fallback: can't reset another user's password without admin API
+  // Send a password reset email instead
+  const { data: userData } = await supabase.from("users").select("email").eq("id", userId).single();
+  if (userData?.email) {
+    const { error } = await supabase.auth.resetPasswordForEmail(userData.email);
+    if (error) return { data: null, error: error.message, success: false };
+    return { data: { temporary_password: "(reset email sent)" }, error: null, success: true };
+  }
+
+  return { data: null, error: "Cannot reset password without admin access.", success: false };
 }

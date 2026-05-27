@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — AttendanceMarkingTable
+// EliteClass — AttendanceMarkingTable
 //
 // The core attendance-marking UI. Renders a session header, bulk-action
 // buttons, a per-student status/notes table, a live summary footer, and

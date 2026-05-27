@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Email Service
+// EliteClass — Email Service
 //
 // Handles professional email delivery for the platform.
 // Uses Resend API via Fetch for lightweight, production-ready delivery.
@@ -9,7 +9,7 @@ import type { ApiResponse } from "@/types";
 
 const RESEND_API_KEY = import.meta.env.VITE_RESEND_API_KEY;
 const APP_URL = import.meta.env.VITE_APP_URL || "http://localhost:5173";
-const APP_NAME = import.meta.env.VITE_APP_NAME || "EduOS";
+const APP_NAME = import.meta.env.VITE_APP_NAME || "EliteClass";
 
 interface SendEmailPayload {
   to: string;

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Register Institute Service (auth module)
+// EliteClass — Register Institute Service (auth module)
 //
 // ARCHITECTURE NOTE — Why this uses supabase.rpc() instead of direct inserts
 // ---------------------------------------------------------------------------
@@ -142,64 +142,69 @@ export async function registerInstitute(
 
   // ── Step 1: Create the Supabase Auth user ──────────────────────────────────
   //
-  // Prefer the admin API when available so new registrations do not depend on
-  // browser-side confirmation/session state.
-  const authClient = supabaseAdmin?.auth.admin ? supabaseAdmin.auth.admin : null;
+  // Use admin API on server, fall back to signUp() in browser.
+  const authClient = supabaseAdmin?.auth.admin ?? null;
 
-  if (!authClient) {
-    return {
-      data: null,
-      error:
-        "Supabase admin credentials are not configured. Add the service role key to the server environment, then restart the app.",
-      success: false,
-    };
-  }
+  let userId: string | null = null;
+  let requiresEmailConfirmation = false;
 
-  let userId = await findAuthUserIdByEmail(email);
+  if (authClient) {
+    // Server-side: use admin API (no email confirmation needed)
+    userId = await findAuthUserIdByEmail(email);
 
-  if (!userId) {
-    const { data: authData, error: authError } = await authClient.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        name: adminName,
-        role: "admin",
-      },
-    });
+    if (!userId) {
+      const { data: authData, error: authError } = await authClient.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          name: adminName,
+          role: "admin",
+        },
+      });
 
-    if (authError) {
-      const alreadyRegistered = authError.message.toLowerCase().includes("already registered");
-      if (alreadyRegistered) {
-        userId = await findAuthUserIdByEmail(email);
+      if (authError) {
+        const alreadyRegistered = authError.message.toLowerCase().includes("already registered");
+        if (alreadyRegistered) {
+          userId = await findAuthUserIdByEmail(email);
+        }
+        if (!userId) {
+          return { data: null, error: authError.message, success: false };
+        }
+      } else if (authData.user) {
+        userId = authData.user.id;
       }
-
-      if (!userId) {
-        return {
-          data: null,
-          error: authError.message,
-          success: false,
-        };
+    } else {
+      // User exists — update password
+      const { error: passwordUpdateError } = await authClient.updateUserById(userId, {
+        password,
+        user_metadata: { name: adminName, role: "admin" },
+      });
+      if (passwordUpdateError) {
+        return { data: null, error: passwordUpdateError.message, success: false };
       }
-    } else if (authData.user) {
-      userId = authData.user.id;
     }
   } else {
-    const { error: passwordUpdateError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    // Browser-side: use standard signUp (may require email confirmation)
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
       password,
-      user_metadata: {
-        name: adminName,
-        role: "admin",
+      options: {
+        data: { name: adminName, role: "admin" },
       },
     });
 
-    if (passwordUpdateError) {
-      return {
-        data: null,
-        error: passwordUpdateError.message,
-        success: false,
-      };
+    if (signUpError) {
+      return { data: null, error: signUpError.message, success: false };
     }
+
+    if (!signUpData.user) {
+      return { data: null, error: "Sign-up succeeded but no user was returned.", success: false };
+    }
+
+    userId = signUpData.user.id;
+    // If session is null, email confirmation is required
+    requiresEmailConfirmation = !signUpData.session;
   }
 
   if (!userId) {
@@ -209,10 +214,6 @@ export async function registerInstitute(
       success: false,
     };
   }
-
-  // Admin-created users are confirmed immediately so the dashboard can open
-  // without waiting for a browser auth session or email link.
-  const requiresEmailConfirmation = false;
 
   // ── Step 2: Atomic institute + profile creation via SECURITY DEFINER RPC ──
   //

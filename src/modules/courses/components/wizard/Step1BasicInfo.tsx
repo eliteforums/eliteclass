@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Wizard Step 1: Basic Course Information
+// EliteClass — LMS Wizard Step 1: Basic Course Information
 //
 // Full react-hook-form + zod form for all course metadata.
 // Two-column desktop layout, dynamic tag inputs, radio groups.

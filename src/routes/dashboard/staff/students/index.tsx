@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Staff: My Students
+// EliteClass — Staff: My Students
 // ---------------------------------------------------------------------------
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -25,7 +25,7 @@ import { TeacherStudentCardGrid } from "@/modules/teacher-students/components/Te
 import type { Batch } from "@/types";
 
 export const Route = createFileRoute("/dashboard/staff/students/")({
-  head: () => ({ meta: [{ title: "My Students — EduOS" }] }),
+  head: () => ({ meta: [{ title: "My Students — EliteClass" }] }),
   component: TeacherStudentsPage,
 });
 

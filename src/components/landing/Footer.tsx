@@ -8,11 +8,11 @@ export function Footer() {
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-primary">
             <GraduationCap className="h-4 w-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold">EduOS</span>
-          <span className="text-sm text-muted-foreground">— The OS for modern institutes</span>
+          <span className="font-semibold">EliteClass</span>
+          <span className="text-sm text-muted-foreground">— AI-Powered Institute Management</span>
         </div>
         <p className="text-sm text-muted-foreground">
-          © {new Date().getFullYear()} EduOS. All rights reserved.
+          © {new Date().getFullYear()} EliteClass. All rights reserved.
         </p>
       </div>
     </footer>

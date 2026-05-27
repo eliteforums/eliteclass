@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Auth Module Types
+// EliteClass — Auth Module Types
 //
 // Types that are specific to the auth module only.
 // Shared domain types (User, Institute, UserRole, ApiResponse, etc.) live in

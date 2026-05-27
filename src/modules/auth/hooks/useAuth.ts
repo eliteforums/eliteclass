@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — useAuth (auth module)
+// EliteClass — useAuth (auth module)
 //
 // A thin, module-scoped wrapper around the global `useAuthStore` and the
 // `signOut` service function. Consumers within the auth module import this

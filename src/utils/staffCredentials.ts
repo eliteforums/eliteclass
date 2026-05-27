@@ -1,5 +1,5 @@
 /**
- * EduOS — Staff Credential Utilities
+ * EliteClass — Staff Credential Utilities
  * 
  * Logic for generating staff passwords and sanitizing names.
  * Pattern: FirstName@XXXX (e.g. Rahul@4821)

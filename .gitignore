@@ -32,3 +32,10 @@ dist-ssr
 *.sw?
 .vercel
 .env*
+
+# IDE/Platform metadata
+.cursor/
+.lovable/
+
+# Merge conflict leftovers
+.merge_tmp/

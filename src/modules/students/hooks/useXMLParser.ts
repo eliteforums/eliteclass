@@ -16,7 +16,8 @@ export function useXMLParser() {
     try {
       const fxp = await import("fast-xml-parser");
       const options = { ignoreAttributes: true, attributeNamePrefix: "@_" };
-      const parsed = fxp.parse(text, options) as any;
+      const parser = new fxp.XMLParser(options);
+      const parsed = parser.parse(text) as any;
 
       const studentsNode = parsed?.students?.student ?? parsed?.student ?? [];
       const list = Array.isArray(studentsNode) ? studentsNode : [studentsNode];

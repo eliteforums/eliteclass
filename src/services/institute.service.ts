@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Institute Service
+// EliteClass — Institute Service
 //
 // All database operations for the `institutes` table live here.
 // Write operations that change subscription_plan should only be called

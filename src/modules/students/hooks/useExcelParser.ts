@@ -16,9 +16,9 @@ export function useExcelParser() {
       if (!worksheet) return { rows: [], error: "Excel file does not contain a worksheet." };
 
       const headerRow = worksheet.getRow(1);
-      const headers = headerRow.values
+      const headers = (Array.isArray(headerRow.values) ? headerRow.values : [])
         .slice(1)
-        .map((value) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, "_"));
+        .map((value: unknown) => String(value ?? "").trim().toLowerCase().replace(/\s+/g, "_"));
 
       const rows: BulkImportRow[] = [];
       worksheet.eachRow((row, rowNumber) => {

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Supabase Client
+// EliteClass — Supabase Client
 //
 // WHY THIS FILE MUST NEVER THROW AT MODULE LOAD TIME
 // ---------------------------------------------------------------------------
@@ -45,7 +45,10 @@ declare global {
 
 const supabaseUrl: string | undefined = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey: string | undefined = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabaseServiceKey: string | undefined = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+// Service role key is NOT prefixed with VITE_ to prevent client-side exposure.
+// It's only available during SSR via import.meta.env (Vite exposes all env vars server-side).
+const supabaseServiceKey: string | undefined =
+  typeof window === 'undefined' ? import.meta.env.SUPABASE_SERVICE_ROLE_KEY : undefined;
 
 // ── Configuration flag ───────────────────────────────────────────────────────
 // Export this so AuthProvider, guards, and tests can check readiness without
@@ -63,7 +66,7 @@ if (!isSupabaseConfigured && import.meta.env.DEV && typeof window !== "undefined
     [
       "",
       "┌─────────────────────────────────────────────────────────────────┐",
-      "│  ⚠  EduOS — Supabase credentials not found                      │",
+      "│  ⚠  EliteClass — Supabase credentials not found                      │",
       "│                                                                 │",
       "│  Create a .env file in the project root:                       │",
       "│                                                                 │",
@@ -114,26 +117,28 @@ if (globalThis.__EDUOS_SUPABASE_CLIENT__ === undefined) {
  * requiring email confirmation, managing RBAC roles).
  *
  * This client uses the service_role key and bypasses Row Level Security (RLS).
- * In TanStack Start, this should ONLY be imported and used within server
- * functions (createServerFn) to avoid leaking the service_role key to the browser.
+ * Only created on the server (SSR) — always null in the browser.
+ * The service key env var has no VITE_ prefix so Vite never bundles it client-side.
  */
-export const supabaseAdmin: SupabaseClient | null =
-  globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__ ??
-  (isSupabaseAdminConfigured
-    ? createClient(supabaseUrl!, supabaseServiceKey!, {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-        global: {
-          fetch: createSupabaseFetch(),
-        },
-      })
-    : null);
+export const supabaseAdmin: SupabaseClient | null = (() => {
+  // HARD GUARD: never create in browser
+  if (typeof window !== 'undefined') return null;
+  if (globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__) return globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__;
+  if (!isSupabaseAdminConfigured) return null;
 
-if (globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__ === undefined) {
-  globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__ = supabaseAdmin;
-}
+  const client = createClient(supabaseUrl!, supabaseServiceKey!, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      fetch: createSupabaseFetch(),
+    },
+  });
+  globalThis.__EDUOS_SUPABASE_ADMIN_CLIENT__ = client;
+  return client;
+})();
 
 // Re-export the type so consumers don't need to import from supabase-js directly.
 export type { SupabaseClient } from "@supabase/supabase-js";

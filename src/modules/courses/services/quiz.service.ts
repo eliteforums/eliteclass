@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LMS Quiz Service
+// EliteClass — LMS Quiz Service
 // All functions return ApiResponse<T> — never throws.
 // ---------------------------------------------------------------------------
 

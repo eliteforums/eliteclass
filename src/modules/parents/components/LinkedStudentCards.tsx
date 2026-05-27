@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — LinkedStudentCards
+// EliteClass — LinkedStudentCards
 //
 // Renders the list of students linked to a parent, used in the parent
 // dashboard and in admin parent-profile views.

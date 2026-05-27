@@ -5,7 +5,7 @@ export function formatCredentialsText(
   credentials: AdmitStudentResult,
 ): string {
   const lines = [
-    "EduOS — Student Login Credentials",
+    "EliteClass — Student Login Credentials",
     "================================",
     "",
     `Student: ${studentName}`,
@@ -30,7 +30,7 @@ export function formatCredentialsText(
     lines.push("");
   }
 
-  lines.push("Sign in at your institute EduOS portal using the email and password above.");
+  lines.push("Sign in at your institute EliteClass portal using the email and password above.");
   lines.push("Change your password after first login.");
   lines.push("");
   lines.push("CONFIDENTIAL — Share securely with the student or guardian only.");
@@ -53,7 +53,7 @@ export function downloadCredentialsFile(studentName: string, credentials: AdmitS
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `eduos-credentials-${credentials.login_id}.txt`;
+  anchor.download = `eliteclass-credentials-${credentials.login_id}.txt`;
   anchor.click();
   URL.revokeObjectURL(url);
 }

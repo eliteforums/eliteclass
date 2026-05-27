@@ -1,0 +1,35 @@
+{
+  "name": "EliteClass",
+  "short_name": "EliteClass",
+  "description": "AI-powered institute management platform for coaching classes, schools, and academies",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#6366f1",
+  "background_color": "#ffffff",
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 import type {
   ApiResponse,
   LmsCourseWithCurriculum,
@@ -50,7 +50,7 @@ function mergeLessonsIntoModules(
         ? nested
         : (byModule.get(mod.id) ?? []).sort((a, b) => a.position - b.position);
 
-    merged.forEach((lesson) => matchedLessonIds.add(lesson.id));
+    merged.forEach((lesson: { id: string }) => matchedLessonIds.add(lesson.id));
 
     return { ...mod, lessons: merged };
   });
@@ -83,7 +83,7 @@ async function loadStudentCourseCurriculum(
   studentId: string,
   instituteId: string,
 ): Promise<ApiResponse<LmsCourseWithCurriculum>> {
-  const db = supabaseAdmin;
+  const db = supabaseAdmin ?? supabase;
   if (!db) return SUPABASE_NOT_CONFIGURED;
 
   const { data: enrollment, error: enrollmentError } = await db

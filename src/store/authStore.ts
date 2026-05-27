@@ -35,12 +35,12 @@ const authStoreImpl = persist<AuthState>(
     getInstituteId: () => get().user?.institute_id ?? null,
   }),
   {
-    name: "eduos-auth",
+    name: "eliteclass-auth",
     partialize: (state) => ({
       user: state.user,
       institute: state.institute,
       isAuthenticated: state.isAuthenticated,
-    }),
+    }) as unknown as AuthState,
     onRehydrateStorage: () => (state) => {
       if (state?.isAuthenticated) {
         state.isLoading = false;
@@ -50,5 +50,5 @@ const authStoreImpl = persist<AuthState>(
 );
 
 export const useAuthStore = create<AuthState>()(
-  import.meta.env.DEV ? devtools(authStoreImpl, { name: "EduOS Auth Store" }) : authStoreImpl,
+  import.meta.env.DEV ? (devtools(authStoreImpl, { name: "EliteClass Auth Store" }) as any) : authStoreImpl,
 );

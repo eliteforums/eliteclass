@@ -11,6 +11,7 @@ import {
 import appCss from "../styles.css?url";
 import { ThemeProvider, themeNoFlashScript } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/AuthProvider";
+import { PWAProvider } from "@/components/pwa";
 import { Toaster } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/utils/helpers";
 
@@ -75,22 +76,35 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "EduOS — AI-Powered Educational Operating System" },
+      { title: "EliteClass — AI-Powered Institute Management Platform" },
       {
         name: "description",
         content:
-          "EduOS unifies ERP, LMS, CRM, communication and AI automation into one operating system for modern educational institutes.",
+          "EliteClass is the all-in-one platform for coaching institutes, schools, and academies. Manage students, attendance, fees, exams, courses, and more with AI-powered automation.",
       },
-      { name: "author", content: "EduOS" },
-      { property: "og:title", content: "EduOS — The OS for modern institutes" },
+      {
+        name: "keywords",
+        content:
+          "institute management, coaching software, school ERP, student management, attendance tracking, fee management, LMS, exam management, AI education, EliteClass",
+      },
+      { name: "author", content: "EliteClass" },
+      { name: "robots", content: "index, follow" },
+      { property: "og:title", content: "EliteClass — AI-Powered Institute Management Platform" },
       {
         property: "og:description",
         content:
-          "ERP, LMS, CRM, AI automation — unified for coaching institutes, schools and academies.",
+          "All-in-one platform for coaching institutes, schools, and academies. ERP, LMS, CRM, and AI automation unified.",
       },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { property: "og:site_name", content: "EliteClass" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "EliteClass — AI-Powered Institute Management" },
+      {
+        name: "twitter:description",
+        content:
+          "Manage your institute with AI-powered automation. Students, attendance, fees, exams, courses — all in one place.",
+      },
+      { name: "theme-color", content: "#6366f1" },
     ],
     links: [
       {
@@ -115,6 +129,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "/favicon.ico",
         type: "image/x-icon",
       },
+      {
+        rel: "manifest",
+        href: "/manifest.webmanifest",
+      },
     ],
   }),
   shellComponent: RootShell,
@@ -128,6 +146,20 @@ function RootShell({ children }: { children: React.ReactNode }) {
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "SoftwareApplication",
+              name: "EliteClass",
+              applicationCategory: "EducationalApplication",
+              operatingSystem: "Web",
+              description: "AI-powered institute management platform",
+              offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+            }),
+          }}
+        />
       </head>
       <body>
         <script dangerouslySetInnerHTML={{ __html: themeNoFlashScript }} />
@@ -146,7 +178,9 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <Outlet />
+          <PWAProvider>
+            <Outlet />
+          </PWAProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Course Creation / Editing Wizard
+// EliteClass — Course Creation / Editing Wizard
 //
 // 6-step wizard for creating and editing LMS courses.
 //

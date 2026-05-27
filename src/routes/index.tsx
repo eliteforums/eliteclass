@@ -11,13 +11,13 @@ import { Footer } from "@/components/landing/Footer";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "EduOS — AI-Powered Educational Operating System" },
+      { title: "EliteClass — AI-Powered Educational Operating System" },
       {
         name: "description",
         content:
-          "EduOS unifies ERP, LMS, CRM, communication and AI automation into one operating system for modern educational institutes.",
+          "EliteClass unifies ERP, LMS, CRM, communication and AI automation into one operating system for modern educational institutes.",
       },
-      { property: "og:title", content: "EduOS — The OS for modern institutes" },
+      { property: "og:title", content: "EliteClass — The OS for modern institutes" },
       {
         property: "og:description",
         content:

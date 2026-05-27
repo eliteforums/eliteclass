@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — FeeStatusBadge
+// EliteClass — FeeStatusBadge
 //
 // A small pill badge that visualises a FeeStatus value with a colored dot
 // and appropriate background / foreground colors in both light and dark mode.

@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// EduOS — Staff: Student Profile
+// EliteClass — Staff: Student Profile
 // ---------------------------------------------------------------------------
 
 import { createFileRoute } from "@tanstack/react-router";
@@ -10,10 +10,10 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { useAuthStore } from "@/store/authStore";
 import { getStaffByUserId } from "@/services/staff.service";
-import { TeacherStudentProfileView } from "@/modules/teacher-students/components/TeacherStudentProfileView";
+import { TeacherStudentProfileViewLazy } from "@/lib/lazy-routes";
 
 export const Route = createFileRoute("/dashboard/staff/students/$studentId")({
-  head: () => ({ meta: [{ title: "Student Profile — EduOS" }] }),
+  head: () => ({ meta: [{ title: "Student Profile — EliteClass" }] }),
   component: TeacherStudentProfilePage,
 });
 
@@ -45,7 +45,7 @@ function TeacherStudentProfilePage() {
   return (
     <ProtectedRoute allowedRoles={["staff"]}>
       <PageHeader title="Student profile" subtitle="Attendance, performance, and remarks" />
-      <TeacherStudentProfileView studentId={studentId} staffId={staffId} />
+      <TeacherStudentProfileViewLazy studentId={studentId} staffId={staffId} />
     </ProtectedRoute>
   );
 }
