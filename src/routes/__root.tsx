@@ -7,6 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
+import { Analytics } from "@vercel/analytics/react";
 
 import appCss from "../styles.css?url";
 import { ThemeProvider, themeNoFlashScript } from "@/components/theme-provider";
@@ -166,6 +167,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
         <Toaster richColors position="top-right" />
         {children}
         <Scripts />
+        <Analytics />
       </body>
     </html>
   );
