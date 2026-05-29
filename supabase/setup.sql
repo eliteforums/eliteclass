@@ -6755,6 +6755,15 @@ CREATE POLICY "lms_course_student_enrolled" ON public.lms_courses
     )
   );
 
+-- Students can browse all published courses in their institute (catalog view)
+CREATE POLICY "lms_course_student_browse_published" ON public.lms_courses
+  FOR SELECT TO authenticated
+  USING (
+    get_my_role() = 'student'
+    AND institute_id = get_my_institute_id()
+    AND status = 'published'
+  );
+
 -- 2. Staff can manage enrollments for their own courses
 CREATE POLICY "lms_enroll_staff_manage_own" ON public.lms_enrollments
   FOR ALL
