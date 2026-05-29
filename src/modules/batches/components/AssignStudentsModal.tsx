@@ -32,8 +32,7 @@ export function AssignStudentsModal({
     if (!isOpen || !instituteId) return;
 
     let cancelled = false;
-
-    async function load() {
+    const debounceTimer = setTimeout(async () => {
       setIsLoading(true);
       setError(null);
 
@@ -49,12 +48,11 @@ export function AssignStudentsModal({
       }
 
       setIsLoading(false);
-    }
-
-    load();
+    }, search ? 300 : 0); // Debounce search, immediate on first load
 
     return () => {
       cancelled = true;
+      clearTimeout(debounceTimer);
     };
   }, [isOpen, instituteId, search]);
 
