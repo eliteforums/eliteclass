@@ -64,6 +64,7 @@ export function BulkImportModal({ instituteId, instituteName, onClose, onComplet
     isImporting,
     progress,
     errors,
+    downloadFailedCSV,
   } = useBulkImport();
 
   async function handleFile(file?: File) {
@@ -172,21 +173,9 @@ export function BulkImportModal({ instituteId, instituteName, onClose, onComplet
   }
 
   function downloadErrorReport() {
-    if (!errors || errors.length === 0) return;
-    const csv = [
-      "row_number,student_name,admission_number,error_message",
-      ...errors.map(
-        (e) =>
-          `${e.rowNumber},"${e.studentName ?? ""}","${e.admissionNumber ?? ""}","${e.errorMessage.replace(/"/g, '""')}"`,
-      ),
-    ].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "import_errors.csv";
-    a.click();
-    URL.revokeObjectURL(url);
+    // Use the hook's downloadFailedCSV which includes all original row data
+    // so users can fix and re-upload just the failed students
+    downloadFailedCSV();
   }
 
   // ── Simplified CSV Mode UI ─────────────────────────────────────────────────
