@@ -284,13 +284,17 @@ export function DashboardSidebar({
       </nav>
 
       <div className="border-t border-sidebar-border p-3">
-        <div
-          title={collapsed ? "Settings (coming soon)" : undefined}
-          className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground opacity-50"
+        <Link
+          to="/dashboard/settings"
+          title={collapsed ? "Settings" : undefined}
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+            "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
+          )}
         >
           <Settings className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Settings</span>}
-        </div>
+        </Link>
       </div>
     </>
   );
