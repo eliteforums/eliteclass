@@ -243,8 +243,14 @@ export async function signOut(): Promise<ApiResponse<null>> {
 export async function requestPasswordReset(email: string): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  // Use the current origin for the redirect URL so it works on any deployment
+  // (localhost in dev, classroom.eliteforums.in in production)
+  const appUrl = typeof window !== "undefined"
+    ? window.location.origin
+    : (import.meta.env.VITE_APP_URL || "https://classroom.eliteforums.in");
+
   const { error } = await supabase!.auth.resetPasswordForEmail(email, {
-    redirectTo: `${import.meta.env.VITE_APP_URL}/auth/update-password`,
+    redirectTo: `${appUrl}/auth/update-password`,
   });
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
