@@ -3,6 +3,7 @@ import { Navigate } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/authStore";
 import { isRoleAllowed } from "@/utils/rbac";
 import { ForcePasswordChangeGuard } from "@/components/ForcePasswordChangeGuard";
+import { ProfileCompletionGuard } from "@/components/ProfileCompletionGuard";
 import type { UserRole } from "@/types";
 
 interface ProtectedRouteProps {
@@ -49,7 +50,9 @@ export function ProtectedRoute({
 
   return (
     <ForcePasswordChangeGuard>
-      {children}
+      <ProfileCompletionGuard>
+        {children}
+      </ProfileCompletionGuard>
     </ForcePasswordChangeGuard>
   );
 }
