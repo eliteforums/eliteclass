@@ -65,7 +65,7 @@ export default function useBulkImport() {
       for (const b of batchRes.data.items) nameToId.set(b.name.toLowerCase(), b.id);
     }
 
-    const chunkSize = 12;
+    const chunkSize = 5;
     const allErrors: BulkImportErrorRow[] = [];
     for (let i = 0; i < toImport.length; i += chunkSize) {
       const chunk = toImport.slice(i, i + chunkSize);
@@ -94,9 +94,38 @@ export default function useBulkImport() {
         const res = settled[j];
         const row = chunk[j];
         if (!res.success || !res.data) {
-          allErrors.push({ rowNumber: row.rowNumber, studentName: row.full_name, admissionNumber: row.admission_number, errorMessage: res.error ?? "Unknown error" });
+          // Retry once on rate limit errors
+          if (res.error && (res.error.includes("rate") || res.error.includes("429") || res.error.includes("too many"))) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const retry = await admitStudent({
+              institute_id: instituteId,
+              institute_name: instituteName,
+              student_name: row.full_name,
+              student_email: row.contact_email ?? null,
+              phone: row.phone ?? "",
+              admission_number: row.admission_number,
+              batch_id: row.batch ? nameToId.get(row.batch.toLowerCase()) ?? null : null,
+              aadhaar_last4: null,
+              emergency_contact: row.emergency_contact_name ? { name: row.emergency_contact_name, phone: row.emergency_contact_phone ?? "", relation: row.emergency_relationship ?? "" } : null,
+              parent_name: row.parent_name ?? null,
+              parent_email: row.parent_email ?? null,
+              parent_phone: row.parent_phone ?? null,
+              parent_occupation: row.occupation ?? null,
+              parent_relation_type: (row.relationship_type as any) ?? null,
+            });
+            if (!retry.success || !retry.data) {
+              allErrors.push({ rowNumber: row.rowNumber, studentName: row.full_name, admissionNumber: row.admission_number, errorMessage: retry.error ?? "Unknown error (after retry)" });
+            }
+          } else {
+            allErrors.push({ rowNumber: row.rowNumber, studentName: row.full_name, admissionNumber: row.admission_number, errorMessage: res.error ?? "Unknown error" });
+          }
         }
         setProgress((p) => ({ done: p.done + 1, total: p.total }));
+      }
+
+      // Delay between chunks to avoid Supabase Auth rate limits
+      if (i + chunkSize < toImport.length) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 

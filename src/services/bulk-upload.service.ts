@@ -365,6 +365,11 @@ export async function bulkCreateStudents(
 
     progress.processed++;
     onProgress({ ...progress });
+
+    // Small delay between requests to avoid Supabase Auth rate limits
+    if (progress.processed < rows.length) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   }
 
   return {
