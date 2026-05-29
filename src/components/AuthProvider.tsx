@@ -5,20 +5,13 @@
 //   1. On mount, restores any existing Supabase session from localStorage
 //      and populates the Zustand authStore so every route sees consistent
 //      state immediately (no flash of unauthenticated content).
-//   2. Subscribes to onAuthStateChange so sign-in / sign-out / token refresh
-//      events update the store automatically without a page reload.
+//   2. Subscribes to onAuthStateChange so explicit sign-out events
+//      update the store automatically.
 //   3. Cleans up the subscription on unmount (SPA teardown / hot-reload).
 //
-// SUPABASE NULL SAFETY
-//   `supabase` is typed as `SupabaseClient | null` (see src/lib/supabase.ts).
-//   When env vars are missing the client is null and the entire auth system
-//   is non-operational. The effect below detects this early and calls
-//   logout() so that:
-//     • isLoading is set to false → ProtectedRoute stops spinning.
-//     • isAuthenticated stays false → auth pages render normally.
-//     • No auth listener is registered → no null-dereference crash.
-//
-// This component is purely behavioural — it renders children as-is.
+// IMPORTANT: This provider intentionally IGNORES most auth state change events
+// (TOKEN_REFRESHED, transient SIGNED_OUT from tab switches) to prevent
+// unwanted page refreshes. Only explicit user-initiated sign-out is honored.
 // ---------------------------------------------------------------------------
 
 import { useEffect, useRef, type ReactNode } from "react";
@@ -28,44 +21,41 @@ import { supabase } from "@/lib/supabase";
 import { getCurrentUser } from "@/services/auth.service";
 import { getErrorMessage } from "@/utils/helpers";
 
-const AUTH_REFRESH_DEBOUNCE_MS = 800;
-
 interface AuthProviderProps {
   children: ReactNode;
+}
+
+/**
+ * Global flag set by the signOut() service function BEFORE calling
+ * supabase.auth.signOut(). This lets the onAuthStateChange listener
+ * distinguish between an intentional logout and a transient SIGNED_OUT
+ * event caused by token refresh failures on tab switch.
+ */
+let userInitiatedSignOut = false;
+
+/** Call this from your signOut/logout service before calling supabase.auth.signOut() */
+export function markSignOutIntentional() {
+  userInitiatedSignOut = true;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const login = useAuthStore((s) => s.login);
   const logout = useAuthStore((s) => s.logout);
   const setLoading = useAuthStore((s) => s.setLoading);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    };
+    return () => { mountedRef.current = false; };
   }, []);
 
   useEffect(() => {
-    // ── Guard: Supabase not configured ──────────────────────────────────────
-    // If env vars are absent, `supabase` is null. There is nothing to
-    // initialise — immediately mark loading as done so the rest of the UI
-    // renders in a "logged out" state without hanging on the spinner.
     if (!supabase) {
-      logout(); // sets isLoading = false, isAuthenticated = false
+      logout();
       return;
     }
 
-    // TypeScript narrows `supabase` to `SupabaseClient` for everything below.
-    // The module-level const cannot be reassigned, so the narrowing holds
-    // inside the nested async function and the onAuthStateChange callback.
-
-    // ── Phase 1: Restore session from localStorage ───────────────────────────
-    // Runs once on mount. getCurrentUser() checks the stored JWT and fetches
-    // the full user + institute record from the database.
+    // ── Phase 1: Restore session on mount ────────────────────────────────────
     async function hydrateFromSession() {
       if (typeof window === "undefined") {
         logout();
@@ -78,68 +68,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (result.success && result.data) {
           login(result.data.user, result.data.institute);
         } else {
-          // Only logout if there's genuinely no session (not a transient network error)
+          // Check if there's still a valid session in storage
           const { data: { session } } = await supabase!.auth.getSession();
           if (!session) {
             logout();
           } else {
-            // Session exists but profile fetch failed — keep user logged in
-            // This prevents logout on transient network errors during tab switch
+            // Session exists but profile fetch failed — keep logged in
             setLoading(false);
           }
         }
-      } catch (err) {
+      } catch {
         if (!mountedRef.current) return;
-        console.warn("[AuthProvider] session hydrate failed:", getErrorMessage(err));
-        // Don't logout on network errors — keep existing auth state
+        // Network error — don't logout, keep existing state
         setLoading(false);
       }
     }
 
     void hydrateFromSession();
 
-    function scheduleHydrate(event: AuthChangeEvent) {
-      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-      const delay = event === "TOKEN_REFRESHED" ? AUTH_REFRESH_DEBOUNCE_MS : 0;
-      refreshTimerRef.current = setTimeout(() => {
-        void hydrateFromSession();
-      }, delay);
-    }
-
-    // ── Phase 2: React to live Supabase auth events ──────────────────────────
+    // ── Phase 2: Listen for auth events ──────────────────────────────────────
+    // ONLY react to intentional sign-out. Ignore everything else.
+    // Token refresh, tab switch events, and transient errors are all ignored
+    // to prevent the page from refreshing unexpectedly.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
-      if (event === "SIGNED_OUT" || !session) {
-        // Before logging out, verify the session is actually gone.
-        // During bulk operations, rate limiting can cause transient auth errors
-        // that fire SIGNED_OUT even though the session is still valid.
-        supabase!.auth.getSession().then(({ data }) => {
-          if (!data.session) {
-            logout();
-          }
-          // If session still exists, ignore this event — it was a false alarm
-        }).catch(() => {
-          // Network error checking session — don't logout, keep current state
-        });
+      if (event === "SIGNED_OUT") {
+        // Only logout if the user explicitly initiated sign-out
+        if (userInitiatedSignOut) {
+          userInitiatedSignOut = false;
+          logout();
+        }
+        // Otherwise ignore — this is a transient event from tab switch / token refresh
         return;
       }
-      if (event === "SIGNED_IN") {
-        // Only re-hydrate on actual sign-in, not on token refresh.
-        // Token refresh happens automatically when returning to the tab —
-        // re-hydrating on every refresh causes unnecessary API calls and
-        // can trigger logout if the network is slow.
-        scheduleHydrate(event);
+
+      if (event === "SIGNED_IN" && session) {
+        // Fresh sign-in (e.g. from another tab or OAuth callback)
+        // Only hydrate if we're not already authenticated
+        const currentState = useAuthStore.getState();
+        if (!currentState.isAuthenticated) {
+          void hydrateFromSession();
+        }
       }
-      // TOKEN_REFRESHED: Supabase handles this internally — no action needed.
-      // The session is already updated in localStorage by the Supabase client.
+
+      // TOKEN_REFRESHED, INITIAL_SESSION, etc. — all ignored.
+      // The Supabase client handles token refresh internally.
     });
 
-    // ── Cleanup ──────────────────────────────────────────────────────────────
     return () => subscription.unsubscribe();
-
-    // login/logout/setLoading are stable Zustand actions — intentionally
-    // omitted from deps to prevent infinite re-subscription loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

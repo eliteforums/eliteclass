@@ -225,6 +225,10 @@ export async function signUp(
 export async function signOut(): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  // Mark this as an intentional sign-out so AuthProvider honors the SIGNED_OUT event
+  const { markSignOutIntentional } = await import("@/components/AuthProvider");
+  markSignOutIntentional();
+
   const { error } = await supabase!.auth.signOut();
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
