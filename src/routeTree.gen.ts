@@ -56,6 +56,8 @@ import { Route as DashboardStudentCompleteProfileRouteImport } from './routes/da
 import { Route as DashboardStudentBatchesRouteImport } from './routes/dashboard/student/batches'
 import { Route as DashboardStudentMyRequestsRouteImport } from './routes/dashboard/student/my-requests'
 import { Route as DashboardAdminBatchRequestsRouteImport } from './routes/dashboard/admin/batch-requests'
+import { Route as DashboardAdminCertificatesIndexRouteImport } from './routes/dashboard/admin/certificates/index'
+import { Route as DashboardStudentCertificatesRouteImport } from './routes/dashboard/student/certificates'
 
 const UnauthorizedRoute = UnauthorizedRouteImport.update({
   id: '/unauthorized',
@@ -327,6 +329,20 @@ const DashboardAdminBatchRequestsRoute =
     getParentRoute: () => DashboardRoute,
   } as any)
 
+const DashboardAdminCertificatesIndexRoute =
+  DashboardAdminCertificatesIndexRouteImport.update({
+    id: '/admin/certificates/',
+    path: '/admin/certificates/',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+
+const DashboardStudentCertificatesRoute =
+  DashboardStudentCertificatesRouteImport.update({
+    id: '/student/certificates',
+    path: '/student/certificates',
+    getParentRoute: () => DashboardRoute,
+  } as any)
+
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRouteWithChildren
@@ -375,6 +391,8 @@ export interface FileRoutesByFullPath {
   '/dashboard/student/batches': typeof DashboardStudentBatchesRoute
   '/dashboard/student/my-requests': typeof DashboardStudentMyRequestsRoute
   '/dashboard/admin/batch-requests': typeof DashboardAdminBatchRequestsRoute
+  '/dashboard/admin/certificates/': typeof DashboardAdminCertificatesIndexRoute
+  '/dashboard/student/certificates': typeof DashboardStudentCertificatesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -423,6 +441,8 @@ export interface FileRoutesByTo {
   '/dashboard/student/batches': typeof DashboardStudentBatchesRoute
   '/dashboard/student/my-requests': typeof DashboardStudentMyRequestsRoute
   '/dashboard/admin/batch-requests': typeof DashboardAdminBatchRequestsRoute
+  '/dashboard/admin/certificates/': typeof DashboardAdminCertificatesIndexRoute
+  '/dashboard/student/certificates': typeof DashboardStudentCertificatesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -473,6 +493,8 @@ export interface FileRoutesById {
   '/dashboard/student/batches': typeof DashboardStudentBatchesRoute
   '/dashboard/student/my-requests': typeof DashboardStudentMyRequestsRoute
   '/dashboard/admin/batch-requests': typeof DashboardAdminBatchRequestsRoute
+  '/dashboard/admin/certificates/': typeof DashboardAdminCertificatesIndexRoute
+  '/dashboard/student/certificates': typeof DashboardStudentCertificatesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -964,6 +986,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminBatchRequestsRouteImport
       parentRoute: typeof DashboardRoute
     }
+    '/dashboard/admin/certificates/': {
+      id: '/admin/certificates/'
+      path: '/admin/certificates/'
+      fullPath: '/dashboard/admin/certificates/'
+      preLoaderRoute: typeof DashboardAdminCertificatesIndexRouteImport
+      parentRoute: typeof DashboardRoute
+    }
+    '/dashboard/student/certificates': {
+      id: '/dashboard/student/certificates'
+      path: '/student/certificates'
+      fullPath: '/dashboard/student/certificates'
+      preLoaderRoute: typeof DashboardStudentCertificatesRouteImport
+      parentRoute: typeof DashboardRoute
+    }
   }
 }
 
@@ -1008,6 +1044,8 @@ interface DashboardRouteChildren {
   DashboardStudentBatchesRoute: typeof DashboardStudentBatchesRoute
   DashboardStudentMyRequestsRoute: typeof DashboardStudentMyRequestsRoute
   DashboardAdminBatchRequestsRoute: typeof DashboardAdminBatchRequestsRoute
+  DashboardAdminCertificatesIndexRoute: typeof DashboardAdminCertificatesIndexRoute
+  DashboardStudentCertificatesRoute: typeof DashboardStudentCertificatesRoute
 }
 
 const DashboardRouteChildren: DashboardRouteChildren = {
@@ -1052,6 +1090,8 @@ const DashboardRouteChildren: DashboardRouteChildren = {
   DashboardStudentBatchesRoute: DashboardStudentBatchesRoute,
   DashboardStudentMyRequestsRoute: DashboardStudentMyRequestsRoute,
   DashboardAdminBatchRequestsRoute: DashboardAdminBatchRequestsRoute,
+  DashboardAdminCertificatesIndexRoute: DashboardAdminCertificatesIndexRoute,
+  DashboardStudentCertificatesRoute: DashboardStudentCertificatesRoute,
 }
 
 const DashboardRouteWithChildren = DashboardRoute._addFileChildren(
