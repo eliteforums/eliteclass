@@ -1938,3 +1938,64 @@ export interface AvailableBatch {
   is_already_member: boolean;
 }
 
+
+// ── Certificates ─────────────────────────────────────────────────────────────
+
+export interface CertificateTemplate {
+  id: string;
+  institute_id: string;
+  name: string;
+  title: string;
+  body_text: string;
+  logo_url: string | null;
+  seal_url: string | null;
+  signatory_name: string;
+  signatory_designation: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCertificateTemplatePayload {
+  institute_id: string;
+  name: string;
+  title: string;
+  body_text: string;
+  logo_url?: string | null;
+  seal_url?: string | null;
+  signatory_name: string;
+  signatory_designation: string;
+  created_by: string;
+}
+
+export interface UpdateCertificateTemplatePayload {
+  name?: string;
+  title?: string;
+  body_text?: string;
+  logo_url?: string | null;
+  seal_url?: string | null;
+  signatory_name?: string;
+  signatory_designation?: string;
+}
+
+export interface IssuedCertificate {
+  id: string;
+  template_id: string;
+  student_id: string;
+  institute_id: string;
+  issued_by: string;
+  issued_at: string;
+  custom_data: CertificateCustomData;
+  template?: CertificateTemplate;
+  student?: any;
+}
+
+export interface CertificateCustomData {
+  start_date?: string;
+  end_date?: string;
+  role?: string;
+  batch_name?: string;
+  course_name?: string;
+  date_issued?: string;
+  [key: string]: string | undefined;
+}

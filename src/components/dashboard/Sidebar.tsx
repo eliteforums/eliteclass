@@ -71,6 +71,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           // Use the more specific staff icon (UserCheck) but keep courses added by remote.
           { title: "Staff", url: "/dashboard/admin/staff", icon: UserCheck },
           { title: "Courses", url: "/dashboard/admin/courses", icon: BookOpen },
+          { title: "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
           { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
           { title: "Schedule", url: "/dashboard/admin/schedule", icon: Calendar },
@@ -130,6 +131,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
           { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
+          { title: "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
           { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
           { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
           { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
@@ -148,6 +150,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "My Learning", url: "/dashboard/student/my-learning", icon: BookOpen },
           { title: "MCQ Tests", url: "/dashboard/student/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/student/assignments", icon: FileText },
+          { title: "Certificates", url: "/dashboard/student/certificates", icon: GraduationCap },
           { title: "Browse Courses", url: "/dashboard/student/courses", icon: GraduationCap },
           { title: "Browse Batches", url: "/dashboard/student/batches", icon: Search },
           { title: "My Requests", url: "/dashboard/student/my-requests", icon: ClipboardList },
