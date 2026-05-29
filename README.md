@@ -309,6 +309,7 @@ See [supabase/README.md](supabase/README.md) for detailed instructions.
 |----------|----------|-------------|
 | `VITE_SUPABASE_URL` | ✅ | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | ✅ | Supabase anonymous key |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Supabase service role key (server-side only, never exposed to client) |
 | `VITE_GROQ_API_KEY` | ❌ | Groq API key for AI features |
 | `VITE_API_BASE_URL` | ❌ | API base URL (defaults to current origin) |
 
@@ -590,6 +591,9 @@ Planned features and improvements:
 
 ## 📈 Recent Updates
 
+- ✅ Exam proctoring with camera/mic deterrent UI and tab-switch detection
+- ✅ Settings page (profile, password, institute management)
+- ✅ Student self-enrollment RLS fix
 - ✅ AI-powered assistant integration
 - ✅ PWA offline support
 - ✅ Advanced exam proctoring

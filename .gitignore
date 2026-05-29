@@ -39,3 +39,6 @@ dist-ssr
 
 # Merge conflict leftovers
 .merge_tmp/
+
+# Development specs
+.kiro/specs/
