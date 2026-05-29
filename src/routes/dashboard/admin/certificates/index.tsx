@@ -6,9 +6,11 @@ import { supabase } from "@/lib/supabase";
 import {
   getTemplatesByInstitute,
   deleteTemplate,
+  createTemplate,
   createIssuedCertificates,
 } from "@/services/certificate.service";
 import { generateBulkCertificatePdf } from "@/services/pdf/certificatePdf.service";
+import { PREBUILT_TEMPLATES } from "@/services/certificate-templates";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,15 +82,60 @@ function TemplatesTab() {
 
   if (templates.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-          <p className="text-muted-foreground">No certificate templates yet.</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Create your first template to start generating certificates.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardContent className="py-8 text-center">
+            <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+            <p className="text-muted-foreground">No certificate templates yet.</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Choose a pre-built template below to get started quickly.
+            </p>
+          </CardContent>
+        </Card>
+
+        <div>
+          <h3 className="text-sm font-semibold text-foreground mb-3">Pre-built Templates</h3>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {PREBUILT_TEMPLATES.map((pt) => (
+              <Card key={pt.id} className="border-dashed">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">{pt.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground line-clamp-3">{pt.body_text.slice(0, 120)}...</p>
+                  <p className="text-xs text-muted-foreground">Signatory: {pt.signatory_name}</p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    onClick={async () => {
+                      if (!user) return;
+                      const result = await createTemplate({
+                        institute_id: user.institute_id,
+                        name: pt.name,
+                        title: pt.title,
+                        body_text: pt.body_text,
+                        signatory_name: pt.signatory_name,
+                        signatory_designation: pt.signatory_designation,
+                        created_by: user.id,
+                      });
+                      if (result.success) {
+                        toast.success(`Template "${pt.name}" added!`);
+                        loadTemplates();
+                      } else {
+                        toast.error(result.error ?? "Failed to add template.");
+                      }
+                    }}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Use This Template
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
     );
   }
 
