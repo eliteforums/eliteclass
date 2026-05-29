@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash, Check } from "lucide-react";
+import { Plus, Trash, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import type { ExamQuestion } from "../../types";
 import { toast } from "sonner";
 import { addQuestion, deleteQuestion } from "../../services/exam.service";
 import { cn } from "@/lib/utils";
+import { PdfMcqGenerator } from "./PdfMcqGenerator";
 
 interface QuestionManagerProps {
   examId: string;
@@ -19,6 +20,7 @@ interface QuestionManagerProps {
 
 export function QuestionManager({ examId, questions, onRefresh }: QuestionManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
+  const [showPdfGenerator, setShowPdfGenerator] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
     question_text: "",
     marks: 1,
@@ -84,12 +86,34 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold text-foreground">Questions ({questions.length})</h3>
-        {!isAdding && (
-          <Button onClick={() => setIsAdding(true)} size="sm">
-            <Plus className="mr-2 h-4 w-4" /> Add Question
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {!isAdding && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPdfGenerator(!showPdfGenerator)}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                {showPdfGenerator ? "Hide AI Generator" : "Generate from PDF"}
+              </Button>
+              <Button onClick={() => setIsAdding(true)} size="sm">
+                <Plus className="mr-2 h-4 w-4" /> Add Question
+              </Button>
+            </>
+          )}
+        </div>
       </div>
+
+      {showPdfGenerator && (
+        <PdfMcqGenerator
+          examId={examId}
+          onQuestionsAdded={() => {
+            onRefresh();
+            setShowPdfGenerator(false);
+          }}
+        />
+      )}
 
       {isAdding && (
         <Card className="border-primary/50 shadow-md">
