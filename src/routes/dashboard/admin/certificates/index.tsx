@@ -294,8 +294,10 @@ function TemplatesTab() {
 
   // Show editor
   if (editingTemplate !== null) {
+    const editorKey = editingTemplate === "new" ? "new" : editingTemplate.id;
     return (
       <TemplateEditor
+        key={editorKey}
         template={editingTemplate === "new" ? null : editingTemplate}
         onSave={() => {
           setEditingTemplate(null);
