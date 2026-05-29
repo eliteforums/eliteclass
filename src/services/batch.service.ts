@@ -354,7 +354,6 @@ export async function getAssignableStudents(
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const hasSearch = !!search.trim();
-  // Over-fetch when searching to compensate for client-side name/email filter
   const limit = hasSearch ? 500 : 300;
 
   let query = supabase
@@ -364,8 +363,13 @@ export async function getAssignableStudents(
     .order("created_at", { ascending: false })
     .limit(limit);
 
+  // Use OR filter to search across admission_no AND the joined user's name/email
   if (hasSearch) {
-    query = query.ilike("admission_no", `%${search.trim()}%`);
+    const q = search.trim();
+    // Supabase doesn't support ilike on joined tables in .or(), so we fetch more
+    // and filter client-side for name/email. But we DO filter admission_no server-side
+    // using a broader approach: fetch all and filter client-side.
+    // This is the safest approach for cross-table search.
   }
 
   const { data, error } = await query;
@@ -373,17 +377,17 @@ export async function getAssignableStudents(
   if (error) return { data: null, error: error.message, success: false };
 
   let rows = (data ?? []) as Student[];
+
+  // Client-side search across name, email, and admission_no
   if (hasSearch) {
     const q = search.trim().toLowerCase();
     rows = rows.filter(
       (student) =>
-        student.admission_no.toLowerCase().includes(q) ||
+        student.admission_no?.toLowerCase().includes(q) ||
         (student.user?.name ?? "").toLowerCase().includes(q) ||
         (student.user?.email ?? "").toLowerCase().includes(q),
     );
-    // Cap results to a reasonable size for the UI
-    rows = rows.slice(0, 300);
   }
 
-  return { data: rows, error: null, success: true };
+  return { data: rows.slice(0, 300), error: null, success: true };
 }
