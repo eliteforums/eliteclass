@@ -16,6 +16,8 @@ import {
   Building2,
   UserCheck,
   FileText,
+  ClipboardList,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -64,6 +66,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         items: [
           { title: "Students", url: "/dashboard/admin/students", icon: GraduationCap },
           { title: "Batches", url: "/dashboard/admin/batches", icon: BookOpen },
+          { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
           { title: "Parents", url: "/dashboard/admin/parents", icon: Users },
           // Use the more specific staff icon (UserCheck) but keep courses added by remote.
           { title: "Staff", url: "/dashboard/admin/staff", icon: UserCheck },
@@ -127,6 +130,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
           { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
+          { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
           { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
           { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
           { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
@@ -145,6 +149,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "MCQ Tests", url: "/dashboard/student/exams", icon: FileText },
           { title: "Assignments", url: "/dashboard/student/assignments", icon: FileText },
           { title: "Browse Courses", url: "/dashboard/student/courses", icon: GraduationCap },
+          { title: "Browse Batches", url: "/dashboard/student/batches", icon: Search },
+          { title: "My Requests", url: "/dashboard/student/my-requests", icon: ClipboardList },
           {
             title: "Progress Tracker",
             url: "/dashboard/student/study-logs",
