@@ -111,7 +111,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (event === "SIGNED_OUT" || !session) {
-        logout();
+        // Before logging out, verify the session is actually gone.
+        // During bulk operations, rate limiting can cause transient auth errors
+        // that fire SIGNED_OUT even though the session is still valid.
+        supabase!.auth.getSession().then(({ data }) => {
+          if (!data.session) {
+            logout();
+          }
+          // If session still exists, ignore this event — it was a false alarm
+        }).catch(() => {
+          // Network error checking session — don't logout, keep current state
+        });
         return;
       }
       if (event === "SIGNED_IN") {
