@@ -10784,6 +10784,9 @@ CREATE TABLE IF NOT EXISTS public.exams (
     negative_marking            BOOLEAN NOT NULL DEFAULT FALSE,
     negative_marks_per_question NUMERIC(10,2) DEFAULT 0,
     randomize_questions         BOOLEAN NOT NULL DEFAULT FALSE,
+    enable_tab_detection        BOOLEAN NOT NULL DEFAULT FALSE,
+    enable_camera_mic           BOOLEAN NOT NULL DEFAULT FALSE,
+    enable_deterrent_ui         BOOLEAN NOT NULL DEFAULT FALSE,
     created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

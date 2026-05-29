@@ -14,6 +14,9 @@ export const examSchema = z.object({
   negative_marking: z.boolean().default(false),
   negative_marks_per_question: z.coerce.number().default(0),
   randomize_questions: z.boolean().default(false),
+  enable_tab_detection: z.boolean().default(false),
+  enable_camera_mic: z.boolean().default(false),
+  enable_deterrent_ui: z.boolean().default(false),
 });
 
 export type ExamFormData = z.infer<typeof examSchema>;

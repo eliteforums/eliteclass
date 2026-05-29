@@ -25,6 +25,7 @@ import {
 import { examSchema, type ExamFormData } from "../../validations/exam.schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Resolver } from "react-hook-form";
+import { ProctoringSettingsCard } from "./ProctoringSettingsCard";
 
 interface ExamFormProps {
   initialData?: Partial<ExamFormData>;
@@ -63,6 +64,9 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       negative_marking: false,
       negative_marks_per_question: 0,
       randomize_questions: false,
+      enable_tab_detection: false,
+      enable_camera_mic: false,
+      enable_deterrent_ui: false,
       ...initialData,
       start_time: formatDateForInput(initialData?.start_time),
       end_time: formatDateForInput(initialData?.end_time),
@@ -352,6 +356,8 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                 </div>
               </CardContent>
             </Card>
+
+            <ProctoringSettingsCard form={form} />
 
             <div className="flex justify-end gap-4">
               <Button type="button" variant="outline" onClick={() => window.history.back()}>
