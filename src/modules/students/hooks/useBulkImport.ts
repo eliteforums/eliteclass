@@ -15,13 +15,13 @@ function isValidPhone(phone?: string | null) {
 }
 
 // ── Rate limit safe delay ────────────────────────────────────────────────────
-// Supabase free tier: 30 auth requests/second, but in practice lower.
-// We process 2 students at a time with 2s gap between chunks = ~1 student/sec.
-// This is very conservative to ensure zero rate limit errors.
-const CHUNK_SIZE = 2;
-const DELAY_BETWEEN_CHUNKS_MS = 2000;
-const RETRY_DELAY_MS = 5000;
-const MAX_RETRIES = 3;
+// Supabase free tier has strict rate limits on auth.admin.createUser().
+// Each admitStudent call creates 1-2 auth users (student + optional parent).
+// We process ONE student at a time with 3s gap to stay well under limits.
+const CHUNK_SIZE = 1;
+const DELAY_BETWEEN_CHUNKS_MS = 3000;
+const RETRY_DELAY_MS = 10000;
+const MAX_RETRIES = 5;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
