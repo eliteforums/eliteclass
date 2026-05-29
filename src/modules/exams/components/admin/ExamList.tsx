@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { listExams, deleteExam, updateExam } from "../../services/exam.service";
 import type { Exam } from "../../types";
 import { ExamStatusBadge } from "../shared/ExamStatusBadge";
+import { ProctoringStatusBadges } from "./ProctoringStatusBadges";
 import { toast } from "sonner";
 import { useNavigate } from "@tanstack/react-router";
 
@@ -63,9 +64,14 @@ export function ExamList() {
       key: "title",
       header: "Test Title",
       render: (exam) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-1">
           <span className="font-medium text-foreground">{exam.title}</span>
           <span className="text-xs text-muted-foreground line-clamp-1">{exam.description || "No description"}</span>
+          <ProctoringStatusBadges
+            enableTabDetection={exam.enable_tab_detection}
+            enableCameraMic={exam.enable_camera_mic}
+            enableDeterrentUi={exam.enable_deterrent_ui}
+          />
         </div>
       ),
     },

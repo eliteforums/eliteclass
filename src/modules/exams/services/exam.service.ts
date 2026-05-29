@@ -1032,3 +1032,47 @@ export async function updateAttemptActivity(attemptId: string): Promise<ApiRespo
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: undefined, error: null, success: true };
 }
+
+// ── Proctoring Services ─────────────────────────────────────────────────────
+
+/**
+ * Fetch all violations for an attempt (for admin results view)
+ */
+export async function getViolationLog(
+  attemptId: string
+): Promise<ApiResponse<ExamViolation[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_violations")
+    .select("*")
+    .eq("attempt_id", attemptId)
+    .order("timestamp", { ascending: true });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: (data || []) as ExamViolation[], error: null, success: true };
+}
+
+/**
+ * Record a proctoring-specific event (camera interruption, etc.)
+ */
+export async function recordProctoringEvent(
+  attemptId: string,
+  eventType: string,
+  data: Record<string, unknown>
+): Promise<ApiResponse<ExamViolation>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data: violation, error } = await supabase
+    .from("exam_violations")
+    .insert({
+      attempt_id: attemptId,
+      violation_type: eventType,
+      violation_data: { source: "proctoring", recordedAt: new Date().toISOString(), ...data },
+    })
+    .select()
+    .single();
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: violation as ExamViolation, error: null, success: true };
+}

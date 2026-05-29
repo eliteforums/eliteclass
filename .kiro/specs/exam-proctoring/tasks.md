@@ -16,11 +16,11 @@ Add configurable proctoring to the MCQ exam system with tab switch detection, ca
 - [x] 8. In `ExamPlayer.tsx`, read proctoring settings from exam data, initialize `useProctoring` hook, render `ProctoringOverlay`, and render blocking overlay when camera/mic is denied or hardware unavailable
 - [x] 9. Pass `enableTabDetection` flag from exam settings to `SecureExamWrapper` to conditionally enable/disable the existing `useTabSwitchDetection` hook
 - [x] 10. Wire `useProctoring.stopStreams()` to exam submission paths (manual and auto-submit) and handle exam resume by re-initializing proctoring from stored settings
-- [~] 11. Add `getViolationLog(attemptId)` and `recordProctoringEvent(attemptId, eventType, data)` functions to `src/modules/exams/services/exam.service.ts`
-- [~] 12. Create `src/modules/exams/components/admin/ViolationLog.tsx` component displaying a table of violations with timestamp, type, and details columns
-- [~] 13. Integrate `ViolationLog` into the exam results view and display total violation count badge in `AttemptList` component
-- [~] 14. Create `src/modules/exams/components/admin/ProctoringStatusBadges.tsx` with colored badges for each active proctoring feature using lucide-react icons (Eye, Camera, Shield)
-- [~] 15. Integrate `ProctoringStatusBadges` into admin exam detail page header and exam list view
+- [x] 11. Add `getViolationLog(attemptId)` and `recordProctoringEvent(attemptId, eventType, data)` functions to `src/modules/exams/services/exam.service.ts`
+- [x] 12. Create `src/modules/exams/components/admin/ViolationLog.tsx` component displaying a table of violations with timestamp, type, and details columns
+- [x] 13. Integrate `ViolationLog` into the exam results view and display total violation count badge in `AttemptList` component
+- [x] 14. Create `src/modules/exams/components/admin/ProctoringStatusBadges.tsx` with colored badges for each active proctoring feature using lucide-react icons (Eye, Camera, Shield)
+- [x] 15. Integrate `ProctoringStatusBadges` into admin exam detail page header and exam list view
 
 ## Task Dependency Graph
 

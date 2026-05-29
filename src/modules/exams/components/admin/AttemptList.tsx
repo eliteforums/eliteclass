@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
-import { listAttempts } from "../../services/exam.service";
+import { listAttempts, getViolationLog } from "../../services/exam.service";
 import { ExamStatusBadge } from "../shared/ExamStatusBadge";
+import { ViolationLog } from "./ViolationLog";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Users } from "lucide-react";
+import { Users, AlertTriangle } from "lucide-react";
+import type { ExamViolation } from "../../types";
 
 interface AttemptListProps {
   examId: string;
@@ -14,6 +17,9 @@ interface AttemptListProps {
 export function AttemptList({ examId }: AttemptListProps) {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(null);
+  const [violations, setViolations] = useState<ExamViolation[]>([]);
+  const [violationsLoading, setViolationsLoading] = useState(false);
 
   useEffect(() => {
     const fetch = async () => {
@@ -24,6 +30,23 @@ export function AttemptList({ examId }: AttemptListProps) {
     };
     fetch();
   }, [examId]);
+
+  const handleToggleViolations = async (attemptId: string) => {
+    if (expandedAttemptId === attemptId) {
+      setExpandedAttemptId(null);
+      setViolations([]);
+      return;
+    }
+    setExpandedAttemptId(attemptId);
+    setViolationsLoading(true);
+    const { data, success } = await getViolationLog(attemptId);
+    if (success && data) {
+      setViolations(data);
+    } else {
+      setViolations([]);
+    }
+    setViolationsLoading(false);
+  };
 
   const columns: DataTableColumn<any>[] = [
     {
@@ -62,11 +85,27 @@ export function AttemptList({ examId }: AttemptListProps) {
     {
       key: "violations",
       header: "Violations",
-      render: (attempt) => (
-        <span className={cn("font-medium", attempt.violation_count > 0 ? "text-destructive" : "text-muted-foreground")}>
-          {attempt.status === "not_started" ? "—" : attempt.violation_count}
-        </span>
-      ),
+      render: (attempt) => {
+        if (attempt.status === "not_started") {
+          return <span className="text-muted-foreground">—</span>;
+        }
+        return (
+          <button
+            type="button"
+            onClick={() => handleToggleViolations(attempt.id)}
+            className="inline-flex items-center gap-1 cursor-pointer hover:opacity-80"
+          >
+            {attempt.violation_count > 0 ? (
+              <Badge variant="destructive" className="gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                {attempt.violation_count}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">0</Badge>
+            )}
+          </button>
+        );
+      },
     },
     {
       key: "last_violation_at",
@@ -104,18 +143,39 @@ export function AttemptList({ examId }: AttemptListProps) {
   ];
 
   return (
-    <DataTable
-      columns={columns}
-      data={attempts}
-      isLoading={isLoading}
-      keyExtractor={(a) => a.id}
-      emptyState={
-        <EmptyState
-          icon={<Users />}
-          title="No students assigned"
-          description="Assign students to this test to see their results here."
-        />
-      }
-    />
+    <div className="space-y-4">
+      <DataTable
+        columns={columns}
+        data={attempts}
+        isLoading={isLoading}
+        keyExtractor={(a) => a.id}
+        emptyState={
+          <EmptyState
+            icon={<Users />}
+            title="No students assigned"
+            description="Assign students to this test to see their results here."
+          />
+        }
+      />
+      {expandedAttemptId && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-medium">Violation Log</h4>
+            <button
+              type="button"
+              onClick={() => setExpandedAttemptId(null)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Close
+            </button>
+          </div>
+          {violationsLoading ? (
+            <p className="text-sm text-muted-foreground">Loading violations...</p>
+          ) : (
+            <ViolationLog violations={violations} />
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -6,6 +6,7 @@ import { QuestionManager } from "@/modules/exams/components/admin/QuestionManage
 import { ExamAssigneeSelector } from "@/modules/exams/components/admin/ExamAssigneeSelector";
 import { AttemptList } from "@/modules/exams/components/admin/AttemptList";
 import { LiveExamMonitoring } from "@/modules/exams/components/admin/LiveExamMonitoring";
+import { ProctoringStatusBadges } from "@/modules/exams/components/admin/ProctoringStatusBadges";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -92,7 +93,12 @@ function ManageExamPage() {
         title={exam.title}
         subtitle={`Manage questions, settings, and student assignments for this test.`}
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <ProctoringStatusBadges
+              enableTabDetection={exam.enable_tab_detection}
+              enableCameraMic={exam.enable_camera_mic}
+              enableDeterrentUi={exam.enable_deterrent_ui}
+            />
             <Button
               variant="outline"
               onClick={() => navigate({ to: "/dashboard/admin/exams" })}
