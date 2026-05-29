@@ -1897,3 +1897,44 @@ export interface AssignmentResourceSchema {
   file_size?: number;
 }
 
+// ── Batch Join Requests ──────────────────────────────────────────────────────
+
+export type BatchJoinRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface BatchJoinRequest {
+  id: string;
+  student_id: string;
+  batch_id: string;
+  institute_id: string;
+  status: BatchJoinRequestStatus;
+  reason: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+  student?: any;
+  batch?: any;
+  reviewer?: Pick<User, 'id' | 'name' | 'role'>;
+}
+
+export interface CreateBatchJoinRequestPayload {
+  student_id: string;
+  batch_id: string;
+  institute_id: string;
+}
+
+export interface AvailableBatch {
+  id: string;
+  name: string;
+  academic_year: string;
+  institute_id: string;
+  is_active: boolean;
+  course_id?: string;
+  course_name?: string;
+  student_count: number;
+  capacity?: number;
+  is_full: boolean;
+  has_pending_request: boolean;
+  is_already_member: boolean;
+}
+
