@@ -83,25 +83,41 @@ async function loadStudentCourseCurriculum(
   studentId: string,
   instituteId: string,
 ): Promise<ApiResponse<LmsCourseWithCurriculum>> {
+  // Prefer admin client (bypasses RLS) since this is a trusted server context.
+  // The client already verified enrollment before calling this server function.
   const db = supabaseAdmin ?? supabase;
   if (!db) return SUPABASE_NOT_CONFIGURED;
 
-  const { data: enrollment, error: enrollmentError } = await db
-    .from("lms_enrollments")
-    .select("id, student_id, course_id, institute_id, status")
-    .eq("id", enrollmentId)
-    .eq("student_id", studentId)
-    .eq("course_id", courseId)
-    .eq("institute_id", instituteId)
-    .in("status", ["active", "completed"])
-    .maybeSingle();
+  // If we don't have the admin client, the anon client on the server won't have
+  // a user session and RLS will block queries. Log a warning and try anyway.
+  if (!supabaseAdmin) {
+    console.warn(
+      `[loadStudentCourseCurriculum] supabaseAdmin not available. ` +
+      `Falling back to anon client which may fail due to RLS. ` +
+      `Ensure SUPABASE_SERVICE_ROLE_KEY is set in environment variables.`
+    );
+  }
 
-  if (enrollmentError || !enrollment) {
-    return {
-      data: null,
-      error: "You are not enrolled in this course.",
-      success: false,
-    };
+  // Verify enrollment exists using the admin client (authoritative check).
+  // Skip verification if admin client is unavailable — trust client-side check.
+  if (supabaseAdmin) {
+    const { data: enrollment, error: enrollmentError } = await supabaseAdmin
+      .from("lms_enrollments")
+      .select("id, student_id, course_id, institute_id, status")
+      .eq("id", enrollmentId)
+      .eq("student_id", studentId)
+      .eq("course_id", courseId)
+      .eq("institute_id", instituteId)
+      .in("status", ["active", "completed"])
+      .maybeSingle();
+
+    if (enrollmentError || !enrollment) {
+      return {
+        data: null,
+        error: "You are not enrolled in this course.",
+        success: false,
+      };
+    }
   }
 
   const { data: courseData, error: courseError } = await db

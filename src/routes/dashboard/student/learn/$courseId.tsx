@@ -111,6 +111,8 @@ function LearnPage() {
     },
     enabled: !!courseId && !!instituteId && !!enrollment?.id,
     staleTime: 5 * 60 * 1000, // 5 min — curriculum rarely changes
+    retry: 2, // Retry on failure (handles race conditions after fresh enrollment)
+    retryDelay: 1000,
   });
 
   // ── Fetch all lesson progress ──────────────────────────────────────────
