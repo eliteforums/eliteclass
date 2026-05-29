@@ -54,7 +54,11 @@ function DashboardOverview() {
   useEffect(() => {
     const instituteId = user?.institute_id;
     if (!instituteId) {
-      setStatsLoading(false);
+      // Don't set loading to false yet — auth might still be hydrating
+      // Only show empty state if we're sure there's no institute
+      if (user && !user.institute_id) {
+        setStatsLoading(false);
+      }
       return;
     }
 
@@ -105,7 +109,7 @@ function DashboardOverview() {
     return () => {
       cancelled = true;
     };
-  }, [user?.institute_id]);
+  }, [user, user?.institute_id]);
 
   const firstName = user?.name?.split(" ")[0] ?? "there";
   const instituteName = institute?.name ?? "your institute";
