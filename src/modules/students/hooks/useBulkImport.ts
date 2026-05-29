@@ -14,9 +14,63 @@ function isValidPhone(phone?: string | null) {
   return /[0-9]{6,15}/.test(s.replace(/[^0-9]/g, ""));
 }
 
+// ── Rate limit safe delay ────────────────────────────────────────────────────
+// Supabase free tier: 30 auth requests/second, but in practice lower.
+// We process 2 students at a time with 2s gap between chunks = ~1 student/sec.
+// This is very conservative to ensure zero rate limit errors.
+const CHUNK_SIZE = 2;
+const DELAY_BETWEEN_CHUNKS_MS = 2000;
+const RETRY_DELAY_MS = 5000;
+const MAX_RETRIES = 3;
+
+async function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Attempt to admit a student with exponential backoff retries.
+ * Returns the result after all retries are exhausted.
+ */
+async function admitWithRetry(
+  payload: AdmitStudentPayload,
+  maxRetries: number = MAX_RETRIES,
+): Promise<ReturnType<typeof admitStudent>> {
+  let lastResult: Awaited<ReturnType<typeof admitStudent>> | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const result = await admitStudent(payload);
+
+    if (result.success) return result;
+
+    lastResult = result;
+
+    // Check if it's a rate limit error — retry with increasing delay
+    const isRateLimit =
+      result.error &&
+      (result.error.toLowerCase().includes("rate") ||
+        result.error.includes("429") ||
+        result.error.toLowerCase().includes("too many") ||
+        result.error.toLowerCase().includes("request limit") ||
+        result.error.toLowerCase().includes("exceeded"));
+
+    if (isRateLimit && attempt < maxRetries) {
+      // Exponential backoff: 5s, 10s, 20s
+      const backoff = RETRY_DELAY_MS * Math.pow(2, attempt);
+      await sleep(backoff);
+      continue;
+    }
+
+    // Not a rate limit error or retries exhausted — return the error
+    break;
+  }
+
+  return lastResult!;
+}
+
 export default function useBulkImport() {
   const [rows, setRows] = useState<BulkImportRow[]>([]);
   const [errors, setErrors] = useState<BulkImportErrorRow[]>([]);
+  const [failedRows, setFailedRows] = useState<BulkImportRow[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
 
@@ -56,6 +110,7 @@ export default function useBulkImport() {
     const toImport = inputRows ?? rows;
     setIsImporting(true);
     setErrors([]);
+    setFailedRows([]);
     setProgress({ done: 0, total: toImport.length });
 
     // Resolve batches
@@ -65,87 +120,122 @@ export default function useBulkImport() {
       for (const b of batchRes.data.items) nameToId.set(b.name.toLowerCase(), b.id);
     }
 
-    const chunkSize = 5;
     const allErrors: BulkImportErrorRow[] = [];
-    for (let i = 0; i < toImport.length; i += chunkSize) {
-      const chunk = toImport.slice(i, i + chunkSize);
-      const promises = chunk.map((r) => {
+    const allFailedRows: BulkImportRow[] = [];
+
+    // Process in small chunks with generous delays
+    for (let i = 0; i < toImport.length; i += CHUNK_SIZE) {
+      const chunk = toImport.slice(i, i + CHUNK_SIZE);
+
+      // Process each student in the chunk sequentially (safest for rate limits)
+      for (const row of chunk) {
         const payload: AdmitStudentPayload = {
           institute_id: instituteId,
           institute_name: instituteName,
-          student_name: r.full_name,
-          student_email: r.contact_email ?? null,
-          phone: r.phone ?? "",
-          admission_number: r.admission_number,
-          batch_id: r.batch ? nameToId.get(r.batch.toLowerCase()) ?? null : null,
+          student_name: row.full_name,
+          student_email: row.contact_email ?? null,
+          phone: row.phone ?? "",
+          admission_number: row.admission_number,
+          batch_id: row.batch ? nameToId.get(row.batch.toLowerCase()) ?? null : null,
           aadhaar_last4: null,
-          emergency_contact: r.emergency_contact_name ? { name: r.emergency_contact_name, phone: r.emergency_contact_phone ?? "", relation: r.emergency_relationship ?? "" } : null,
-          parent_name: r.parent_name ?? null,
-          parent_email: r.parent_email ?? null,
-          parent_phone: r.parent_phone ?? null,
-          parent_occupation: r.occupation ?? null,
-          parent_relation_type: (r.relationship_type as any) ?? null,
+          emergency_contact: row.emergency_contact_name
+            ? { name: row.emergency_contact_name, phone: row.emergency_contact_phone ?? "", relation: row.emergency_relationship ?? "" }
+            : null,
+          parent_name: row.parent_name ?? null,
+          parent_email: row.parent_email ?? null,
+          parent_phone: row.parent_phone ?? null,
+          parent_occupation: row.occupation ?? null,
+          parent_relation_type: (row.relationship_type as any) ?? null,
         };
-        return admitStudent(payload);
-      });
 
-      const settled = await Promise.all(promises);
-      for (let j = 0; j < settled.length; j++) {
-        const res = settled[j];
-        const row = chunk[j];
-        if (!res.success || !res.data) {
-          // Retry once on rate limit errors
-          if (res.error && (res.error.includes("rate") || res.error.includes("429") || res.error.includes("too many"))) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            const retry = await admitStudent({
-              institute_id: instituteId,
-              institute_name: instituteName,
-              student_name: row.full_name,
-              student_email: row.contact_email ?? null,
-              phone: row.phone ?? "",
-              admission_number: row.admission_number,
-              batch_id: row.batch ? nameToId.get(row.batch.toLowerCase()) ?? null : null,
-              aadhaar_last4: null,
-              emergency_contact: row.emergency_contact_name ? { name: row.emergency_contact_name, phone: row.emergency_contact_phone ?? "", relation: row.emergency_relationship ?? "" } : null,
-              parent_name: row.parent_name ?? null,
-              parent_email: row.parent_email ?? null,
-              parent_phone: row.parent_phone ?? null,
-              parent_occupation: row.occupation ?? null,
-              parent_relation_type: (row.relationship_type as any) ?? null,
-            });
-            if (!retry.success || !retry.data) {
-              allErrors.push({ rowNumber: row.rowNumber, studentName: row.full_name, admissionNumber: row.admission_number, errorMessage: retry.error ?? "Unknown error (after retry)" });
-            }
-          } else {
-            allErrors.push({ rowNumber: row.rowNumber, studentName: row.full_name, admissionNumber: row.admission_number, errorMessage: res.error ?? "Unknown error" });
-          }
+        const result = await admitWithRetry(payload);
+
+        if (!result.success || !result.data) {
+          allErrors.push({
+            rowNumber: row.rowNumber,
+            studentName: row.full_name,
+            admissionNumber: row.admission_number,
+            errorMessage: result.error ?? "Unknown error",
+          });
+          allFailedRows.push(row);
         }
+
         setProgress((p) => ({ done: p.done + 1, total: p.total }));
+
+        // Small delay between individual requests within a chunk
+        await sleep(500);
       }
 
-      // Delay between chunks to avoid Supabase Auth rate limits
-      if (i + chunkSize < toImport.length) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Longer delay between chunks to stay well under rate limits
+      if (i + CHUNK_SIZE < toImport.length) {
+        await sleep(DELAY_BETWEEN_CHUNKS_MS);
       }
     }
 
     setErrors(allErrors);
+    setFailedRows(allFailedRows);
     setIsImporting(false);
     return { errors: allErrors };
   }
 
-  function downloadErrorCSV(fileType = "unknown") {
-    if (errors.length === 0) return;
-    const header = "row_number,file_type,student_name,admission_number,error_message";
-    const rowsCsv = errors.map((e) => `${e.rowNumber},${fileType},"${(e.studentName ?? "").replace(/"/g, '""')}","${(e.admissionNumber ?? "").replace(/"/g, '""')}","${e.errorMessage.replace(/"/g, '""')}"`);
-    const csv = [header, ...rowsCsv].join("\n");
+  /**
+   * Downloads a CSV file containing all failed student rows with their original data
+   * so the user can fix issues and re-upload only the failed ones.
+   */
+  function downloadFailedCSV() {
+    if (failedRows.length === 0 && errors.length === 0) return;
+
+    // If we have the original row data, export it in the same format as the input
+    if (failedRows.length > 0) {
+      const header = "full_name,admission_number,contact_email,phone,batch,parent_name,parent_email,parent_phone,relationship_type,occupation,emergency_contact_name,emergency_contact_phone,emergency_relationship,error_message";
+      const csvRows = failedRows.map((row, idx) => {
+        const error = errors[idx]?.errorMessage ?? "";
+        return [
+          `"${(row.full_name ?? "").replace(/"/g, '""')}"`,
+          `"${(row.admission_number ?? "").replace(/"/g, '""')}"`,
+          `"${(row.contact_email ?? "").replace(/"/g, '""')}"`,
+          `"${(row.phone ?? "").replace(/"/g, '""')}"`,
+          `"${(row.batch ?? "").replace(/"/g, '""')}"`,
+          `"${(row.parent_name ?? "").replace(/"/g, '""')}"`,
+          `"${(row.parent_email ?? "").replace(/"/g, '""')}"`,
+          `"${(row.parent_phone ?? "").replace(/"/g, '""')}"`,
+          `"${(row.relationship_type ?? "").replace(/"/g, '""')}"`,
+          `"${(row.occupation ?? "").replace(/"/g, '""')}"`,
+          `"${(row.emergency_contact_name ?? "").replace(/"/g, '""')}"`,
+          `"${(row.emergency_contact_phone ?? "").replace(/"/g, '""')}"`,
+          `"${(row.emergency_relationship ?? "").replace(/"/g, '""')}"`,
+          `"${error.replace(/"/g, '""')}"`,
+        ].join(",");
+      });
+      const csv = [header, ...csvRows].join("\n");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `failed_students_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    // Fallback: export just the error info if we don't have original rows
+    const header = "row_number,student_name,admission_number,error_message";
+    const csvRows = errors.map((e) =>
+      `${e.rowNumber},"${(e.studentName ?? "").replace(/"/g, '""')}","${(e.admissionNumber ?? "").replace(/"/g, '""')}","${e.errorMessage.replace(/"/g, '""')}"`
+    );
+    const csv = [header, ...csvRows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "import_errors.csv";
+    a.download = `failed_students_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // Keep backward-compatible downloadErrorCSV as alias
+  function downloadErrorCSV(fileType = "unknown") {
+    downloadFailedCSV();
   }
 
   return useMemo(() => ({
@@ -158,7 +248,8 @@ export default function useBulkImport() {
     isImporting,
     progress,
     errors,
+    failedRows,
     downloadErrorCSV,
-  }), [rows, loadRows, removeRow, updateRow, validateRows, importRows, isImporting, progress, errors, downloadErrorCSV]);
+    downloadFailedCSV,
+  }), [rows, loadRows, removeRow, updateRow, validateRows, importRows, isImporting, progress, errors, failedRows, downloadErrorCSV, downloadFailedCSV]);
 }
-

@@ -366,9 +366,10 @@ export async function bulkCreateStudents(
     progress.processed++;
     onProgress({ ...progress });
 
-    // Small delay between requests to avoid Supabase Auth rate limits
+    // Conservative delay between requests to avoid Supabase Auth rate limits
+    // Supabase free tier allows ~30 req/s but we stay well under to be safe
     if (progress.processed < rows.length) {
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
