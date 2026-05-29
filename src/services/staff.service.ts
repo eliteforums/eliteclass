@@ -847,7 +847,12 @@ export async function resetStaffPassword(
   // Send a password reset email instead
   const { data: userData } = await supabase.from("users").select("email").eq("id", userId).single();
   if (userData?.email) {
-    const { error } = await supabase.auth.resetPasswordForEmail(userData.email);
+    const appUrl = typeof window !== "undefined"
+      ? window.location.origin
+      : (import.meta.env.VITE_APP_URL || "https://classroom.eliteforums.in");
+    const { error } = await supabase.auth.resetPasswordForEmail(userData.email, {
+      redirectTo: `${appUrl}/auth/update-password`,
+    });
     if (error) return { data: null, error: error.message, success: false };
     return { data: { temporary_password: "(reset email sent)" }, error: null, success: true };
   }
