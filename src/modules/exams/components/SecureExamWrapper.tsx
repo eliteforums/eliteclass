@@ -37,6 +37,7 @@ interface SecureExamWrapperProps {
   submissionLockRef?: React.MutableRefObject<boolean>;
   children: React.ReactNode;
   enabled?: boolean;
+  enableTabDetection?: boolean;
   onAutoSubmit?: () => void;
 }
 
@@ -46,6 +47,7 @@ export function SecureExamWrapper({
   submissionLockRef,
   children,
   enabled = true,
+  enableTabDetection = true,
   onAutoSubmit,
 }: SecureExamWrapperProps) {
   const [showViolationModal, setShowViolationModal] = useState(false);
@@ -148,7 +150,7 @@ export function SecureExamWrapper({
 
   // Tab switch detection
   useTabSwitchDetection({
-    enabled: enabled && !shouldAutoSubmit,
+    enabled: enabled && enableTabDetection && !shouldAutoSubmit,
     onViolation: handleViolation,
     shouldIgnoreViolation,
   });

@@ -20,6 +20,9 @@ export interface Exam {
   negative_marking: boolean;
   negative_marks_per_question: number;
   randomize_questions: boolean;
+  enable_tab_detection: boolean;
+  enable_camera_mic: boolean;
+  enable_deterrent_ui: boolean;
   created_at: string;
   updated_at: string;
   questions?: ExamQuestion[];

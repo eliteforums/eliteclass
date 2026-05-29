@@ -7,7 +7,8 @@ import {
   AlertTriangle,
   FileQuestion,
   Info,
-  Loader2
+  Loader2,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -34,6 +35,8 @@ import { SecureExamWrapper } from "../SecureExamWrapper";
 import { useRealtimeExamTimer } from "../../hooks/useRealtimeExamTimer";
 import { useAttemptValidation } from "../../hooks/useAttemptValidation";
 import { generateBrowserFingerprint, getOrCreateDeviceId } from "../../utils/exam-security";
+import { useProctoring } from "../../hooks/useProctoring";
+import { ProctoringOverlay } from "./ProctoringOverlay";
 
 interface ExamPlayerProps {
   examId: string;
@@ -60,6 +63,20 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     examId,
     userId: user?.id || '',
     enabled: true,
+  });
+
+  // ── Proctoring Hook ─────────────────────────────────────────────────────────
+
+  const enableTabDetection = exam?.enable_tab_detection ?? false;
+  const enableCameraMic = exam?.enable_camera_mic ?? false;
+  const enableDeterrentUi = exam?.enable_deterrent_ui ?? false;
+
+  const proctoring = useProctoring({
+    enabled: securityEnabled && (enableCameraMic || enableDeterrentUi || enableTabDetection),
+    enableTabDetection,
+    enableCameraMic,
+    enableDeterrentUi,
+    attemptId: attempt?.id || '',
   });
 
   const { timeRemaining, isExpired } = useRealtimeExamTimer({
@@ -222,10 +239,17 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     try {
       if (!isAuto) {
         const confirmSubmit = window.confirm("Are you sure you want to submit your test?");
-        if (!confirmSubmit) return;
+        if (!confirmSubmit) {
+          submissionLockRef.current = false;
+          setIsSubmittingExam(false);
+          return;
+        }
       } else {
         toast.info("Submitting your test automatically...");
       }
+
+      // Stop proctoring streams before submission
+      proctoring.stopStreams();
 
       // Lock attempt before submission
       await lockExamAttempt(attempt.id);
@@ -300,9 +324,44 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
       initialViolationCount={attempt.violation_count ?? 0}
       submissionLockRef={submissionLockRef}
       enabled={securityEnabled}
-      onAutoSubmit={() => navigate({ to: "/dashboard/student/exams" })}
+      enableTabDetection={enableTabDetection}
+      onAutoSubmit={() => {
+        proctoring.stopStreams();
+        navigate({ to: "/dashboard/student/exams" });
+      }}
     >
       <div className="min-h-screen bg-muted/30 flex flex-col">
+        {/* Proctoring Overlay */}
+        <ProctoringOverlay
+          cameraStream={proctoring.cameraStream}
+          showCameraPreview={enableDeterrentUi && enableCameraMic && proctoring.isCameraActive}
+          showRecordingIndicator={enableDeterrentUi}
+        />
+
+        {/* Blocking Overlay - shown when camera/mic is denied or hardware unavailable */}
+        {proctoring.showBlockingOverlay && (
+          <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 text-center">
+            <div className="max-w-md space-y-6">
+              <div className="mx-auto size-16 bg-destructive/10 rounded-full flex items-center justify-center">
+                <AlertTriangle className="size-8 text-destructive" />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-2xl font-bold">Camera & Microphone Required</h2>
+                <p className="text-muted-foreground">
+                  {proctoring.blockingReason || 'Camera and microphone access is required to proceed with this exam.'}
+                </p>
+              </div>
+              <Button size="lg" className="w-full" onClick={() => proctoring.retryCamera()}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry Permissions
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Please allow camera and microphone access in your browser settings, then click retry.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header className="bg-card border-b border-border h-16 px-6 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-4">
