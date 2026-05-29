@@ -78,12 +78,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (result.success && result.data) {
           login(result.data.user, result.data.institute);
         } else {
-          logout();
+          // Only logout if there's genuinely no session (not a transient network error)
+          const { data: { session } } = await supabase!.auth.getSession();
+          if (!session) {
+            logout();
+          } else {
+            // Session exists but profile fetch failed — keep user logged in
+            // This prevents logout on transient network errors during tab switch
+            setLoading(false);
+          }
         }
       } catch (err) {
         if (!mountedRef.current) return;
         console.warn("[AuthProvider] session hydrate failed:", getErrorMessage(err));
-        logout();
+        // Don't logout on network errors — keep existing auth state
+        setLoading(false);
       }
     }
 
@@ -105,9 +114,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         logout();
         return;
       }
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+      if (event === "SIGNED_IN") {
+        // Only re-hydrate on actual sign-in, not on token refresh.
+        // Token refresh happens automatically when returning to the tab —
+        // re-hydrating on every refresh causes unnecessary API calls and
+        // can trigger logout if the network is slow.
         scheduleHydrate(event);
       }
+      // TOKEN_REFRESHED: Supabase handles this internally — no action needed.
+      // The session is already updated in localStorage by the Supabase client.
     });
 
     // ── Cleanup ──────────────────────────────────────────────────────────────
