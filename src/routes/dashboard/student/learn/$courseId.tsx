@@ -17,12 +17,12 @@ import { useAllLessonProgress } from "@/modules/courses/hooks/useProgress";
 import { CoursePlayer } from "@/modules/courses/components/player/CoursePlayer";
 import {
   getStudentEnrollment,
+  getCourseWithCurriculum,
 } from "@/modules/courses/services/course.service";
 import { upsertLessonProgress } from "@/modules/courses/services/progress.service";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { enrollmentKeys } from "@/modules/courses/hooks/useEnrollment";
 import { progressKeys } from "@/modules/courses/hooks/useProgress";
-import { getStudentCourseCurriculum } from "@/modules/courses/services/student-curriculum.server";
 import type { LmsLessonProgress } from "@/types";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -96,14 +96,7 @@ function LearnPage() {
   } = useQuery({
     queryKey: ["course-curriculum", courseId, instituteId],
     queryFn: async () => {
-      const res = await getStudentCourseCurriculum({
-        data: {
-          courseId,
-          enrollmentId: enrollment?.id ?? "",
-          studentId,
-          instituteId,
-        },
-      });
+      const res = await getCourseWithCurriculum(courseId, instituteId);
       if (!res.success || !res.data) {
         throw new Error(res.error ?? "Course not found");
       }
