@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" fill="#1a1a1a"/>
+  <!-- Outer hexagonal shape -->
+  <path d="M256 60 L430 160 L430 352 L256 452 L82 352 L82 160 Z" stroke="white" stroke-width="32" fill="none" stroke-linejoin="round"/>
+  <!-- Inner interlocking hexagonal pattern -->
+  <path d="M256 120 L370 190 L370 322 L256 392 L142 322 L142 190 Z" stroke="white" stroke-width="28" fill="none" stroke-linejoin="round"/>
+  <!-- Center connecting element -->
+  <path d="M200 180 L312 180 L340 256 L312 332 L200 332 L172 256 Z" stroke="white" stroke-width="24" fill="none" stroke-linejoin="round"/>
+</svg>
