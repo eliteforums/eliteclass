@@ -20,7 +20,6 @@ import {
   updateInstitute,
   changePassword,
 } from "@/services/profile.service";
-import { useTranslation, LANGUAGES } from "@/lib/i18n";
 import { AvatarPicker } from "@/components/avatars/AvatarPicker";
 import { AvatarDisplay } from "@/components/avatars/AvatarPreview";
 
@@ -97,7 +96,16 @@ function SettingsContent() {
 // ── Language Section ──────────────────────────────────────────────────────────
 
 function LanguageSection() {
-  const { t, language, setLanguage } = useTranslation();
+  // Use the same react-i18next instance as the header LanguageSwitcher
+  const { i18n } = require("react-i18next").useTranslation();
+  const { LANGUAGE_OPTIONS } = require("@/lib/i18n-config");
+
+  const currentLang = i18n.language;
+
+  function handleSetLanguage(code: string) {
+    localStorage.setItem("eliteclass-language", code);
+    i18n.changeLanguage(code);
+  }
 
   return (
     <section className="rounded-xl border border-border bg-card p-6">
@@ -106,18 +114,18 @@ function LanguageSection() {
           <Globe className="h-4 w-4 text-indigo-500" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-foreground">{t("settings.language")}</h2>
-          <p className="text-xs text-muted-foreground">{t("settings.selectLanguage")}</p>
+          <h2 className="text-base font-semibold text-foreground">Language</h2>
+          <p className="text-xs text-muted-foreground">Select your preferred language</p>
         </div>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {LANGUAGES.map((lang) => (
+        {LANGUAGE_OPTIONS.map((lang: { code: string; name: string; nativeName: string }) => (
           <button
             key={lang.code}
-            onClick={() => setLanguage(lang.code)}
+            onClick={() => handleSetLanguage(lang.code)}
             className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
-              language === lang.code
+              currentLang === lang.code
                 ? "border-primary bg-primary/5 ring-1 ring-primary/20"
                 : "border-border hover:bg-muted/50"
             }`}
@@ -126,7 +134,7 @@ function LanguageSection() {
               <div className="text-sm font-medium text-foreground">{lang.nativeName}</div>
               <div className="text-xs text-muted-foreground">{lang.name}</div>
             </div>
-            {language === lang.code && (
+            {currentLang === lang.code && (
               <Check className="h-4 w-4 shrink-0 text-primary" />
             )}
           </button>

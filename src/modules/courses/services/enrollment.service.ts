@@ -281,12 +281,12 @@ export async function getCourseEnrollments(
 export async function isStudentEnrolled(
   courseId: string,
   studentId: string,
-): Promise<ApiResponse<{ enrolled: boolean; enrollmentId: string | null }>> {
+): Promise<ApiResponse<{ enrolled: boolean; enrollmentId: string | null; status: string | null }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("lms_enrollments")
-    .select("id")
+    .select("id, status")
     .eq("course_id", courseId)
     .eq("student_id", studentId)
     .neq("status", "dropped")
@@ -298,6 +298,7 @@ export async function isStudentEnrolled(
     data: {
       enrolled: data !== null,
       enrollmentId: data ? (data as { id: string }).id : null,
+      status: data ? (data as { status: string }).status : null,
     },
     error: null,
     success: true,
