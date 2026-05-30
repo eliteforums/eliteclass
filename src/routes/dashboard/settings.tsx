@@ -357,6 +357,7 @@ function PasswordSection() {
 function InstituteSection() {
   const { institute, setInstitute } = useAuthStore();
   const [saving, setSaving] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const {
     register,
@@ -387,6 +388,80 @@ function InstituteSection() {
     toast.success("Institute updated");
   }
 
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !institute) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please select an image file (PNG, JPG, SVG).");
+      return;
+    }
+
+    // Validate size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo file must be under 2MB.");
+      return;
+    }
+
+    setUploadingLogo(true);
+
+    try {
+      // Upload to Supabase Storage
+      const ext = file.name.split(".").pop() ?? "png";
+      const filePath = `institute-logos/${institute.id}/logo.${ext}`;
+
+      const { data: uploadData, error: uploadError } = await (await import("@/lib/supabase")).supabase!
+        .storage.from("public-assets")
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadError) {
+        toast.error("Failed to upload logo: " + uploadError.message);
+        setUploadingLogo(false);
+        return;
+      }
+
+      // Get public URL
+      const { data: urlData } = (await import("@/lib/supabase")).supabase!
+        .storage.from("public-assets")
+        .getPublicUrl(filePath);
+
+      const publicUrl = urlData?.publicUrl;
+      if (!publicUrl) {
+        toast.error("Failed to get logo URL.");
+        setUploadingLogo(false);
+        return;
+      }
+
+      // Update institute record with logo URL
+      const result = await updateInstitute(institute.id, { logo: publicUrl });
+      if (result.success && result.data) {
+        setInstitute(result.data);
+        toast.success("Institute logo updated!");
+      } else {
+        toast.error(result.error ?? "Failed to save logo.");
+      }
+    } catch (err) {
+      toast.error("An error occurred uploading the logo.");
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
+
+  async function handleRemoveLogo() {
+    if (!institute) return;
+    setSaving(true);
+
+    const result = await updateInstitute(institute.id, { logo: null });
+    if (result.success && result.data) {
+      setInstitute(result.data);
+      toast.success("Logo removed.");
+    } else {
+      toast.error(result.error ?? "Failed to remove logo.");
+    }
+    setSaving(false);
+  }
+
   return (
     <section className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center gap-3 mb-5">
@@ -396,6 +471,63 @@ function InstituteSection() {
         <div>
           <h2 className="text-base font-semibold text-foreground">Institute</h2>
           <p className="text-xs text-muted-foreground">Manage your institute details</p>
+        </div>
+      </div>
+
+      {/* Logo Upload Section */}
+      <div className="mb-6 space-y-3">
+        <label className="block text-sm font-medium text-foreground">
+          Institute Logo
+        </label>
+        <p className="text-xs text-muted-foreground">
+          This logo will be used on certificates and official documents.
+        </p>
+        <div className="flex items-center gap-4">
+          {/* Logo preview */}
+          <div className="h-16 w-16 shrink-0 rounded-lg border border-border bg-muted/30 flex items-center justify-center overflow-hidden">
+            {institute?.logo ? (
+              <img
+                src={institute.logo}
+                alt="Institute logo"
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <Building2 className="h-6 w-6 text-muted-foreground/50" />
+            )}
+          </div>
+
+          {/* Upload controls */}
+          <div className="flex flex-col gap-2">
+            <label className="relative cursor-pointer">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted">
+                {uploadingLogo ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>Upload Logo</>
+                )}
+              </span>
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                onChange={handleLogoUpload}
+                disabled={uploadingLogo}
+                className="absolute inset-0 cursor-pointer opacity-0"
+              />
+            </label>
+            {institute?.logo && (
+              <button
+                type="button"
+                onClick={handleRemoveLogo}
+                className="text-xs text-destructive hover:underline text-left"
+              >
+                Remove logo
+              </button>
+            )}
+            <p className="text-[10px] text-muted-foreground">PNG, JPG, SVG. Max 2MB.</p>
+          </div>
         </div>
       </div>
 
