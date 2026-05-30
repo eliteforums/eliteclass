@@ -14,6 +14,7 @@ import {
   FileText,
   Clock,
   BookOpen,
+  CheckCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -222,22 +223,23 @@ function PdfViewer({ lesson, onComplete }: { lesson: LmsLesson; onComplete: () =
     lesson.title?.toLowerCase() === "pdf" ? "Course Documentation" : lesson.title;
 
   return (
-    <div className="flex flex-col h-[85vh] w-full bg-background relative group">
-      <div className="flex items-center justify-between border-b border-border/40 bg-background/95 backdrop-blur-xl px-4 md:px-8 py-4 sticky top-0 z-10 shadow-sm transition-all">
-        <div className="flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner border border-primary/20">
+    <div className="flex flex-col h-[calc(100vh-4rem)] sm:h-[85vh] w-full bg-background relative group">
+      {/* Header — responsive for mobile */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 bg-background/95 backdrop-blur-xl px-3 sm:px-4 md:px-8 py-3 sm:py-4 sticky top-0 z-10 shadow-sm transition-all">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+          <div className="hidden sm:flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner border border-primary/20 shrink-0">
             <FileText className="size-6" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
                 Lesson {lesson.position}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                • PDF Guide
+                • PDF
               </span>
             </div>
-            <p className="text-lg font-bold leading-tight text-foreground tracking-tight">
+            <p className="text-sm sm:text-lg font-bold leading-tight text-foreground tracking-tight truncate">
               {displayTitle}
             </p>
           </div>
@@ -262,22 +264,39 @@ function PdfViewer({ lesson, onComplete }: { lesson: LmsLesson; onComplete: () =
 
         <Button
           variant="default"
-          size="lg"
+          size="sm"
           onClick={onComplete}
-          className="rounded-full px-8 shadow-lg hover:shadow-primary/20 transition-all font-bold h-12 bg-primary hover:-translate-y-0.5"
+          className="rounded-full px-4 sm:px-8 shadow-lg hover:shadow-primary/20 transition-all font-bold h-9 sm:h-12 text-xs sm:text-sm bg-primary hover:-translate-y-0.5 shrink-0"
         >
-          Mark as Complete
+          <CheckCircle className="size-4 sm:hidden mr-1" />
+          <span className="hidden sm:inline">Mark as Complete</span>
+          <span className="sm:hidden">Complete</span>
         </Button>
       </div>
+
+      {/* PDF content area */}
       <div className="flex-1 w-full bg-muted/20 flex flex-col items-center p-0 md:p-6 overflow-hidden">
         <iframe
           src={pdfUrl}
           title={lesson.title}
-          className="w-full h-full max-w-6xl rounded-none md:rounded-2xl border-0 md:border border-border/40 shadow-2xl bg-black"
+          className="w-full h-full max-w-6xl rounded-none md:rounded-2xl border-0 md:border border-border/40 shadow-2xl bg-white"
           allow="autoplay"
           allowFullScreen
           aria-label={`PDF: ${lesson.title}`}
         />
+
+        {/* Mobile fallback — link to open PDF in new tab if iframe doesn't work */}
+        <div className="sm:hidden px-4 py-2 w-full">
+          <a
+            href={pdfUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors w-full"
+          >
+            <FileText className="size-4" />
+            Open PDF in New Tab
+          </a>
+        </div>
       </div>
     </div>
   );
