@@ -163,3 +163,167 @@ Keep it clear and professional.`;
 
   return callGroq(systemPrompt, userPrompt);
 }
+
+// ── AI Notes Summarization ───────────────────────────────────────────────────
+
+/**
+ * Summarizes long notes/content into concise bullet points.
+ * Useful for lesson content, study material, or lecture notes.
+ */
+export async function summarizeNotes(text: string, options?: { style?: "bullets" | "paragraph" | "flashcards"; maxPoints?: number }): Promise<string> {
+  const style = options?.style ?? "bullets";
+  const maxPoints = options?.maxPoints ?? 8;
+
+  const styleInstructions = {
+    bullets: `Summarize into ${maxPoints} concise bullet points. Each point should capture one key concept.`,
+    paragraph: `Write a concise summary paragraph (3-5 sentences) capturing the main ideas.`,
+    flashcards: `Create ${maxPoints} Q&A flashcards from the content. Format: Q: [question]\\nA: [answer]`,
+  };
+
+  const systemPrompt = `You are an expert study assistant that creates clear, concise summaries of educational content. Focus on key concepts, definitions, and important facts. Make the summary easy to review and memorize.`;
+
+  const userPrompt = `${styleInstructions[style]}\n\nContent to summarize:\n\n${text.slice(0, 6000)}`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
+
+// ── AI Lesson Plan Generator ─────────────────────────────────────────────────
+
+export interface LessonPlanData {
+  topic: string;
+  subject?: string;
+  duration?: string; // e.g. "45 minutes"
+  level?: string; // e.g. "Beginner", "Intermediate", "Advanced"
+  objectives?: string;
+}
+
+/**
+ * Generates a structured lesson plan for a given topic.
+ */
+export async function generateLessonPlan(data: LessonPlanData): Promise<string> {
+  const systemPrompt = `You are an experienced curriculum designer. Create structured, practical lesson plans that are easy to follow. Include clear objectives, activities, and assessment methods.`;
+
+  const userPrompt = `Create a lesson plan for:
+- Topic: ${data.topic}
+${data.subject ? `- Subject: ${data.subject}` : ""}
+${data.duration ? `- Duration: ${data.duration}` : "- Duration: 45 minutes"}
+${data.level ? `- Level: ${data.level}` : ""}
+${data.objectives ? `- Objectives: ${data.objectives}` : ""}
+
+Include:
+1. Learning Objectives (2-3 clear goals)
+2. Introduction/Hook (5 min)
+3. Main Content (broken into segments)
+4. Activities/Practice
+5. Assessment/Check for Understanding
+6. Homework/Follow-up
+
+Keep it practical and actionable.`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
+
+// ── AI Assignment Feedback ───────────────────────────────────────────────────
+
+/**
+ * Generates constructive feedback for a student's assignment submission.
+ */
+export async function generateAssignmentFeedback(data: {
+  assignmentTitle: string;
+  studentName: string;
+  submissionContent?: string;
+  score?: number;
+  maxScore?: number;
+}): Promise<string> {
+  const systemPrompt = `You are a supportive teacher providing constructive feedback on student assignments. Be specific, encouraging, and suggest improvements. Keep feedback to 3-5 sentences.`;
+
+  const userPrompt = `Provide feedback for:
+- Assignment: "${data.assignmentTitle}"
+- Student: ${data.studentName}
+${data.score !== undefined ? `- Score: ${data.score}/${data.maxScore ?? 100}` : ""}
+${data.submissionContent ? `- Submission preview: "${data.submissionContent.slice(0, 500)}"` : ""}
+
+Write constructive feedback that:
+1. Acknowledges what was done well
+2. Identifies areas for improvement
+3. Gives a specific suggestion for next time`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
+
+// ── AI Study Tips Generator ──────────────────────────────────────────────────
+
+/**
+ * Generates personalized study tips based on a student's weak areas.
+ */
+export async function generateStudyTips(data: {
+  studentName: string;
+  weakSubjects?: string[];
+  upcomingExams?: string[];
+  studyHoursPerDay?: number;
+}): Promise<string> {
+  const systemPrompt = `You are a study coach providing personalized, actionable study tips. Be specific and practical. Focus on techniques that actually work (spaced repetition, active recall, etc.).`;
+
+  const userPrompt = `Generate personalized study tips for ${data.studentName}:
+${data.weakSubjects?.length ? `- Weak areas: ${data.weakSubjects.join(", ")}` : ""}
+${data.upcomingExams?.length ? `- Upcoming exams: ${data.upcomingExams.join(", ")}` : ""}
+${data.studyHoursPerDay ? `- Available study time: ${data.studyHoursPerDay} hours/day` : ""}
+
+Provide 5-6 specific, actionable study tips. Include:
+- Time management suggestions
+- Effective study techniques for their weak areas
+- Exam preparation strategies`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
+
+// ── AI Course Description Generator ──────────────────────────────────────────
+
+/**
+ * Generates a professional course description from basic details.
+ */
+export async function generateCourseDescription(data: {
+  title: string;
+  topics?: string[];
+  duration?: string;
+  level?: string;
+  targetAudience?: string;
+}): Promise<string> {
+  const systemPrompt = `You are a marketing copywriter for an educational platform. Write compelling, clear course descriptions that highlight value and outcomes. Keep it to 3-4 sentences.`;
+
+  const userPrompt = `Write a course description for:
+- Title: "${data.title}"
+${data.topics?.length ? `- Topics covered: ${data.topics.join(", ")}` : ""}
+${data.duration ? `- Duration: ${data.duration}` : ""}
+${data.level ? `- Level: ${data.level}` : ""}
+${data.targetAudience ? `- Target audience: ${data.targetAudience}` : ""}
+
+Write a compelling 3-4 sentence description that:
+1. Hooks the reader
+2. Highlights what they'll learn
+3. Mentions the outcome/benefit`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
+
+// ── AI Doubt Solver ──────────────────────────────────────────────────────────
+
+/**
+ * Answers a student's academic doubt/question with a clear explanation.
+ */
+export async function solveDoubt(data: {
+  question: string;
+  subject?: string;
+  level?: string;
+}): Promise<string> {
+  const systemPrompt = `You are a patient, knowledgeable tutor. Explain concepts clearly using simple language. Use examples when helpful. If the question is ambiguous, provide the most likely interpretation and answer.`;
+
+  const userPrompt = `A student asks:
+"${data.question}"
+${data.subject ? `Subject: ${data.subject}` : ""}
+${data.level ? `Level: ${data.level}` : ""}
+
+Provide a clear, concise explanation. Use an example if it helps clarify the concept.`;
+
+  return callGroq(systemPrompt, userPrompt);
+}
