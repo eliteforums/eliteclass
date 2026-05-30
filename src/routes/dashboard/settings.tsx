@@ -13,6 +13,7 @@ import { Loader2, User as UserIcon, Building2, Lock, Check, Globe } from "lucide
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/authStore";
 import {
   updateProfile,
@@ -20,6 +21,8 @@ import {
   changePassword,
 } from "@/services/profile.service";
 import { useTranslation, LANGUAGES } from "@/lib/i18n";
+import { AvatarPicker } from "@/components/avatars/AvatarPicker";
+import { AvatarDisplay } from "@/components/avatars/AvatarPreview";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
@@ -138,6 +141,8 @@ function LanguageSection() {
 function ProfileSection() {
   const { user, setUser } = useAuthStore();
   const [saving, setSaving] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [savingAvatar, setSavingAvatar] = useState(false);
 
   const {
     register,
@@ -173,6 +178,22 @@ function ProfileSection() {
     toast.success("Profile updated");
   }
 
+  async function handleAvatarSelect(avatarConfig: string) {
+    if (!user) return;
+    setSavingAvatar(true);
+
+    const result = await updateProfile(user.id, { avatar_url: avatarConfig });
+    setSavingAvatar(false);
+
+    if (result.success && result.data) {
+      setUser(result.data);
+      toast.success("Avatar updated!");
+      setShowAvatarPicker(false);
+    } else {
+      toast.error(result.error ?? "Failed to update avatar");
+    }
+  }
+
   return (
     <section className="rounded-xl border border-border bg-card p-6">
       <div className="flex items-center gap-3 mb-5">
@@ -183,6 +204,39 @@ function ProfileSection() {
           <h2 className="text-base font-semibold text-foreground">Profile</h2>
           <p className="text-xs text-muted-foreground">Your personal information</p>
         </div>
+      </div>
+
+      {/* Avatar Section */}
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-foreground mb-2">Profile Picture</label>
+        <div className="flex items-center gap-4">
+          <AvatarDisplay
+            avatarUrl={user?.avatar_url}
+            name={user?.name ?? "User"}
+            size={64}
+          />
+          <div className="flex flex-col gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAvatarPicker(!showAvatarPicker)}
+            >
+              {showAvatarPicker ? "Close" : "Change Avatar"}
+            </Button>
+            <p className="text-[10px] text-muted-foreground">Choose from 18+ avatar styles</p>
+          </div>
+        </div>
+
+        {showAvatarPicker && (
+          <div className="mt-4 rounded-lg border border-border p-4 bg-background">
+            <AvatarPicker
+              currentAvatar={user?.avatar_url}
+              userName={user?.name ?? "User"}
+              onSelect={handleAvatarSelect}
+              onCancel={() => setShowAvatarPicker(false)}
+            />
+          </div>
+        )}
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
