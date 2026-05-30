@@ -586,14 +586,14 @@ Built with modern web technologies:
 
 Planned features and improvements:
 
+- [ ] Multi-language support (Hindi, Marathi, Tamil, Telugu + more)
+- [ ] Advanced AI analytics (predictive student performance, dropout risk scoring, revenue forecasting)
+- [ ] Enhanced reporting dashboards (custom report builder, scheduled exports, visual charts)
 - [ ] Mobile app (React Native)
-- [ ] Advanced AI analytics
-- [ ] Payment gateway integration
+- [ ] Payment gateway integration (Razorpay/Stripe)
 - [ ] SMS/WhatsApp notifications
 - [ ] Video conferencing integration
 - [ ] Mobile app for teachers
-- [ ] Enhanced reporting dashboards
-- [ ] Multi-language support
 
 ---
 
