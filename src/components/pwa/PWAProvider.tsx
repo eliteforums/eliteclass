@@ -6,6 +6,7 @@ import { useLocationTracking } from "@/hooks/useLocationTracking";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { InstallBanner } from "./InstallBanner";
 import { UpdatePrompt } from "./UpdatePrompt";
+import { StudentAttendancePopup } from "@/components/attendance/StudentAttendancePopup";
 
 interface PWAProviderProps {
   children: ReactNode;
@@ -44,6 +45,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
           <OfflineIndicator />
           <InstallBanner />
           <UpdatePrompt showUpdate={showUpdate} onUpdate={skipWaitingAndReload} />
+          <StudentAttendancePopup />
         </>
       )}
     </>

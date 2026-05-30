@@ -15,6 +15,7 @@ import appCss from "../styles.css?url";
 import { ThemeProvider, themeNoFlashScript } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/AuthProvider";
 import { PWAProvider } from "@/components/pwa";
+import { LocationGate } from "@/components/LocationGate";
 import { Toaster } from "@/components/ui/sonner";
 import { getErrorMessage } from "@/utils/helpers";
 
@@ -192,9 +193,11 @@ function RootComponent() {
       <I18nextProvider i18n={i18n}>
         <ThemeProvider>
           <AuthProvider>
-            <PWAProvider>
-              <Outlet />
-            </PWAProvider>
+            <LocationGate>
+              <PWAProvider>
+                <Outlet />
+              </PWAProvider>
+            </LocationGate>
           </AuthProvider>
         </ThemeProvider>
       </I18nextProvider>
