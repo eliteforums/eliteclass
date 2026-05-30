@@ -1,0 +1,33 @@
+{
+  "title": "Notifications",
+  "noNotifications": "Aucune notification pour le moment",
+  "markAllRead": "Tout marquer comme lu",
+  "markAsRead": "Marquer comme lu",
+  "unreadCount": "{{count}} non lues",
+  "unreadCountOverflow": "99+",
+  "viewAll": "Voir toutes les notifications",
+  "compose": {
+    "title": "Envoyer une Notification",
+    "titleLabel": "Titre",
+    "titlePlaceholder": "Entrez le titre de la notification",
+    "bodyLabel": "Message",
+    "bodyPlaceholder": "Entrez le message de la notification",
+    "target": "Envoyer à",
+    "targetAll": "Tous les Étudiants",
+    "targetBatch": "Groupe Spécifique",
+    "targetIndividual": "Étudiants Individuels",
+    "selectBatch": "Sélectionnez un groupe",
+    "selectStudents": "Sélectionnez des étudiants",
+    "send": "Envoyer la Notification",
+    "sending": "Envoi en cours...",
+    "success": "Notification envoyée à {{count}} étudiants",
+    "titleTooLong": "Le titre doit contenir 100 caractères ou moins",
+    "bodyTooLong": "Le message doit contenir 500 caractères ou moins",
+    "titleRequired": "Le titre est obligatoire",
+    "bodyRequired": "Le message est obligatoire",
+    "permissionDenied": "Vous n'avez pas la permission d'envoyer à ce groupe"
+  },
+  "empty": "Vous êtes à jour !",
+  "loadingError": "Échec du chargement des notifications",
+  "reconnecting": "Reconnexion..."
+}

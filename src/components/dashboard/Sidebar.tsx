@@ -19,6 +19,7 @@ import {
   ClipboardList,
   Search,
   Brain,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -91,6 +92,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
             url: "/dashboard/messages",
             icon: MessageSquare,
           },
+          { title: "Notifications", url: "/dashboard/notifications", icon: Bell },
           { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
@@ -138,6 +140,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
           { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
           { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: "Notifications", url: "/dashboard/notifications", icon: Bell },
           { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },

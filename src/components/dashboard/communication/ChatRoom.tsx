@@ -4,6 +4,9 @@ import { toast } from "sonner";
 import { useBatchMessages } from "@/hooks/useBatchMessages";
 import { useAuth } from "@/hooks/useAuth";
 import { MessageBubble } from "./MessageBubble";
+import { GIFPickerButton } from "./GIFPickerButton";
+
+const MAX_MESSAGE_LENGTH = 2000;
 
 interface ChatRoomProps {
   batchId: string;
@@ -12,11 +15,16 @@ interface ChatRoomProps {
 
 export function ChatRoom({ batchId, batchName }: ChatRoomProps) {
   const { user } = useAuth();
-  const { messages, isLoading, isConnected, sendMessage } = useBatchMessages(batchId);
+  const { messages, isLoading, isConnected, sendMessage, retryMessage } =
+    useBatchMessages(batchId);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  const isOverLimit = input.length > MAX_MESSAGE_LENGTH;
+  const isEmptyOrWhitespace = !input.trim();
+  const isSendDisabled = isEmptyOrWhitespace || isOverLimit || isSending;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -25,18 +33,37 @@ export function ChatRoom({ batchId, batchName }: ChatRoomProps) {
 
   async function handleSend() {
     const content = input.trim();
-    if (!content || isSending) return;
+    if (!content || isSending || isOverLimit) return;
 
     setInput("");
     setIsSending(true);
 
-    const success = await sendMessage(content);
+    const success = await sendMessage(content, "text");
     if (!success) {
-      toast.error("Failed to send message. Please try again.");
-      setInput(content); // Restore input for retry
+      toast.error("Failed to send message. Tap the message to retry.");
     }
 
     setIsSending(false);
+  }
+
+  async function handleSendGif(gifUrl: string) {
+    if (isSending) return;
+
+    setIsSending(true);
+
+    const success = await sendMessage("", "gif", gifUrl);
+    if (!success) {
+      toast.error("Failed to send GIF. Tap the message to retry.");
+    }
+
+    setIsSending(false);
+  }
+
+  async function handleRetry(optimisticId: string) {
+    const success = await retryMessage(optimisticId);
+    if (!success) {
+      toast.error("Retry failed. Please try again.");
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -44,6 +71,10 @@ export function ChatRoom({ batchId, batchName }: ChatRoomProps) {
       e.preventDefault();
       handleSend();
     }
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value);
   }
 
   return (
@@ -85,10 +116,11 @@ export function ChatRoom({ batchId, batchName }: ChatRoomProps) {
 
             return (
               <MessageBubble
-                key={message.id}
+                key={message._optimisticId || message.id}
                 message={message}
                 isOwn={isOwn}
                 showSenderName={showSenderName}
+                onRetry={handleRetry}
               />
             );
           })
@@ -98,19 +130,39 @@ export function ChatRoom({ batchId, batchName }: ChatRoomProps) {
 
       {/* Input area */}
       <div className="border-t px-4 py-3">
+        {/* Character count warning */}
+        {input.length > 0 && (
+          <div className="flex justify-end mb-1">
+            <span
+              className={`text-xs ${
+                isOverLimit
+                  ? "text-destructive font-medium"
+                  : input.length > MAX_MESSAGE_LENGTH * 0.9
+                    ? "text-yellow-600"
+                    : "text-muted-foreground"
+              }`}
+            >
+              {input.length}/{MAX_MESSAGE_LENGTH}
+            </span>
+          </div>
+        )}
         <div className="flex items-end gap-2">
+          <GIFPickerButton onSelectGif={handleSendGif} disabled={isSending} />
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder="Type a message..."
             rows={1}
-            className="flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-32"
+            maxLength={MAX_MESSAGE_LENGTH + 100} // Allow slight overflow to show warning
+            className={`flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-32 ${
+              isOverLimit ? "border-destructive focus:ring-destructive/20" : ""
+            }`}
             style={{ minHeight: "38px" }}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isSending}
+            disabled={isSendDisabled}
             className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-2 text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Send message"
           >
