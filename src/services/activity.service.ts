@@ -27,6 +27,7 @@ export interface UserSession {
   latitude: number | null;
   longitude: number | null;
   created_at: string;
+  user_name?: string;
 }
 
 export interface ActivityLog {
@@ -43,6 +44,7 @@ export interface ActivityLog {
   page_url: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  user_name?: string;
 }
 
 export interface UserLocation {
@@ -60,6 +62,7 @@ export interface UserLocation {
   is_online: boolean;
   last_seen_at: string;
   updated_at: string;
+  user_name?: string;
 }
 
 export type ActivityCategory =
@@ -266,7 +269,7 @@ export async function getSessionLogs(
 
   let query = supabase
     .from("user_sessions")
-    .select("*")
+    .select("*, users!user_sessions_user_id_fkey(name)")
     .eq("institute_id", instituteId)
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 100);
@@ -277,7 +280,13 @@ export async function getSessionLogs(
 
   const { data, error } = await query;
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as UserSession[], error: null, success: true };
+
+  const sessions = (data ?? []).map((row: any) => ({
+    ...row,
+    user_name: row.users?.name ?? null,
+    users: undefined,
+  }));
+  return { data: sessions as UserSession[], error: null, success: true };
 }
 
 export async function getActivityLogs(
@@ -288,7 +297,7 @@ export async function getActivityLogs(
 
   let query = supabase
     .from("user_activity_logs")
-    .select("*")
+    .select("*, users!user_activity_logs_user_id_fkey(name)")
     .eq("institute_id", instituteId)
     .order("created_at", { ascending: false })
     .limit(options?.limit ?? 100);
@@ -298,7 +307,13 @@ export async function getActivityLogs(
 
   const { data, error } = await query;
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as ActivityLog[], error: null, success: true };
+
+  const logs = (data ?? []).map((row: any) => ({
+    ...row,
+    user_name: row.users?.name ?? null,
+    users: undefined,
+  }));
+  return { data: logs as ActivityLog[], error: null, success: true };
 }
 
 export async function getLiveLocations(
@@ -308,11 +323,17 @@ export async function getLiveLocations(
 
   const { data, error } = await supabase
     .from("user_locations")
-    .select("*")
+    .select("*, users!user_locations_user_id_fkey(name)")
     .eq("institute_id", instituteId)
     .eq("is_online", true)
     .order("last_seen_at", { ascending: false });
 
   if (error) return { data: null, error: error.message, success: false };
-  return { data: data as UserLocation[], error: null, success: true };
+
+  const locations = (data ?? []).map((row: any) => ({
+    ...row,
+    user_name: row.users?.name ?? null,
+    users: undefined,
+  }));
+  return { data: locations as UserLocation[], error: null, success: true };
 }
