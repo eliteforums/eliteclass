@@ -1,0 +1,33 @@
+{
+  "title": "Notificaciones",
+  "noNotifications": "Aún no hay notificaciones",
+  "markAllRead": "Marcar todas como leídas",
+  "markAsRead": "Marcar como leída",
+  "unreadCount": "{{count}} sin leer",
+  "unreadCountOverflow": "99+",
+  "viewAll": "Ver todas las notificaciones",
+  "compose": {
+    "title": "Enviar Notificación",
+    "titleLabel": "Título",
+    "titlePlaceholder": "Ingresa el título de la notificación",
+    "bodyLabel": "Mensaje",
+    "bodyPlaceholder": "Ingresa el mensaje de la notificación",
+    "target": "Enviar a",
+    "targetAll": "Todos los Estudiantes",
+    "targetBatch": "Grupo Específico",
+    "targetIndividual": "Estudiantes Individuales",
+    "selectBatch": "Selecciona un grupo",
+    "selectStudents": "Selecciona estudiantes",
+    "send": "Enviar Notificación",
+    "sending": "Enviando...",
+    "success": "Notificación enviada a {{count}} estudiantes",
+    "titleTooLong": "El título debe tener 100 caracteres o menos",
+    "bodyTooLong": "El mensaje debe tener 500 caracteres o menos",
+    "titleRequired": "El título es obligatorio",
+    "bodyRequired": "El mensaje es obligatorio",
+    "permissionDenied": "No tienes permiso para enviar a este grupo"
+  },
+  "empty": "¡Estás al día!",
+  "loadingError": "Error al cargar notificaciones",
+  "reconnecting": "Reconectando..."
+}

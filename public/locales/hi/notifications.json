@@ -1,0 +1,33 @@
+{
+  "title": "सूचनाएं",
+  "noNotifications": "अभी कोई सूचना नहीं",
+  "markAllRead": "सभी को पढ़ा हुआ चिह्नित करें",
+  "markAsRead": "पढ़ा हुआ चिह्नित करें",
+  "unreadCount": "{{count}} अपठित",
+  "unreadCountOverflow": "99+",
+  "viewAll": "सभी सूचनाएं देखें",
+  "compose": {
+    "title": "सूचना भेजें",
+    "titleLabel": "शीर्षक",
+    "titlePlaceholder": "सूचना शीर्षक दर्ज करें",
+    "bodyLabel": "संदेश",
+    "bodyPlaceholder": "सूचना संदेश दर्ज करें",
+    "target": "भेजें",
+    "targetAll": "सभी छात्र",
+    "targetBatch": "विशिष्ट बैच",
+    "targetIndividual": "व्यक्तिगत छात्र",
+    "selectBatch": "एक बैच चुनें",
+    "selectStudents": "छात्र चुनें",
+    "send": "सूचना भेजें",
+    "sending": "भेज रहे हैं...",
+    "success": "{{count}} छात्रों को सूचना भेजी गई",
+    "titleTooLong": "शीर्षक 100 अक्षरों से अधिक नहीं होना चाहिए",
+    "bodyTooLong": "संदेश 500 अक्षरों से अधिक नहीं होना चाहिए",
+    "titleRequired": "शीर्षक आवश्यक है",
+    "bodyRequired": "संदेश आवश्यक है",
+    "permissionDenied": "आपको इस बैच को भेजने की अनुमति नहीं है"
+  },
+  "empty": "सब कुछ पढ़ लिया!",
+  "loadingError": "सूचनाएं लोड करने में विफल",
+  "reconnecting": "पुनः कनेक्ट हो रहा है..."
+}
