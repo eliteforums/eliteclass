@@ -86,7 +86,7 @@ function getNavGroups(role: UserRole, t: (key: string) => string): NavGroup[] {
           { title: t("nav.attendance") || "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
           { title: t("nav.progressTracker") || "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
           { title: t("nav.fees") || "Fees & Billing", url: "/dashboard/admin/fees", icon: CreditCard },
-          { title: t("nav.reports") || "Reports", url: "/dashboard/admin/reports", icon: FileText },
+          { title: "Reports & Logs", url: "/dashboard/admin/reports", icon: FileText },
           { title: t("nav.messages") || "Communication", url: "/dashboard/messages", icon: MessageSquare },
           { title: t("nav.notifications") || "Notifications", url: "/dashboard/notifications", icon: Bell },
           { title: t("nav.ai") || "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
