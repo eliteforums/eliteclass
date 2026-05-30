@@ -30,6 +30,8 @@ export * from "./message.service";
 export * from "./notification.service";
 export * from "./dm.service";
 export * from "./translate.service";
+// activity.service: import directly to avoid collision with security.service exports
+// import { logSession, logActivity, updateLocation, ... } from "@/services/activity.service";
 // student.service re-exports getBatchesByInstitute from batch.service.
 // Export only the unique symbols from student.service to avoid collision.
 export {
