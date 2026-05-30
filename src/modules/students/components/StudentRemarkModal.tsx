@@ -10,10 +10,11 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, MessageSquarePlus, CheckCircle2, X } from "lucide-react";
+import { Loader2, MessageSquarePlus, CheckCircle2, X, Sparkles } from "lucide-react";
 
 import { remarkSchema, type RemarkSchema } from "@/modules/students/validations";
 import { addStudentRemark } from "@/services";
+import { generateStudentRemark } from "@/services/ai.service";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export function StudentRemarkModal({
 }: StudentRemarkModalProps) {
   const [serverError, setServerError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const {
     register,
@@ -163,6 +165,35 @@ export function StudentRemarkModal({
                   {serverError}
                 </div>
               )}
+
+              {/* AI Generate Button */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isSubmitting || isGeneratingAI}
+                  onClick={async () => {
+                    setIsGeneratingAI(true);
+                    try {
+                      const remark = await generateStudentRemark({ studentName });
+                      if (remark) {
+                        reset({ remark });
+                      }
+                    } catch {
+                      // Silently fail — user can write manually
+                    } finally {
+                      setIsGeneratingAI(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+                >
+                  {isGeneratingAI ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  {isGeneratingAI ? "Generating..." : "AI Generate Remark"}
+                </button>
+              </div>
 
               {/* Textarea */}
               <div>
