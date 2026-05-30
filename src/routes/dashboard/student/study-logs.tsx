@@ -54,7 +54,7 @@ function StudentStudyLogsPage() {
     );
   }
 
-  if (!studentId || !primaryBatchId || !instituteId) {
+  if (!studentId || !instituteId) {
     return (
       <ProtectedRoute allowedRoles={["student"]}>
         <PageHeader
@@ -64,9 +64,29 @@ function StudentStudyLogsPage() {
         <Card className="mt-8">
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-bold">Profile incomplete</h3>
+            <h3 className="text-lg font-bold">Student profile not found</h3>
             <p className="text-sm text-muted-foreground max-w-xs">
-              We couldn't find your student profile or assigned batch. Please contact your institute.
+              We couldn't find your student record. Please contact your institute admin.
+            </p>
+          </CardContent>
+        </Card>
+      </ProtectedRoute>
+    );
+  }
+
+  if (!primaryBatchId) {
+    return (
+      <ProtectedRoute allowedRoles={["student"]}>
+        <PageHeader
+          title="Progress Tracker"
+          subtitle="Track your daily learning and assignments"
+        />
+        <Card className="mt-8">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-bold">No batch assigned yet</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              You haven't been assigned to a batch yet. Browse available batches and send a join request, or contact your institute.
             </p>
           </CardContent>
         </Card>
