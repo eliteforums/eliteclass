@@ -2,7 +2,6 @@ import { useState, useEffect, type ReactNode } from "react";
 import { Navigate, useLocation } from "@tanstack/react-router";
 import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabase";
-import { checkProfileCompleteness } from "@/utils/profileCompleteness";
 
 interface ProfileCompletionGuardProps {
   children: ReactNode;
@@ -27,7 +26,7 @@ export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps
 
     async function checkProfile() {
       try {
-        // Get student record with emergency_contact
+        // Get student record — check if emergency_contact has been filled
         const { data: student } = await supabase!
           .from("students")
           .select("id, emergency_contact")
@@ -35,44 +34,16 @@ export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps
           .single();
 
         if (!student) {
-          setIsComplete(true); // fail-open
+          setIsComplete(true); // fail-open if no student record found
           return;
         }
 
-        // Get linked parent info
-        const { data: parentLinks } = await supabase!
-          .from("student_parents")
-          .select("parent:parents(user_id)")
-          .eq("student_id", student.id)
-          .limit(1);
+        // Profile is complete if emergency_contact has name and phone filled
+        // This is the minimum requirement — parent linking is optional/best-effort
+        const ec = student.emergency_contact as { name?: string; phone?: string; relation?: string } | null;
+        const hasEmergencyContact = !!(ec?.name?.trim() && ec?.phone?.trim());
 
-        let parentName: string | null = null;
-        let parentPhone: string | null = null;
-        let parentEmail: string | null = null;
-
-        if (parentLinks && parentLinks.length > 0) {
-          const parentUserId = (parentLinks[0] as any)?.parent?.user_id;
-          if (parentUserId) {
-            const { data: parentUser } = await supabase!
-              .from("users")
-              .select("name, phone, email")
-              .eq("id", parentUserId)
-              .single();
-            if (parentUser) {
-              parentName = parentUser.name;
-              parentPhone = parentUser.phone;
-              parentEmail = parentUser.email;
-            }
-          }
-        }
-
-        const result = checkProfileCompleteness(
-          student.emergency_contact as any,
-          parentName,
-          parentPhone,
-          parentEmail,
-        );
-        setIsComplete(result.isComplete);
+        setIsComplete(hasEmergencyContact);
       } catch {
         setIsComplete(true); // fail-open on errors
       }

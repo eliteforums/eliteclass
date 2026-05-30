@@ -62,7 +62,7 @@ function CompleteProfilePage() {
       }
 
       // 2. Update emergency_contact on student
-      const { error: updateError } = await supabase
+      const { error: updateError, data: updatedStudent } = await supabase
         .from("students")
         .update({
           emergency_contact: {
@@ -72,10 +72,19 @@ function CompleteProfilePage() {
           },
           updated_at: new Date().toISOString(),
         })
-        .eq("id", student.id);
+        .eq("id", student.id)
+        .select("id, emergency_contact")
+        .single();
 
       if (updateError) {
         toast.error("Failed to save emergency contact: " + updateError.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Verify the update actually persisted (RLS may silently block)
+      if (!updatedStudent?.emergency_contact) {
+        toast.error("Unable to save profile data. Please contact your institute admin.");
         setIsSubmitting(false);
         return;
       }
