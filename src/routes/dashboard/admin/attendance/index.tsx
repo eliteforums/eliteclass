@@ -52,6 +52,7 @@ import {
 import { CreateSessionModal } from "@/modules/attendance/components/CreateSessionModal";
 import { AttendanceMarkingTable } from "@/modules/attendance/components/AttendanceMarkingTable";
 import { AttendanceSummaryCard } from "@/modules/attendance/components/AttendanceSummaryCard";
+import { GeoAttendancePrompt } from "@/components/attendance/GeoAttendancePrompt";
 import { resolveSessionBatchId } from "@/modules/attendance/utils/sessionHelpers";
 import type {
   AttendanceSession,
@@ -599,6 +600,16 @@ function AttendancePage() {
           </button>
         }
       />
+
+      {/* ── Geo-Fenced Attendance Prompt ─────────────────────────────── */}
+      {sessionBatchFilter && (
+        <div className="mt-4">
+          <GeoAttendancePrompt
+            batchId={sessionBatchFilter}
+            batchName={batches.find(b => b.id === sessionBatchFilter)?.name ?? "Selected Batch"}
+          />
+        </div>
+      )}
 
       {/* ── Tab bar ───────────────────────────────────────────────────── */}
       <div
