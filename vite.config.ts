@@ -29,20 +29,27 @@ export default defineConfig({
         brotliSize: true,
         filename: "dist/stats.html",
       }),
-      VitePWA({
-        strategies: "injectManifest",
-        srcDir: "src",
-        filename: "sw.ts",
-        registerType: "prompt",
-        injectRegister: false,
-        manifest: false,
-        devOptions: { enabled: false },
-        injectManifest: {
-          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
-          globPatterns: ['**/*.{js,css,html,woff2,png,svg,ico}'],
-          globIgnores: ['**/stats.html'],
-        },
-      }),
+      // PWA plugin disabled in SSR build (Vercel/Cloudflare) — the SW is served
+      // as a static file from public/ or built separately.
+      // Enable only for pure client builds (vite build --mode client).
+      ...(process.env.VERCEL || process.env.CF_PAGES
+        ? []
+        : [
+            VitePWA({
+              strategies: "injectManifest",
+              srcDir: "src",
+              filename: "sw.ts",
+              registerType: "prompt",
+              injectRegister: false,
+              manifest: false,
+              devOptions: { enabled: false },
+              injectManifest: {
+                maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+                globPatterns: ["**/*.{js,css,html,woff2,png,svg,ico}"],
+                globIgnores: ["**/stats.html"],
+              },
+            }),
+          ]),
     ],
     build: {
       target: "esnext",
