@@ -67,6 +67,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!mountedRef.current) return;
         if (result.success && result.data) {
           login(result.data.user, result.data.institute);
+          // Log session (fire-and-forget)
+          import("@/services/activity.service").then((m) => m.logSession("login")).catch(() => {});
         } else {
           // Check if there's still a valid session in storage
           const { data: { session } } = await supabase!.auth.getSession();
