@@ -171,15 +171,17 @@ function DashboardOverview() {
         </div>
       ) : null}
 
-      {/* Recent admissions + AI panel */}
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <RecentTable students={recentStudents} isLoading={statsLoading} />
+      {/* Recent admissions + AI panel — admin/staff only */}
+      {(user?.role === "admin" || user?.role === "staff" || user?.role === "super_admin") && (
+        <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <RecentTable students={recentStudents} isLoading={statsLoading} />
+          </div>
+          <div>
+            <AIPanel />
+          </div>
         </div>
-        <div>
-          <AIPanel />
-        </div>
-      </div>
+      )}
     </>
   );
 }
