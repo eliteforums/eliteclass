@@ -35,65 +35,60 @@
 import { jsPDF } from "jspdf";
 import type { CertificateTemplate, CertificateCustomData } from "@/types";
 
-// ── Elite Forums Logo as SVG path data (drawn programmatically) ──────────────
-// Since we can't embed the actual PNG in code easily, we draw the hexagonal
-// logo shape using jsPDF drawing primitives.
+// ── Logo loading helper ──────────────────────────────────────────────────────
+// Loads the actual logo from /logo.svg and converts to a data URL for jsPDF.
 
-function drawEliteForumsLogo(doc: jsPDF, x: number, y: number, size: number) {
-  // Draw a simplified hexagonal logo representation
-  const cx = x + size / 2;
-  const cy = y + size / 2;
-  const r = size / 2 - 2;
+let logoDataUrl: string | null = null;
 
-  // Outer hexagon
-  doc.setDrawColor(33, 33, 33);
-  doc.setLineWidth(2.5);
-  const points: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 6;
-    points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)]);
+async function loadLogoDataUrl(): Promise<string | null> {
+  if (logoDataUrl) return logoDataUrl;
+  try {
+    const response = await fetch("/logo.svg");
+    if (!response.ok) return null;
+    const svgText = await response.text();
+    // Convert SVG to a data URL
+    const encoded = btoa(unescape(encodeURIComponent(svgText)));
+    logoDataUrl = `data:image/svg+xml;base64,${encoded}`;
+    return logoDataUrl;
+  } catch {
+    return null;
   }
-  doc.setFillColor(33, 33, 33);
-  doc.triangle(points[0][0], points[0][1], points[1][0], points[1][1], points[2][0], points[2][1], "F");
-  doc.triangle(points[0][0], points[0][1], points[2][0], points[2][1], points[3][0], points[3][1], "F");
-  doc.triangle(points[0][0], points[0][1], points[3][0], points[3][1], points[4][0], points[4][1], "F");
-  doc.triangle(points[0][0], points[0][1], points[4][0], points[4][1], points[5][0], points[5][1], "F");
-
-  // Inner white hexagon
-  const ir = r * 0.55;
-  doc.setFillColor(255, 255, 255);
-  const innerPoints: [number, number][] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 3) * i - Math.PI / 6;
-    innerPoints.push([cx + ir * Math.cos(angle), cy + ir * Math.sin(angle)]);
-  }
-  doc.triangle(innerPoints[0][0], innerPoints[0][1], innerPoints[1][0], innerPoints[1][1], innerPoints[2][0], innerPoints[2][1], "F");
-  doc.triangle(innerPoints[0][0], innerPoints[0][1], innerPoints[2][0], innerPoints[2][1], innerPoints[3][0], innerPoints[3][1], "F");
-  doc.triangle(innerPoints[0][0], innerPoints[0][1], innerPoints[3][0], innerPoints[3][1], innerPoints[4][0], innerPoints[4][1], "F");
-  doc.triangle(innerPoints[0][0], innerPoints[0][1], innerPoints[4][0], innerPoints[4][1], innerPoints[5][0], innerPoints[5][1], "F");
 }
 
-function drawCompanySeal(doc: jsPDF, x: number, y: number) {
-  // Outer circle
-  doc.setDrawColor(45, 55, 72);
-  doc.setLineWidth(1.8);
+async function drawLogo(doc: jsPDF, x: number, y: number, size: number) {
+  const dataUrl = await loadLogoDataUrl();
+  if (dataUrl) {
+    try {
+      doc.addImage(dataUrl, "SVG", x, y, size, size);
+      return;
+    } catch {
+      // Fall through to fallback
+    }
+  }
+  // Fallback: draw a simple placeholder rectangle with "EF" text
+  doc.setFillColor(33, 33, 33);
+  doc.roundedRect(x, y, size, size, 3, 3, "F");
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(255, 255, 255);
+  doc.text("EF", x + size / 2, y + size / 2 + 3, { align: "center" });
+  doc.setTextColor(33, 33, 33);
+}
+
+function drawSealPlaceholder(doc: jsPDF, x: number, y: number) {
+  // Draw a blank space with a light dashed circle border for physical seal placement
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.5);
+  // Dashed circle (approximated with a light circle)
   doc.circle(x, y, 16);
   doc.circle(x, y, 13);
 
-  // Text inside seal
-  doc.setFontSize(5);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(45, 55, 72);
-  doc.text("ELITE FORUMS", x, y - 6, { align: "center" });
-
-  // Star
-  doc.setFontSize(8);
-  doc.text("★", x, y + 1, { align: "center" });
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "bold");
-  doc.text("ESTD", x, y + 5, { align: "center" });
-  doc.text("2023", x, y + 9, { align: "center" });
+  // Light text indicating seal placement area
+  doc.setFontSize(6);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 180, 180);
+  doc.text("(Seal)", x, y + 2, { align: "center" });
+  doc.setTextColor(33, 33, 33);
 }
 
 /**
@@ -144,7 +139,7 @@ export async function renderCertificatePage(
   // ═══════════════════════════════════════════════════════════════════════════
   // LOGO + COMPANY NAME (left side)
   // ═══════════════════════════════════════════════════════════════════════════
-  drawEliteForumsLogo(doc, marginLeft, 14, 22);
+  await drawLogo(doc, marginLeft, 14, 22);
 
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
@@ -261,8 +256,8 @@ export async function renderCertificatePage(
   doc.setFont("helvetica", "bold");
   doc.text("ELITE FORUMS", marginLeft, signatoryY + 10);
 
-  // Company seal (right side)
-  drawCompanySeal(doc, rightX - 20, signatoryY);
+  // Company seal placeholder (right side) — blank space for physical seal
+  drawSealPlaceholder(doc, rightX - 20, signatoryY);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // BLUE FOOTER BAR (bottom)
