@@ -609,6 +609,7 @@ Planned features and improvements:
 
 ## 📈 Recent Updates
 
+- ✅ **Avatar System (18+ Styles)** — DiceBear, Avvvatars, and Boring Avatars with style picker, randomization, and 12-variant grid
 - ✅ **Multilingual Platform** — Full i18n support with 5 languages (English, Hindi, Marathi, Spanish, French) via react-i18next with language switcher in topbar
 - ✅ **Live Notifications** — Real-time notification system with Supabase Realtime, unread badges, admin/instructor compose UI
 - ✅ **WhatsApp-Style Chat** — Emoji picker, GIF picker (GIPHY), optimistic updates, 2000 char limit, retry on failure
@@ -621,12 +622,12 @@ Planned features and improvements:
 - ✅ **Canvas Auto-Save** — Teacher canvas now auto-saves to localStorage with draft persistence
 - ✅ **Certificate Templates** — User-uploaded logos, blank seal placeholder for physical stamping
 - ✅ AI-powered PDF to MCQ generator (upload PDF → AI generates questions)
-- ✅ 9 AI features: notes summarization, study tips, lesson plans, doubt solver, remarks, exam analytics, communication drafts, assignment feedback, course descriptions
+- ✅ 10 AI features: notes summarization, study tips, lesson plans, doubt solver, remarks, exam analytics, communication drafts, assignment feedback, course descriptions, AI chat assistant
 - ✅ Bulk certificate generator with custom templates (PDF generation)
 - ✅ Student onboarding guard (mandatory profile completion)
 - ✅ Batch join requests (student self-service with admin approval)
 - ✅ Exam proctoring (camera/mic, tab detection, deterrent UI)
-- ✅ Settings page (profile, password, institute management, logo upload)
+- ✅ Settings page (profile, avatar, password, institute management, logo upload)
 - ✅ Real-time AI insights dashboard (live data from Supabase)
 - ✅ Parent portal with student tracking
 
