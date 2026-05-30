@@ -1,68 +1,231 @@
 /// <reference lib="webworker" />
-import { precacheAndRoute } from 'workbox-precaching';
-import { registerRoute, NavigationRoute } from 'workbox-routing';
-import { CacheFirst, StaleWhileRevalidate, NetworkFirst } from 'workbox-strategies';
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { registerRoute, NavigationRoute, Route } from 'workbox-routing';
+import { CacheFirst, StaleWhileRevalidate, NetworkFirst, NetworkOnly } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { CacheableResponsePlugin } from 'workbox-cacheable-response';
+import { BackgroundSyncPlugin } from 'workbox-background-sync';
 
 declare let self: ServiceWorkerGlobalScope;
 
-// Precache build assets injected by vite-plugin-pwa
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. Precache — build assets injected by vite-plugin-pwa
+// ═══════════════════════════════════════════════════════════════════════════════
+
 precacheAndRoute(self.__WB_MANIFEST);
+cleanupOutdatedCaches();
 
-// Cache First for hashed static assets
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. Cache First — hashed static assets (JS, CSS, fonts, images)
+//    These have content hashes in filenames so they never change.
+// ═══════════════════════════════════════════════════════════════════════════════
+
 registerRoute(
-  ({ url }) => /\/assets\/.*\.[a-f0-9]{8}\.(js|css|woff2?|png|jpg|svg)$/.test(url.pathname),
+  ({ url }) => /\/assets\/.*\.[a-f0-9]{8}\.(js|css|woff2?|png|jpg|svg|webp)$/.test(url.pathname),
   new CacheFirst({
-    cacheName: 'eliteclass-static-v1',
-    plugins: [
-      new CacheableResponsePlugin({ statuses: [0, 200] }),
-    ],
-  })
-);
-
-// Stale While Revalidate for HTML navigation
-registerRoute(
-  new NavigationRoute(
-    new StaleWhileRevalidate({
-      cacheName: 'eliteclass-documents-v1',
-    })
-  )
-);
-
-// Network First for Supabase API GET requests
-registerRoute(
-  ({ url }) => /^https:\/\/[a-z0-9]+\.supabase\.co\/rest\/v1\//.test(url.href),
-  new NetworkFirst({
-    cacheName: 'eliteclass-api-v1',
-    networkTimeoutSeconds: 3,
+    cacheName: 'eliteclass-static-v2',
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({
-        maxEntries: 100,
-        maxAgeSeconds: 86400,
+        maxEntries: 200,
+        maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
       }),
     ],
   })
 );
 
-// Skip waiting when prompted by client
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. Stale While Revalidate — translation/locale JSON files
+//    Show cached translations immediately while fetching fresh copies.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) => url.pathname.startsWith('/locales/') && url.pathname.endsWith('.json'),
+  new StaleWhileRevalidate({
+    cacheName: 'eliteclass-locales-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 30,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+      }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. Cache First — Google Fonts and CDN resources
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) =>
+    url.origin === 'https://fonts.googleapis.com' ||
+    url.origin === 'https://fonts.gstatic.com' ||
+    url.origin === 'https://cdn.jsdelivr.net',
+  new CacheFirst({
+    cacheName: 'eliteclass-cdn-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 50,
+        maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+      }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. Cache First — platform images (logo, icons, favicons)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) =>
+    url.pathname.startsWith('/icons/') ||
+    url.pathname === '/logo.svg' ||
+    url.pathname === '/favicon.ico',
+  new CacheFirst({
+    cacheName: 'eliteclass-icons-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 6. Network First — Supabase API requests (with offline fallback to cache)
+//    Tries network first with a 5s timeout. Falls back to cached response.
+//    This gives offline access to previously loaded data.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) => /^https:\/\/[a-z0-9]+\.supabase\.co\/rest\/v1\//.test(url.href),
+  new NetworkFirst({
+    cacheName: 'eliteclass-api-v2',
+    networkTimeoutSeconds: 5,
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 200,
+        maxAgeSeconds: 24 * 60 * 60, // 1 day
+      }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 7. Stale While Revalidate — Supabase Storage (uploaded files, logos)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) => /^https:\/\/[a-z0-9]+\.supabase\.co\/storage\/v1\//.test(url.href),
+  new StaleWhileRevalidate({
+    cacheName: 'eliteclass-storage-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 100,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 days
+      }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 8. Background Sync — queue failed POST/PATCH requests for retry
+//    When offline, mutations (messages, attendance marking, etc.) are queued
+//    and automatically retried when the connection is restored.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const bgSyncPlugin = new BackgroundSyncPlugin('eliteclass-offline-queue', {
+  maxRetentionTime: 24 * 60, // 24 hours in minutes
+});
+
+// Queue failed Supabase POST/PATCH/DELETE requests for background sync
+registerRoute(
+  ({ url, request }) =>
+    /^https:\/\/[a-z0-9]+\.supabase\.co\/rest\/v1\//.test(url.href) &&
+    ['POST', 'PATCH', 'DELETE'].includes(request.method),
+  new NetworkOnly({
+    plugins: [bgSyncPlugin],
+  }),
+  'POST'
+);
+
+registerRoute(
+  ({ url, request }) =>
+    /^https:\/\/[a-z0-9]+\.supabase\.co\/rest\/v1\//.test(url.href) &&
+    request.method === 'PATCH',
+  new NetworkOnly({
+    plugins: [bgSyncPlugin],
+  }),
+  'PATCH'
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 9. Navigation — Stale While Revalidate for HTML pages
+//    Serves cached page shell immediately while checking for updates.
+//    If fully offline and no cache, serves offline fallback page.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const navigationHandler = new StaleWhileRevalidate({
+  cacheName: 'eliteclass-pages-v2',
+  plugins: [
+    new CacheableResponsePlugin({ statuses: [0, 200] }),
+  ],
+});
+
+registerRoute(new NavigationRoute(navigationHandler, {
+  // Don't cache auth callback URLs
+  denylist: [/\/auth\/callback/, /\/api\//],
+}));
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10. GIPHY API — Stale While Revalidate (for GIF picker)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+registerRoute(
+  ({ url }) => url.origin === 'https://api.giphy.com',
+  new StaleWhileRevalidate({
+    cacheName: 'eliteclass-giphy-v1',
+    plugins: [
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+      new ExpirationPlugin({
+        maxEntries: 50,
+        maxAgeSeconds: 60 * 60, // 1 hour
+      }),
+    ],
+  })
+);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 11. Skip Waiting — respond to client message to activate new SW immediately
+// ═══════════════════════════════════════════════════════════════════════════════
+
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });
 
-// Claim clients immediately on activate + clean old caches
+// ═══════════════════════════════════════════════════════════════════════════════
+// 12. Activate — claim clients + clean old caches
+// ═══════════════════════════════════════════════════════════════════════════════
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     Promise.all([
       self.clients.claim(),
+      // Delete old cache versions
       caches.keys().then((cacheNames) => {
         const validCaches = new Set([
-          'eliteclass-static-v1',
-          'eliteclass-documents-v1',
-          'eliteclass-api-v1',
+          'eliteclass-static-v2',
+          'eliteclass-locales-v1',
+          'eliteclass-cdn-v1',
+          'eliteclass-icons-v1',
+          'eliteclass-api-v2',
+          'eliteclass-storage-v1',
+          'eliteclass-pages-v2',
+          'eliteclass-giphy-v1',
         ]);
         return Promise.all(
           cacheNames
