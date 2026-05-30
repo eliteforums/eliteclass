@@ -14,6 +14,10 @@ import {
   FileText,
   Brain,
   Award,
+  Globe,
+  Bell,
+  Smile,
+  Wifi,
 } from "lucide-react";
 
 const features = [
@@ -50,32 +54,47 @@ const features = [
   {
     icon: Brain,
     title: "AI-Powered Features",
-    desc: "Notes summarization, study tips, lesson plans, doubt solving, and auto-remarks.",
+    desc: "Notes summarization, study tips, lesson plans, doubt solving, auto-remarks, and exam analytics.",
   },
   {
-    icon: Award,
-    title: "Bulk Certificates",
-    desc: "Create templates, select students, and generate professional PDF certificates.",
+    icon: Globe,
+    title: "Multilingual Platform",
+    desc: "Full i18n support in 5 languages — English, Hindi, Marathi, Spanish, French — with auto-detection.",
+  },
+  {
+    icon: Bell,
+    title: "Live Notifications",
+    desc: "Real-time notifications via Supabase Realtime. Admins and instructors can broadcast to batches.",
+  },
+  {
+    icon: Smile,
+    title: "WhatsApp-Style Chat",
+    desc: "Batch group chat and 1:1 DMs with emoji picker, GIF support, and optimistic message delivery.",
   },
   {
     icon: BarChart3,
     title: "Real-time Analytics",
-    desc: "Live dashboards with AI insights across academics, fees, and operations.",
+    desc: "Live dashboards with per-student insights, attendance trends, fee status, and AI-powered recommendations.",
+  },
+  {
+    icon: Award,
+    title: "Bulk Certificates",
+    desc: "Custom templates with your logo, generate professional PDF certificates for students.",
+  },
+  {
+    icon: Wifi,
+    title: "Offline-Ready PWA",
+    desc: "Install as an app, works offline with background sync. Cached data loads instantly.",
   },
   {
     icon: MessageSquare,
-    title: "Communication",
-    desc: "AI-drafted announcements, fee reminders, and parent updates.",
+    title: "AI Communication",
+    desc: "AI-drafted announcements, fee reminders, parent updates, and assignment feedback.",
   },
   {
     icon: GraduationCap,
-    title: "Batch Management",
-    desc: "Student batch requests, instructor approval, and self-service enrollment.",
-  },
-  {
-    icon: Megaphone,
-    title: "Settings & Profile",
-    desc: "Profile management, password changes, and institute configuration.",
+    title: "Batch & Course Management",
+    desc: "Student batch requests, instructor approval, self-service enrollment, and canvas editor.",
   },
 ];
 
