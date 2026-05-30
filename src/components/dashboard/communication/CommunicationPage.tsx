@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { MessageSquare, Users } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
 import { getUserBatches, type ChatBatch } from "@/services/message.service";
 import { BatchList } from "./BatchList";
@@ -10,6 +9,7 @@ import { DirectMessageRoom } from "./DirectMessageRoom";
 import { BatchMemberList } from "./BatchMemberList";
 import type { DMConversation } from "@/services/dm.service";
 
+type ActiveTab = "batch-chat" | "direct-messages";
 type DMView = "conversations" | "members";
 
 export function CommunicationPage() {
@@ -17,9 +17,11 @@ export function CommunicationPage() {
   const [batches, setBatches] = useState<ChatBatch[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("batch-chat");
 
   // DM state
-  const [selectedConversation, setSelectedConversation] = useState<DMConversation | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<DMConversation | null>(null);
   const [dmView, setDmView] = useState<DMView>("conversations");
 
   useEffect(() => {
@@ -50,42 +52,58 @@ export function CommunicationPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] border rounded-lg overflow-hidden bg-background">
-      <Tabs defaultValue="batch-chat" className="flex w-full">
-        {/* Left panel with tabs */}
-        <div className="w-[280px] border-r flex flex-col shrink-0">
-          <div className="px-3 py-2 border-b">
-            <TabsList className="w-full grid grid-cols-2 h-9">
-              <TabsTrigger value="batch-chat" className="text-xs">
-                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                Batch Chat
-              </TabsTrigger>
-              <TabsTrigger value="direct-messages" className="text-xs">
-                <Users className="h-3.5 w-3.5 mr-1.5" />
-                Direct Messages
-              </TabsTrigger>
-            </TabsList>
+      {/* Left panel */}
+      <div className="w-[280px] border-r flex flex-col shrink-0">
+        {/* Tab switcher */}
+        <div className="px-3 py-2 border-b">
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
+            <button
+              onClick={() => setActiveTab("batch-chat")}
+              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === "batch-chat"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Batch Chat
+            </button>
+            <button
+              onClick={() => setActiveTab("direct-messages")}
+              className={`flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                activeTab === "direct-messages"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="h-3.5 w-3.5" />
+              Direct Messages
+            </button>
           </div>
+        </div>
 
-          {/* Batch Chat list */}
-          <TabsContent value="batch-chat" className="flex-1 overflow-y-auto m-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              </div>
-            ) : (
-              <BatchList
-                batches={batches}
-                selectedBatchId={selectedBatchId}
-                onSelectBatch={setSelectedBatchId}
-              />
-            )}
-          </TabsContent>
+        {/* Left panel content */}
+        <div className="flex-1 overflow-y-auto">
+          {activeTab === "batch-chat" && (
+            <>
+              {isLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                <BatchList
+                  batches={batches}
+                  selectedBatchId={selectedBatchId}
+                  onSelectBatch={setSelectedBatchId}
+                />
+              )}
+            </>
+          )}
 
-          {/* DM list */}
-          <TabsContent value="direct-messages" className="flex-1 overflow-y-auto m-0">
+          {activeTab === "direct-messages" && (
             <div className="flex flex-col h-full">
               {/* Sub-navigation for DMs */}
-              <div className="flex border-b">
+              <div className="flex border-b shrink-0">
                 <button
                   onClick={() => setDmView("conversations")}
                   className={`flex-1 py-2 text-xs font-medium transition-colors ${
@@ -116,41 +134,57 @@ export function CommunicationPage() {
                     onSelectConversation={handleSelectConversation}
                   />
                 ) : (
-                  <BatchMemberList onStartConversation={handleStartConversation} />
+                  <BatchMemberList
+                    onStartConversation={handleStartConversation}
+                  />
                 )}
               </div>
             </div>
-          </TabsContent>
+          )}
         </div>
+      </div>
 
-        {/* Chat room panel */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <TabsContent value="batch-chat" className="flex-1 m-0 flex flex-col min-h-0">
+      {/* Right panel — Chat room */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {activeTab === "batch-chat" && (
+          <>
             {selectedBatch ? (
-              <ChatRoom batchId={selectedBatch.id} batchName={selectedBatch.name} />
+              <ChatRoom
+                batchId={selectedBatch.id}
+                batchName={selectedBatch.name}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
                 <MessageSquare className="h-10 w-10 opacity-40" />
                 <p className="text-sm">Select a batch to start chatting</p>
               </div>
             )}
-          </TabsContent>
+          </>
+        )}
 
-          <TabsContent value="direct-messages" className="flex-1 m-0 flex flex-col min-h-0">
+        {activeTab === "direct-messages" && (
+          <>
             {selectedConversation ? (
               <DirectMessageRoom
                 conversationId={selectedConversation.id}
-                recipientName={selectedConversation.other_participant?.name ?? "Unknown"}
+                recipientName={
+                  selectedConversation.other_participant?.name ?? "Unknown"
+                }
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
                 <Users className="h-10 w-10 opacity-40" />
-                <p className="text-sm">Select a conversation or start a new one</p>
+                <p className="text-sm">
+                  Select a conversation or start a new one
+                </p>
+                <p className="text-xs">
+                  Go to the Members tab to message a batch mate
+                </p>
               </div>
             )}
-          </TabsContent>
-        </div>
-      </Tabs>
+          </>
+        )}
+      </div>
     </div>
   );
 }
