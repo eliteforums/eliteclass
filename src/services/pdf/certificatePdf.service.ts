@@ -35,43 +35,38 @@
 import { jsPDF } from "jspdf";
 import type { CertificateTemplate, CertificateCustomData } from "@/types";
 
-// ── Logo loading helper ──────────────────────────────────────────────────────
-// Loads the actual logo from /logo.svg and converts to a data URL for jsPDF.
+// ── Logo placeholder ─────────────────────────────────────────────────────────
+// If the certificate template has a logo_url (user-uploaded), it's rendered.
+// Otherwise, a blank placeholder space is left for the user to add their logo.
 
-let logoDataUrl: string | null = null;
-
-async function loadLogoDataUrl(): Promise<string | null> {
-  if (logoDataUrl) return logoDataUrl;
-  try {
-    const response = await fetch("/logo.svg");
-    if (!response.ok) return null;
-    const svgText = await response.text();
-    // Convert SVG to a data URL
-    const encoded = btoa(unescape(encodeURIComponent(svgText)));
-    logoDataUrl = `data:image/svg+xml;base64,${encoded}`;
-    return logoDataUrl;
-  } catch {
-    return null;
-  }
-}
-
-async function drawLogo(doc: jsPDF, x: number, y: number, size: number) {
-  const dataUrl = await loadLogoDataUrl();
-  if (dataUrl) {
+async function drawLogo(doc: jsPDF, x: number, y: number, size: number, logoUrl: string | null | undefined) {
+  // If user has uploaded a custom logo, render it
+  if (logoUrl) {
     try {
-      doc.addImage(dataUrl, "SVG", x, y, size, size);
-      return;
+      const response = await fetch(logoUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        doc.addImage(dataUrl, "PNG", x, y, size, size);
+        return;
+      }
     } catch {
-      // Fall through to fallback
+      // Fall through to placeholder
     }
   }
-  // Fallback: draw a simple placeholder rectangle with "EF" text
-  doc.setFillColor(33, 33, 33);
-  doc.roundedRect(x, y, size, size, 3, 3, "F");
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "bold");
-  doc.setTextColor(255, 255, 255);
-  doc.text("EF", x + size / 2, y + size / 2 + 3, { align: "center" });
+
+  // Leave blank placeholder space for logo (light dashed border)
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(x, y, size, size, 2, 2, "S");
+  doc.setFontSize(6);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(180, 180, 180);
+  doc.text("Logo", x + size / 2, y + size / 2 + 2, { align: "center" });
   doc.setTextColor(33, 33, 33);
 }
 
@@ -139,7 +134,7 @@ export async function renderCertificatePage(
   // ═══════════════════════════════════════════════════════════════════════════
   // LOGO + COMPANY NAME (left side)
   // ═══════════════════════════════════════════════════════════════════════════
-  await drawLogo(doc, marginLeft, 14, 22);
+  await drawLogo(doc, marginLeft, 14, 22, template.logo_url);
 
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
