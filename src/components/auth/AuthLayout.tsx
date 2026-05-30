@@ -33,8 +33,8 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
 
         {/* Top-left: Logo */}
         <Link to="/" className="relative z-10 flex items-center gap-2.5 w-fit group">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 ring-1 ring-blue-400/30 group-hover:bg-blue-500/30 transition-colors">
-            <GraduationCap className="h-5 w-5 text-blue-300" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 ring-1 ring-blue-400/30 group-hover:bg-blue-500/30 transition-colors overflow-hidden">
+            <img src="/logo.svg" alt="EliteClass" className="h-5 w-5" />
           </div>
           <span className="text-xl font-bold text-white tracking-tight">EliteClass</span>
         </Link>
@@ -77,8 +77,8 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
         <div className="w-full max-w-sm flex flex-col gap-0">
           {/* Mobile-only logo */}
           <Link to="/" className="md:hidden mb-8 flex items-center justify-center gap-2.5 group">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20 group-hover:bg-primary/20 transition-colors">
-              <GraduationCap className="h-4 w-4 text-primary" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 ring-1 ring-primary/20 group-hover:bg-primary/20 transition-colors overflow-hidden">
+              <img src="/logo.svg" alt="EliteClass" className="h-4 w-4" />
             </div>
             <span className="text-lg font-bold text-foreground group-hover:text-primary transition-colors">
               EliteClass
