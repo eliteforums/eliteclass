@@ -172,3 +172,71 @@ ALTER TABLE IF EXISTS public.attendance_sessions ENABLE ROW LEVEL SECURITY;
 -- DONE! Verify with:
 -- SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public' ORDER BY tablename, policyname;
 -- ═══════════════════════════════════════════════════════════════════════════════
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 8. FIX: Students can create parent records during profile completion
+--    Without these, the profile form silently fails to create parent users.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- Students can INSERT parent users (role=parent) in their institute
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'students_insert_parent_user' AND tablename = 'users') THEN
+    EXECUTE 'CREATE POLICY "students_insert_parent_user" ON public.users FOR INSERT WITH CHECK (
+      institute_id = public.get_my_institute_id()
+      AND role = ''parent''
+      AND public.get_my_role() = ''student''::user_role
+    )';
+  END IF;
+END $$;
+
+-- Students can INSERT parent records
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'students_insert_parent_record' AND tablename = 'parents') THEN
+    EXECUTE 'CREATE POLICY "students_insert_parent_record" ON public.parents FOR INSERT WITH CHECK (
+      institute_id = public.get_my_institute_id()
+      AND public.get_my_role() = ''student''::user_role
+    )';
+  END IF;
+END $$;
+
+-- Students can INSERT student_parents links (using SECURITY DEFINER helper)
+CREATE OR REPLACE FUNCTION public.get_my_student_id()
+RETURNS UUID
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public SET row_security = off
+AS $$ SELECT id FROM public.students WHERE user_id = auth.uid() LIMIT 1; $$;
+
+GRANT EXECUTE ON FUNCTION public.get_my_student_id() TO authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'students_insert_student_parents' AND tablename = 'student_parents') THEN
+    EXECUTE 'CREATE POLICY "students_insert_student_parents" ON public.student_parents FOR INSERT WITH CHECK (
+      student_id = public.get_my_student_id()
+    )';
+  END IF;
+END $$;
+
+-- Students can SELECT their own parent links (for profile completeness check)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'students_select_own_parents' AND tablename = 'student_parents') THEN
+    EXECUTE 'CREATE POLICY "students_select_own_parents" ON public.student_parents FOR SELECT USING (
+      student_id = public.get_my_student_id()
+    )';
+  END IF;
+END $$;
+
+-- Staff can also view parents (for the Parents tab)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'staff_read_parents' AND tablename = 'parents') THEN
+    EXECUTE 'CREATE POLICY "staff_read_parents" ON public.parents FOR SELECT USING (
+      institute_id = public.get_my_institute_id()
+      AND public.get_my_role() = ''staff''::user_role
+    )';
+  END IF;
+END $$;
