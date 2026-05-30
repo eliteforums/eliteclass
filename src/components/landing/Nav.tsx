@@ -9,8 +9,8 @@ export function Nav() {
       <div className="mx-auto max-w-7xl px-6 py-4">
         <nav className="glass flex items-center justify-between rounded-2xl px-5 py-3 shadow-card">
           <Link to="/" className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary">
-              <GraduationCap className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-primary overflow-hidden">
+              <img src="/logo.svg" alt="EliteClass" className="h-5 w-5" />
             </div>
             <span className="text-lg font-semibold tracking-tight">EliteClass</span>
           </Link>

@@ -201,8 +201,8 @@ export function DashboardSidebar({
   const navigation = (
     <>
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-4">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-primary shadow-glow">
-          <span className="text-xs font-bold text-primary-foreground">{instituteInitials}</span>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-primary shadow-glow overflow-hidden">
+          <img src="/logo.svg" alt="Logo" className="h-6 w-6" />
         </div>
         {!collapsed && (
           <div className="flex min-w-0 flex-col leading-tight">
