@@ -15,7 +15,10 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNewMenu, setShowNewMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const newMenuRef = useRef<HTMLDivElement>(null);
 
   const displayName = user?.name ?? "User";
   const roleLabel = ROLE_LABELS[(user?.role ?? "student") as UserRole] ?? user?.role ?? "Student";
@@ -27,10 +30,13 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
+        setShowNewMenu(false);
+      }
     }
-    if (menuOpen) document.addEventListener("mousedown", handleClickOutside);
+    if (menuOpen || showNewMenu) document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [menuOpen]);
+  }, [menuOpen, showNewMenu]);
 
   async function handleLogout() {
     setMenuOpen(false);
@@ -57,6 +63,17 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             placeholder="Search students, courses, invoices…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && searchQuery.trim()) {
+                const role = user?.role;
+                if (role === "admin" || role === "staff") {
+                  navigate({ to: "/dashboard/admin/students", search: { q: searchQuery.trim() } } as any);
+                }
+                setSearchQuery("");
+              }
+            }}
             className="h-9 w-full rounded-lg border border-border bg-card/60 pl-9 pr-16 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
           />
           <kbd className="absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
@@ -65,12 +82,48 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <Button
-            size="sm"
-            className="hidden bg-gradient-primary text-primary-foreground hover:opacity-90 sm:inline-flex"
-          >
-            <Plus className="h-4 w-4" /> New
-          </Button>
+          {/* New button with dropdown */}
+          {(user?.role === "admin" || user?.role === "staff") && (
+            <div className="relative" ref={newMenuRef}>
+              <Button
+                size="sm"
+                className="hidden bg-gradient-primary text-primary-foreground hover:opacity-90 sm:inline-flex"
+                onClick={() => setShowNewMenu((v) => !v)}
+              >
+                <Plus className="h-4 w-4" /> New
+              </Button>
+              {showNewMenu && (
+                <div className="absolute right-0 top-full mt-1.5 w-48 rounded-lg border border-border bg-card shadow-lg z-50">
+                  <div className="p-1">
+                    <button
+                      onClick={() => { setShowNewMenu(false); navigate({ to: "/dashboard/admin/students" } as any); }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      Admit Student
+                    </button>
+                    <button
+                      onClick={() => { setShowNewMenu(false); navigate({ to: "/dashboard/admin/batches" } as any); }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      Create Batch
+                    </button>
+                    <button
+                      onClick={() => { setShowNewMenu(false); navigate({ to: "/dashboard/admin/assignments" } as any); }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      New Assignment
+                    </button>
+                    <button
+                      onClick={() => { setShowNewMenu(false); navigate({ to: "/dashboard/notifications" } as any); }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-muted transition-colors"
+                    >
+                      Send Notification
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <NotificationBell />
 
