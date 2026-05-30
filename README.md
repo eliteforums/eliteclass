@@ -61,9 +61,17 @@ Whether you're managing student enrollments, tracking attendance, conducting sec
 ### 🤖 AI Features
 | Feature | Details |
 |---------|---------|
-| **AI Assistant** | Context-aware support for users (requires Groq API key) |
-| **Smart Communication** | Batch messaging, notifications |
-| **Automated Reports** | Generate insights from student data |
+| **PDF to MCQ Generator** | Upload PDF → AI extracts/generates MCQ questions with review workflow |
+| **Notes Summarization** | Summarize content into bullet points, paragraphs, or flashcards |
+| **AI Student Remarks** | Auto-generate personalized performance feedback for report cards |
+| **Exam Analytics** | AI-powered insights on exam results with recommendations |
+| **Communication Drafts** | AI-drafted fee reminders, announcements, and parent updates |
+| **Lesson Plan Generator** | Create structured lesson plans from topic/duration/level |
+| **Assignment Feedback** | Constructive AI feedback on student submissions |
+| **Study Tips** | Personalized study recommendations based on weak areas |
+| **Course Descriptions** | Generate compelling course descriptions from basic details |
+| **Doubt Solver** | Answer student academic questions with clear explanations |
+| **AI Chat Assistant** | Context-aware conversational support (Groq API) |
 
 ### 🔒 Security & Multi-Tenancy
 | Feature | Details |
@@ -591,15 +599,18 @@ Planned features and improvements:
 
 ## 📈 Recent Updates
 
-- ✅ Exam proctoring with camera/mic deterrent UI and tab-switch detection
+- ✅ AI-powered PDF to MCQ generator (upload PDF → AI generates questions)
+- ✅ 9 AI features: notes summarization, study tips, lesson plans, doubt solver, remarks, exam analytics, communication drafts, assignment feedback, course descriptions
+- ✅ Bulk certificate generator with Elite Forums template (PDF generation)
+- ✅ Student onboarding guard (mandatory profile completion)
+- ✅ Batch join requests (student self-service with admin approval)
+- ✅ Exam proctoring (camera/mic, tab detection, deterrent UI)
 - ✅ Settings page (profile, password, institute management)
-- ✅ Student self-enrollment RLS fix
-- ✅ AI-powered assistant integration
+- ✅ Real-time AI insights dashboard (live data, no dummy content)
+- ✅ Tab-switch page refresh fix (no more false logouts)
+- ✅ Rate-limit-proof bulk student import (277+ students)
 - ✅ PWA offline support
-- ✅ Advanced exam proctoring
-- ✅ Real-time messaging system
-- ✅ Enhanced batch management
-- ✅ Parent portal improvements
+- ✅ Parent portal with student tracking
 
 ---
 

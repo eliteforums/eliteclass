@@ -10,67 +10,73 @@ import {
   Wallet,
   GraduationCap,
   Megaphone,
-  Boxes,
-  Trophy,
+  Shield,
+  FileText,
+  Brain,
+  Award,
 } from "lucide-react";
 
 const features = [
   {
     icon: Users,
     title: "Student Management",
-    desc: "Admissions, profiles, documents and lifecycle tracking in one place.",
+    desc: "Admissions, profiles, batch requests, and lifecycle tracking in one place.",
   },
   {
     icon: CalendarCheck,
     title: "Smart Attendance",
-    desc: "Manual, QR and AI-predicted attendance with absentee alerts.",
+    desc: "Daily session-based tracking for students and staff with batch scoping.",
   },
   {
     icon: Wallet,
     title: "Fee Management",
-    desc: "Plans, installments, online payments and automated reminders.",
+    desc: "Fee structures, payment tracking, receipts, and real-time revenue analytics.",
   },
   {
     icon: BookOpen,
     title: "Built-in LMS",
-    desc: "Lectures, notes, assignments, live classes and doubt solving.",
+    desc: "Courses, modules, lessons, progress tracking, and student self-enrollment.",
   },
   {
-    icon: Briefcase,
-    title: "Admission CRM",
-    desc: "Lead pipeline, follow-ups, seminars and conversion analytics.",
+    icon: FileText,
+    title: "MCQ Exam System",
+    desc: "Secure exams with AI question generation from PDFs, proctoring, and auto-grading.",
+  },
+  {
+    icon: Shield,
+    title: "Exam Proctoring",
+    desc: "Tab detection, camera/mic activation, and deterrent UI for secure assessments.",
+  },
+  {
+    icon: Brain,
+    title: "AI-Powered Features",
+    desc: "Notes summarization, study tips, lesson plans, doubt solving, and auto-remarks.",
+  },
+  {
+    icon: Award,
+    title: "Bulk Certificates",
+    desc: "Create templates, select students, and generate professional PDF certificates.",
+  },
+  {
+    icon: BarChart3,
+    title: "Real-time Analytics",
+    desc: "Live dashboards with AI insights across academics, fees, and operations.",
   },
   {
     icon: MessageSquare,
     title: "Communication",
-    desc: "WhatsApp, SMS, email and push — automated end-to-end.",
-  },
-  {
-    icon: BarChart3,
-    title: "Analytics",
-    desc: "Real-time dashboards across academics, fees and operations.",
-  },
-  {
-    icon: Sparkles,
-    title: "AI Automation",
-    desc: "Remarks, paper generation, risk analysis and recovery hints.",
+    desc: "AI-drafted announcements, fee reminders, and parent updates.",
   },
   {
     icon: GraduationCap,
-    title: "Examinations",
-    desc: "Question banks, scheduling, results and AI paper generation.",
+    title: "Batch Management",
+    desc: "Student batch requests, instructor approval, and self-service enrollment.",
   },
   {
     icon: Megaphone,
-    title: "Branding Kit",
-    desc: "Posters, certificates and social creatives generated for you.",
+    title: "Settings & Profile",
+    desc: "Profile management, password changes, and institute configuration.",
   },
-  {
-    icon: Trophy,
-    title: "Events & Seminars",
-    desc: "Registration, QR check-in, attendance logs and feedback.",
-  },
-  { icon: Boxes, title: "Inventory", desc: "Stock, asset logs and history across branches." },
 ];
 
 export function Features() {
