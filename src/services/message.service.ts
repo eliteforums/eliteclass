@@ -19,12 +19,16 @@ const SUPABASE_NOT_CONFIGURED = {
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+export type MessageType = "text" | "gif" | "emoji";
+
 export interface ChatMessage {
   id: string;
   batch_id: string;
   sender_id: string;
   sender_name: string;
   content: string;
+  message_type: MessageType;
+  gif_url: string | null;
   created_at: string;
 }
 
@@ -161,7 +165,7 @@ export async function getMessagesForBatch(
   try {
     const { data, error } = await supabase
       .from("messages")
-      .select("id, batch_id, sender_id, content, created_at, users(name)")
+      .select("id, batch_id, sender_id, content, message_type, gif_url, created_at, users(name)")
       .eq("batch_id", batchId)
       .order("created_at", { ascending: true })
       .limit(limit);
@@ -175,7 +179,9 @@ export async function getMessagesForBatch(
         batch_id: row.batch_id as string,
         sender_id: row.sender_id as string,
         sender_name: user?.name ?? "Unknown",
-        content: row.content as string,
+        content: (row.content as string) ?? "",
+        message_type: (row.message_type as MessageType) ?? "text",
+        gif_url: (row.gif_url as string) ?? null,
         created_at: row.created_at as string,
       };
     });
@@ -193,23 +199,33 @@ export async function getMessagesForBatch(
 // ── sendMessage ──────────────────────────────────────────────────────────────
 /**
  * Inserts a new message into the messages table.
+ * Supports text and GIF message types.
  */
 export async function sendMessage(
   batchId: string,
   senderId: string,
   content: string,
+  messageType: MessageType = "text",
+  gifUrl?: string,
 ): Promise<ApiResponse<ChatMessage>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   try {
+    const insertPayload: Record<string, unknown> = {
+      batch_id: batchId,
+      sender_id: senderId,
+      content: content.trim(),
+      message_type: messageType,
+    };
+
+    if (gifUrl) {
+      insertPayload.gif_url = gifUrl;
+    }
+
     const { data, error } = await supabase
       .from("messages")
-      .insert({
-        batch_id: batchId,
-        sender_id: senderId,
-        content: content.trim(),
-      })
-      .select("id, batch_id, sender_id, content, created_at, users(name)")
+      .insert(insertPayload)
+      .select("id, batch_id, sender_id, content, message_type, gif_url, created_at, users(name)")
       .single();
 
     if (error) return { data: null, error: error.message, success: false };
@@ -220,7 +236,9 @@ export async function sendMessage(
       batch_id: data.batch_id as string,
       sender_id: data.sender_id as string,
       sender_name: user?.name ?? "Unknown",
-      content: data.content as string,
+      content: (data.content as string) ?? "",
+      message_type: (data.message_type as MessageType) ?? "text",
+      gif_url: (data.gif_url as string) ?? null,
       created_at: data.created_at as string,
     };
 

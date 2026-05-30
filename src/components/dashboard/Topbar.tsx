@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect } from "react";
-import { Search, Bell, PanelLeft, Plus, LogOut, ChevronDown } from "lucide-react";
+import { Search, PanelLeft, Plus, LogOut, ChevronDown } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
+import { NotificationBell } from "@/components/dashboard/notifications/NotificationBell";
 import { useAuthStore } from "@/store/authStore";
 import { signOut } from "@/services/auth.service";
 import { ROLE_LABELS } from "@/utils/rbac";
@@ -70,10 +72,9 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
             <Plus className="h-4 w-4" /> New
           </Button>
 
-          <Button variant="ghost" size="icon" className="relative">
-            <Bell className="h-4 w-4" />
-            <span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-destructive" />
-          </Button>
+          <NotificationBell />
+
+          <LanguageSwitcher />
 
           <ThemeToggle />
 
