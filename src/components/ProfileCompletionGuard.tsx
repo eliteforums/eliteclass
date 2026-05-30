@@ -7,6 +7,10 @@ interface ProfileCompletionGuardProps {
   children: ReactNode;
 }
 
+// Session-level flag: once the student completes the form in this session,
+// skip the guard entirely to prevent redirect loops when RLS blocks the read-back.
+const SESSION_KEY = "eliteclass-profile-completed";
+
 export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps) {
   const { user } = useAuthStore();
   const location = useLocation();
@@ -20,6 +24,12 @@ export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps
 
     // Don't check if already on the complete-profile page
     if (location.pathname.includes("complete-profile")) {
+      setIsComplete(true);
+      return;
+    }
+
+    // If the student already completed the form in this session, skip check
+    if (sessionStorage.getItem(SESSION_KEY) === "true") {
       setIsComplete(true);
       return;
     }
@@ -39,9 +49,13 @@ export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps
         }
 
         // Profile is complete if emergency_contact has name and phone filled
-        // This is the minimum requirement — parent linking is optional/best-effort
         const ec = student.emergency_contact as { name?: string; phone?: string; relation?: string } | null;
         const hasEmergencyContact = !!(ec?.name?.trim() && ec?.phone?.trim());
+
+        if (hasEmergencyContact) {
+          // Persist in session so we don't re-query
+          sessionStorage.setItem(SESSION_KEY, "true");
+        }
 
         setIsComplete(hasEmergencyContact);
       } catch {
@@ -63,4 +77,12 @@ export function ProfileCompletionGuard({ children }: ProfileCompletionGuardProps
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Call this after successfully saving the profile completion form.
+ * Sets the session flag so the guard won't redirect back.
+ */
+export function markProfileAsCompleted(): void {
+  sessionStorage.setItem(SESSION_KEY, "true");
 }
