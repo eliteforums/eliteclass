@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "@/store/authStore";
 import { getInitials } from "@/utils/helpers";
 import {
@@ -52,48 +53,43 @@ interface NavGroup {
 // Each role gets the correct base paths — pointing to REAL routes that exist.
 // Items marked `comingSoon` render as disabled placeholders.
 // ---------------------------------------------------------------------------
-function getNavGroups(role: UserRole): NavGroup[] {
+function getNavGroups(role: UserRole, t: (key: string) => string): NavGroup[] {
   // Merge strategy: prefer non-destructive union of both branches.
   if (role === "admin") {
     return [
       {
-        label: "Overview",
+        label: t("nav.overview") || "Overview",
         items: [
-          { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-          { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
-          { title: "AI Analytics", url: "/dashboard/admin/ai-analytics", icon: Brain },
+          { title: t("nav.dashboard") || "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+          { title: t("nav.analytics") || "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+          { title: t("nav.aiAnalytics") || "AI Analytics", url: "/dashboard/admin/ai-analytics", icon: Brain },
         ],
       },
       {
-        label: "Manage",
+        label: t("nav.manage") || "Manage",
         items: [
-          { title: "Students", url: "/dashboard/admin/students", icon: GraduationCap },
-          { title: "Batches", url: "/dashboard/admin/batches", icon: BookOpen },
-          { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
-          { title: "Parents", url: "/dashboard/admin/parents", icon: Users },
-          // Use the more specific staff icon (UserCheck) but keep courses added by remote.
-          { title: "Staff", url: "/dashboard/admin/staff", icon: UserCheck },
-          { title: "Courses", url: "/dashboard/admin/courses", icon: BookOpen },
-          { title: "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
-          { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
-          { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
-          { title: "Schedule", url: "/dashboard/admin/schedule", icon: Calendar },
+          { title: t("nav.students") || "Students", url: "/dashboard/admin/students", icon: GraduationCap },
+          { title: t("nav.batches") || "Batches", url: "/dashboard/admin/batches", icon: BookOpen },
+          { title: t("nav.batchRequests") || "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
+          { title: t("nav.parents") || "Parents", url: "/dashboard/admin/parents", icon: Users },
+          { title: t("nav.staff") || "Staff", url: "/dashboard/admin/staff", icon: UserCheck },
+          { title: t("nav.courses") || "Courses", url: "/dashboard/admin/courses", icon: BookOpen },
+          { title: t("nav.certificates") || "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
+          { title: t("nav.exams") || "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
+          { title: t("nav.assignments") || "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
+          { title: t("nav.schedule") || "Schedule", url: "/dashboard/admin/schedule", icon: Calendar },
         ],
       },
       {
-        label: "Operations",
+        label: t("nav.operations") || "Operations",
         items: [
-          { title: "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
-          { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
-          { title: "Fees & Billing", url: "/dashboard/admin/fees", icon: CreditCard },
-          { title: "Reports", url: "/dashboard/admin/reports", icon: FileText },
-          {
-            title: "Communication",
-            url: "/dashboard/messages",
-            icon: MessageSquare,
-          },
-          { title: "Notifications", url: "/dashboard/notifications", icon: Bell },
-          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
+          { title: t("nav.attendance") || "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
+          { title: t("nav.progressTracker") || "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
+          { title: t("nav.fees") || "Fees & Billing", url: "/dashboard/admin/fees", icon: CreditCard },
+          { title: t("nav.reports") || "Reports", url: "/dashboard/admin/reports", icon: FileText },
+          { title: t("nav.messages") || "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: t("nav.notifications") || "Notifications", url: "/dashboard/notifications", icon: Bell },
+          { title: t("nav.ai") || "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -102,17 +98,17 @@ function getNavGroups(role: UserRole): NavGroup[] {
   if (role === "super_admin") {
     return [
       {
-        label: "Overview",
+        label: t("nav.overview") || "Overview",
         items: [
-          { title: "Dashboard", url: "/dashboard/super-admin", icon: LayoutDashboard },
-          { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+          { title: t("nav.dashboard") || "Dashboard", url: "/dashboard/super-admin", icon: LayoutDashboard },
+          { title: t("nav.analytics") || "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
         ],
       },
       {
-        label: "Platform",
+        label: t("nav.platform") || "Platform",
         items: [
-          { title: "Institutes", url: "/dashboard/super-admin", icon: Building2 },
-          { title: "Users", url: "/dashboard/super-admin", icon: Users },
+          { title: t("nav.institutes") || "Institutes", url: "/dashboard/super-admin", icon: Building2 },
+          { title: t("nav.users") || "Users", url: "/dashboard/super-admin", icon: Users },
         ],
       },
     ];
@@ -121,27 +117,27 @@ function getNavGroups(role: UserRole): NavGroup[] {
   if (role === "staff") {
     return [
       {
-        label: "Overview",
+        label: t("nav.overview") || "Overview",
         items: [
-          { title: "Dashboard", url: "/dashboard/staff", icon: LayoutDashboard },
-          { title: "Students", url: "/dashboard/staff/students", icon: GraduationCap },
-          { title: "Schedule", url: "/dashboard/admin/schedule", icon: Calendar },
-          { title: "My Courses", url: "/dashboard/staff/courses", icon: BookOpen },
-          { title: "Canvas", url: "/dashboard/admin/assignments", icon: FileText },
+          { title: t("nav.dashboard") || "Dashboard", url: "/dashboard/staff", icon: LayoutDashboard },
+          { title: t("nav.students") || "Students", url: "/dashboard/staff/students", icon: GraduationCap },
+          { title: t("nav.schedule") || "Schedule", url: "/dashboard/admin/schedule", icon: Calendar },
+          { title: t("nav.myCourses") || "My Courses", url: "/dashboard/staff/courses", icon: BookOpen },
+          { title: t("nav.canvas") || "Canvas", url: "/dashboard/admin/assignments", icon: FileText },
         ],
       },
       {
-        label: "Operations",
+        label: t("nav.operations") || "Operations",
         items: [
-          { title: "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
-          { title: "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
-          { title: "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
-          { title: "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
-          { title: "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
-          { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
-          { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
-          { title: "Notifications", url: "/dashboard/notifications", icon: Bell },
-          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
+          { title: t("nav.attendance") || "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
+          { title: t("nav.exams") || "MCQ Tests", url: "/dashboard/admin/exams", icon: FileText },
+          { title: t("nav.assignments") || "Assignments", url: "/dashboard/admin/assignments", icon: FileText },
+          { title: t("nav.certificates") || "Certificates", url: "/dashboard/admin/certificates", icon: GraduationCap },
+          { title: t("nav.batchRequests") || "Batch Requests", url: "/dashboard/admin/batch-requests", icon: ClipboardList },
+          { title: t("nav.progressTracker") || "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
+          { title: t("nav.messages") || "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: t("nav.notifications") || "Notifications", url: "/dashboard/notifications", icon: Bell },
+          { title: t("nav.ai") || "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -150,23 +146,19 @@ function getNavGroups(role: UserRole): NavGroup[] {
   if (role === "student") {
     return [
       {
-        label: "My Portal",
+        label: t("nav.myPortal") || "My Portal",
         items: [
-          { title: "Dashboard", url: "/dashboard/student", icon: LayoutDashboard },
-          { title: "My Learning", url: "/dashboard/student/my-learning", icon: BookOpen },
-          { title: "MCQ Tests", url: "/dashboard/student/exams", icon: FileText },
-          { title: "Assignments", url: "/dashboard/student/assignments", icon: FileText },
-          { title: "Certificates", url: "/dashboard/student/certificates", icon: GraduationCap },
-          { title: "Browse Courses", url: "/dashboard/student/courses", icon: GraduationCap },
-          { title: "Browse Batches", url: "/dashboard/student/batches", icon: Search },
-          { title: "My Requests", url: "/dashboard/student/my-requests", icon: ClipboardList },
-          {
-            title: "Progress Tracker",
-            url: "/dashboard/student/study-logs",
-            icon: LayoutDashboard,
-          },
-          { title: "Communication", url: "/dashboard/messages", icon: MessageSquare },
-          { title: "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
+          { title: t("nav.dashboard") || "Dashboard", url: "/dashboard/student", icon: LayoutDashboard },
+          { title: t("nav.myLearning") || "My Learning", url: "/dashboard/student/my-learning", icon: BookOpen },
+          { title: t("nav.exams") || "MCQ Tests", url: "/dashboard/student/exams", icon: FileText },
+          { title: t("nav.assignments") || "Assignments", url: "/dashboard/student/assignments", icon: FileText },
+          { title: t("nav.certificates") || "Certificates", url: "/dashboard/student/certificates", icon: GraduationCap },
+          { title: t("nav.browseCourses") || "Browse Courses", url: "/dashboard/student/courses", icon: GraduationCap },
+          { title: t("nav.browseBatches") || "Browse Batches", url: "/dashboard/student/batches", icon: Search },
+          { title: t("nav.myRequests") || "My Requests", url: "/dashboard/student/my-requests", icon: ClipboardList },
+          { title: t("nav.progressTracker") || "Progress Tracker", url: "/dashboard/student/study-logs", icon: LayoutDashboard },
+          { title: t("nav.messages") || "Communication", url: "/dashboard/messages", icon: MessageSquare },
+          { title: t("nav.ai") || "AI Assistant", url: "/dashboard/ai", icon: Sparkles },
         ],
       },
     ];
@@ -175,8 +167,8 @@ function getNavGroups(role: UserRole): NavGroup[] {
   if (role === "parent") {
     return [
       {
-        label: "My Portal",
-        items: [{ title: "My Children", url: "/dashboard/parent", icon: Users }],
+        label: t("nav.myPortal") || "My Portal",
+        items: [{ title: t("nav.myChildren") || "My Children", url: "/dashboard/parent", icon: Users }],
       },
     ];
   }
@@ -198,11 +190,12 @@ export function DashboardSidebar({
 }) {
   const currentPath = useRouterState({ select: (s) => s.location.pathname });
   const { institute, user } = useAuthStore();
+  const { t } = useTranslation();
 
   const role = (user?.role ?? "student") as UserRole;
   const instituteName = institute?.name ?? "EliteClass";
   const instituteInitials = getInitials(instituteName);
-  const groups = getNavGroups(role);
+  const groups = getNavGroups(role, t);
 
   const navigation = (
     <>
@@ -301,14 +294,14 @@ export function DashboardSidebar({
       <div className="border-t border-sidebar-border p-3">
         <Link
           to="/dashboard/settings"
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? t("nav.settings") || "Settings" : undefined}
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
             "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
           )}
         >
           <Settings className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span>{t("nav.settings") || "Settings"}</span>}
         </Link>
       </div>
     </>
