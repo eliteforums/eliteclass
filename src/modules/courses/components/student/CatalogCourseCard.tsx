@@ -51,7 +51,8 @@ export function CatalogCourseCard({ course, onOpenCourse }: CatalogCourseCardPro
   const { mutate: enroll, isPending: enrolling } = useSelfEnroll();
 
   const isEnrolled = enrollStatus?.enrolled ?? false;
-  const pct = 0; // Progress is displayed in My Learning, not here
+  const isCompleted = enrollStatus?.status === "completed";
+  const pct = isCompleted ? 100 : 0; // Progress display — 100% for completed courses
 
   const handlePrimary = () => {
     if (isEnrolled) {
@@ -158,7 +159,7 @@ export function CatalogCourseCard({ course, onOpenCourse }: CatalogCourseCardPro
           ) : (
             <UserPlus className="h-4 w-4" />
           )}
-          {isEnrolled ? "Continue Learning" : "Enroll & Start"}
+          {isEnrolled ? (isCompleted ? "Completed ✓" : "Continue Learning") : "Enroll & Start"}
         </Button>
       </CardFooter>
     </Card>
