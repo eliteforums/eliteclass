@@ -15,6 +15,8 @@
   },
   "dependencies": {
     "@cloudflare/vite-plugin": "^1.25.5",
+    "@dicebear/collection": "^9.4.2",
+    "@dicebear/core": "^10.0.0",
     "@emoji-mart/data": "^1.2.1",
     "@emoji-mart/react": "^1.1.1",
     "@hookform/resolvers": "^5.2.2",
@@ -53,6 +55,8 @@
     "@tanstack/react-virtual": "^3.13.26",
     "@tanstack/router-plugin": "^1.167.28",
     "@vercel/analytics": "^2.0.1",
+    "avvvatars-react": "^0.4.2",
+    "boring-avatars": "^2.0.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
