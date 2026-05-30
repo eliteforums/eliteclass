@@ -9,10 +9,9 @@ CREATE TABLE IF NOT EXISTS public.translation_cache (
   UNIQUE(source_text_hash, source_lang, target_lang)
 );
 
--- Partial index for efficient cache lookups (only non-expired entries)
+-- Regular composite index for cache lookups (filtered by expires_at in queries)
 CREATE INDEX IF NOT EXISTS idx_translation_cache_lookup
-  ON public.translation_cache (source_text_hash, source_lang, target_lang)
-  WHERE expires_at > now();
+  ON public.translation_cache (source_text_hash, source_lang, target_lang, expires_at);
 
 -- RLS
 ALTER TABLE public.translation_cache ENABLE ROW LEVEL SECURITY;
