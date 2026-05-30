@@ -15,6 +15,7 @@ import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
 import { useAuthStore } from "@/store/authStore";
 import { getStudentsByInstitute } from "@/services/student.service";
 import { getStaffByInstitute } from "@/services/staff.service";
+import { supabase } from "@/lib/supabase";
 import type { Student } from "@/types";
 
 export const Route = createFileRoute("/dashboard/")({
@@ -47,6 +48,8 @@ function DashboardOverview() {
 
   const [studentCount, setStudentCount] = useState<number | null>(null);
   const [staffCount, setStaffCount] = useState<number | null>(null);
+  const [revenueThisMonth, setRevenueThisMonth] = useState<number | null>(null);
+  const [coursesLive, setCoursesLive] = useState<number | null>(null);
   const [recentStudents, setRecentStudents] = useState<Student[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -91,6 +94,36 @@ function DashboardOverview() {
           setStaffCount(0);
           setStatsError((current) => current ?? staffResult.error ?? "Failed to load staff.");
         }
+
+        // Fetch revenue (fee transactions this month)
+        if (supabase) {
+          const startOfMonth = new Date();
+          startOfMonth.setDate(1);
+          startOfMonth.setHours(0, 0, 0, 0);
+
+          const { data: feeData } = await supabase
+            .from("fee_transactions")
+            .select("amount")
+            .eq("institute_id", instituteId!)
+            .eq("status", "paid")
+            .gte("paid_at", startOfMonth.toISOString());
+
+          if (!cancelled) {
+            const totalRevenue = (feeData ?? []).reduce((sum: number, t: any) => sum + (Number(t.amount) || 0), 0);
+            setRevenueThisMonth(totalRevenue);
+          }
+
+          // Fetch published courses count
+          const { count: courseCount } = await supabase
+            .from("lms_courses")
+            .select("id", { count: "exact", head: true })
+            .eq("institute_id", instituteId!)
+            .eq("status", "published");
+
+          if (!cancelled) {
+            setCoursesLive(courseCount ?? 0);
+          }
+        }
       } catch (err) {
         if (!cancelled) {
           setStudentCount(0);
@@ -130,7 +163,7 @@ function DashboardOverview() {
       </div>
 
       {/* Live stat cards */}
-      <StatCards studentCount={studentCount} staffCount={staffCount} isLoading={statsLoading} />
+      <StatCards studentCount={studentCount} staffCount={staffCount} revenueThisMonth={revenueThisMonth} coursesLive={coursesLive} isLoading={statsLoading} />
 
       {!statsLoading && statsError ? (
         <div className="mt-6 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">

@@ -10,6 +10,10 @@ interface StatCardsProps {
   studentCount: number | null;
   /** Real staff count from Supabase. `null` while loading. */
   staffCount: number | null;
+  /** Revenue collected this month. `null` while loading. */
+  revenueThisMonth: number | null;
+  /** Number of published courses. `null` while loading. */
+  coursesLive: number | null;
   /** When true, renders animated skeleton placeholders instead of values. */
   isLoading?: boolean;
 }
@@ -53,8 +57,13 @@ function SkeletonValue() {
 // ---------------------------------------------------------------------------
 // StatCards
 // ---------------------------------------------------------------------------
-export function StatCards({ studentCount, staffCount, isLoading = false }: StatCardsProps) {
-  // Build stats dynamically — Revenue and Courses are future modules
+export function StatCards({ studentCount, staffCount, revenueThisMonth, coursesLive, isLoading = false }: StatCardsProps) {
+  const formatCurrency = (amount: number) => {
+    if (amount >= 100000) return `₹${(amount / 100000).toFixed(1)}L`;
+    if (amount >= 1000) return `₹${(amount / 1000).toFixed(1)}K`;
+    return `₹${amount.toLocaleString("en-IN")}`;
+  };
+
   const stats = [
     {
       label: "Total Students",
@@ -62,7 +71,6 @@ export function StatCards({ studentCount, staffCount, isLoading = false }: StatC
       positive: true,
       icon: GraduationCap,
       spark: [10, 14, 12, 18, 22, 19, 28],
-      // Only show delta badge once we have historical data
       delta: null as number | null,
       suffix: "",
     },
@@ -77,8 +85,7 @@ export function StatCards({ studentCount, staffCount, isLoading = false }: StatC
     },
     {
       label: "Revenue (MTD)",
-      // Revenue module not yet built — placeholder
-      value: "Coming soon",
+      value: revenueThisMonth !== null ? formatCurrency(revenueThisMonth) : null,
       positive: true,
       icon: IndianRupee,
       spark: [12, 18, 15, 22, 28, 26, 34],
@@ -87,8 +94,7 @@ export function StatCards({ studentCount, staffCount, isLoading = false }: StatC
     },
     {
       label: "Courses Live",
-      // Courses module not yet built — placeholder
-      value: "Coming soon",
+      value: coursesLive !== null ? coursesLive.toString() : null,
       positive: true,
       icon: BookOpen,
       spark: [20, 18, 22, 19, 21, 18, 17],
@@ -120,12 +126,7 @@ export function StatCards({ studentCount, staffCount, isLoading = false }: StatC
               {isLoading && s.value === null ? (
                 <SkeletonValue />
               ) : (
-                <p
-                  className={cn(
-                    "mt-2 text-3xl font-semibold tracking-tight",
-                    s.value === "Coming soon" && "text-xl text-muted-foreground",
-                  )}
-                >
+                <p className="mt-2 text-3xl font-semibold tracking-tight">
                   {s.value ?? "—"}
                 </p>
               )}
@@ -151,7 +152,7 @@ export function StatCards({ studentCount, staffCount, isLoading = false }: StatC
             ) : (
               // No historical delta available yet
               <span className="text-[11px] text-muted-foreground/60">
-                {s.value === "Coming soon" ? "Module coming soon" : "Live data"}
+                Live data
               </span>
             )}
 
