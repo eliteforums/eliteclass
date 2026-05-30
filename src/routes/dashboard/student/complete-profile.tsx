@@ -90,104 +90,17 @@ function CompleteProfilePage() {
         return;
       }
 
-      // 3. Check if parent already linked
-      const { data: existingLinks } = await supabase
-        .from("student_parents")
-        .select("parent_id, parent:parents(user_id)")
-        .eq("student_id", student.id)
-        .limit(1);
-
-      if (existingLinks && existingLinks.length > 0) {
-        // Update existing parent user record
-        const parentUserId = (existingLinks[0] as any)?.parent?.user_id;
-        if (parentUserId) {
-          await supabase
-            .from("users")
-            .update({
-              name: data.parent_name,
-              phone: data.parent_phone,
-              email: data.parent_email,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", parentUserId);
-        }
-      } else {
-        // Create parent user + parent record + link
-        // Use a simplified approach: create user record, parent record, and link
-        const { data: parentUser, error: parentUserError } = await supabase
-          .from("users")
-          .insert({
-            institute_id: student.institute_id,
-            name: data.parent_name,
-            email: data.parent_email,
-            phone: data.parent_phone,
-            role: "parent",
-            is_active: true,
-          })
-          .select("id")
-          .single();
-
-        if (parentUserError || !parentUser) {
-          // Parent might already exist by email — try to find them
-          const { data: existingUser } = await supabase
-            .from("users")
-            .select("id")
-            .eq("email", data.parent_email)
-            .eq("institute_id", student.institute_id)
-            .single();
-
-          if (existingUser) {
-            // Update existing user
-            await supabase
-              .from("users")
-              .update({
-                name: data.parent_name,
-                phone: data.parent_phone,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", existingUser.id);
-
-            // Check if parent record exists
-            const { data: existingParent } = await supabase
-              .from("parents")
-              .select("id")
-              .eq("user_id", existingUser.id)
-              .single();
-
-            const parentId = existingParent?.id;
-            if (parentId) {
-              // Link student to parent
-              await supabase.from("student_parents").insert({
-                student_id: student.id,
-                parent_id: parentId,
-                relation_type: data.emergency_contact_relation,
-              });
-            }
-          }
-          // If we can't create/find parent, still consider profile complete
-          // since emergency contact is saved
-        } else {
-          // Create parent record
-          const { data: parentRecord } = await supabase
-            .from("parents")
-            .insert({
-              institute_id: student.institute_id,
-              user_id: parentUser.id,
-              occupation: null,
-            })
-            .select("id")
-            .single();
-
-          if (parentRecord) {
-            // Link student to parent
-            await supabase.from("student_parents").insert({
-              student_id: student.id,
-              parent_id: parentRecord.id,
-              relation_type: data.emergency_contact_relation,
-            });
-          }
-        }
-      }
+      // 3. Create or update parent using SECURITY DEFINER RPC
+      // This bypasses RLS since students can't directly INSERT into users table
+      await supabase.rpc("create_parent_for_student", {
+        p_student_id: student.id,
+        p_institute_id: student.institute_id,
+        p_parent_name: data.parent_name,
+        p_parent_email: data.parent_email,
+        p_parent_phone: data.parent_phone,
+        p_relation: data.emergency_contact_relation,
+      });
+      // Parent creation is best-effort — don't block on failure
 
       toast.success("Profile completed successfully!");
       markProfileAsCompleted();
