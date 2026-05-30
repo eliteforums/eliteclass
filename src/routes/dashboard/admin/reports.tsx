@@ -4,15 +4,17 @@
 // charts (Recharts), and export capabilities (PDF via jsPDF, CSV for Excel).
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabase";
+import { getSessionLogs, getActivityLogs, getLiveLocations, type UserSession, type ActivityLog, type UserLocation } from "@/services/activity.service";
 import {
   BarChart,
   Bar,
@@ -38,6 +40,10 @@ import {
   CreditCard,
   GraduationCap,
   ClipboardList,
+  Activity,
+  MapPin,
+  LogIn,
+  Clock,
 } from "lucide-react";
 import { jsPDF } from "jspdf";
 
@@ -104,9 +110,132 @@ const PIE_COLORS = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b
 
 function ReportsPage() {
   return (
-    <ProtectedRoute allowedRoles={["admin"]}>
-      <ReportsContent />
+    <ProtectedRoute allowedRoles={["admin", "staff"]}>
+      <PageHeader title="Reports & Activity Logs" subtitle="Generate reports, view login history, and track user activity." />
+      <Tabs defaultValue="reports" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="reports" className="gap-1.5"><BarChart3 className="h-3.5 w-3.5" />Reports</TabsTrigger>
+          <TabsTrigger value="logins" className="gap-1.5"><LogIn className="h-3.5 w-3.5" />Login Logs</TabsTrigger>
+          <TabsTrigger value="activity" className="gap-1.5"><Activity className="h-3.5 w-3.5" />Activity Trail</TabsTrigger>
+          <TabsTrigger value="locations" className="gap-1.5"><MapPin className="h-3.5 w-3.5" />Live Locations</TabsTrigger>
+        </TabsList>
+        <TabsContent value="reports"><ReportsContent /></TabsContent>
+        <TabsContent value="logins"><LoginsTab /></TabsContent>
+        <TabsContent value="activity"><ActivityTrailTab /></TabsContent>
+        <TabsContent value="locations"><LocationsTab /></TabsContent>
+      </Tabs>
     </ProtectedRoute>
+  );
+}
+
+function LoginsTab() {
+  const { user } = useAuthStore();
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!user?.institute_id) return;
+    setLoading(true);
+    getSessionLogs(user.institute_id, { limit: 50 }).then((res) => {
+      if (res.success && res.data) setSessions(res.data);
+      setLoading(false);
+    });
+  }, [user?.institute_id]);
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (sessions.length === 0) return <Card className="mt-4"><CardContent className="py-8 text-center text-muted-foreground">No login sessions recorded yet. Run supabase/add_activity_tracking.sql first.</CardContent></Card>;
+  return (
+    <div className="space-y-2 mt-4">
+      {sessions.map((s) => (
+        <div key={s.id} className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm">
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${s.event_type === "login" ? "bg-green-100 text-green-600 dark:bg-green-950 dark:text-green-400" : "bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400"}`}>
+            <LogIn className="h-4 w-4" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium truncate">{s.user_id.slice(0, 8)}...</p>
+            <p className="text-xs text-muted-foreground">{s.event_type} • {s.browser || "Unknown"} on {s.os || "Unknown"} ({s.device_type || "unknown"})</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xs text-muted-foreground">{s.city ? `${s.city}, ${s.country}` : s.ip_address || "Unknown"}</p>
+            <p className="text-[10px] text-muted-foreground">{new Date(s.created_at).toLocaleString()}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActivityTrailTab() {
+  const { user } = useAuthStore();
+  const [logs, setLogs] = useState<ActivityLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!user?.institute_id) return;
+    setLoading(true);
+    getActivityLogs(user.institute_id, { limit: 50 }).then((res) => {
+      if (res.success && res.data) setLogs(res.data);
+      setLoading(false);
+    });
+  }, [user?.institute_id]);
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (logs.length === 0) return <Card className="mt-4"><CardContent className="py-8 text-center text-muted-foreground">No activity logged yet.</CardContent></Card>;
+  return (
+    <div className="space-y-2 mt-4">
+      {logs.map((log) => (
+        <div key={log.id} className="flex items-center gap-3 rounded-lg border px-4 py-3 text-sm">
+          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            <Activity className="h-4 w-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium">{log.action}</p>
+            <p className="text-xs text-muted-foreground truncate">{log.description || log.category}{log.target_name ? ` → ${log.target_name}` : ""}</p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-xs text-muted-foreground">{log.page_url}</p>
+            <p className="text-[10px] text-muted-foreground">{new Date(log.created_at).toLocaleString()}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LocationsTab() {
+  const { user } = useAuthStore();
+  const [locations, setLocations] = useState<UserLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    if (!user?.institute_id) return;
+    setLoading(true);
+    getLiveLocations(user.institute_id).then((res) => {
+      if (res.success && res.data) setLocations(res.data);
+      setLoading(false);
+    });
+  }, [user?.institute_id]);
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (locations.length === 0) return <Card className="mt-4"><CardContent className="py-8 text-center text-muted-foreground">No users currently online with location sharing.</CardContent></Card>;
+  return (
+    <div className="space-y-3 mt-4">
+      <p className="text-sm text-muted-foreground">{locations.length} user(s) online</p>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {locations.map((loc) => (
+          <Card key={loc.id}>
+            <CardContent className="py-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-sm font-medium">{loc.user_id.slice(0, 8)}...</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                <span>{loc.city || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>Last seen: {new Date(loc.last_seen_at).toLocaleTimeString()}</span>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -461,11 +590,7 @@ function ReportsContent() {
   const activeTemplate = REPORT_TEMPLATES.find((t) => t.id === activeTab);
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Reports"
-        subtitle="Generate, visualize, and export reports for attendance, fees, exams, and enrollment."
-      />
+    <div className="space-y-6 mt-4">
 
       {/* Report Type Tabs */}
       <div className="flex flex-wrap gap-2">
