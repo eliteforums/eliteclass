@@ -18,6 +18,7 @@ import {
   FileText,
   ClipboardList,
   Search,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -59,6 +60,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
         items: [
           { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
           { title: "Analytics", url: "/dashboard/analytics", icon: BarChart3 },
+          { title: "AI Analytics", url: "/dashboard/admin/ai-analytics", icon: Brain },
         ],
       },
       {
@@ -83,6 +85,7 @@ function getNavGroups(role: UserRole): NavGroup[] {
           { title: "Attendance", url: "/dashboard/admin/attendance", icon: Calendar },
           { title: "Progress Tracker", url: "/dashboard/admin/study-logs", icon: LayoutDashboard },
           { title: "Fees & Billing", url: "/dashboard/admin/fees", icon: CreditCard },
+          { title: "Reports", url: "/dashboard/admin/reports", icon: FileText },
           {
             title: "Communication",
             url: "/dashboard/messages",

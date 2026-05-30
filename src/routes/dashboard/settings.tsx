@@ -9,7 +9,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2, User as UserIcon, Building2, Lock, Check } from "lucide-react";
+import { Loader2, User as UserIcon, Building2, Lock, Check, Globe } from "lucide-react";
 import { toast } from "sonner";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -19,6 +19,7 @@ import {
   updateInstitute,
   changePassword,
 } from "@/services/profile.service";
+import { useTranslation, LANGUAGES } from "@/lib/i18n";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
 
@@ -74,6 +75,9 @@ function SettingsContent() {
       />
 
       <div className="mt-6 space-y-8">
+        {/* Language Section */}
+        <LanguageSection />
+
         {/* Profile Section */}
         <ProfileSection />
 
@@ -84,6 +88,48 @@ function SettingsContent() {
         {isAdmin && <InstituteSection />}
       </div>
     </div>
+  );
+}
+
+// ── Language Section ──────────────────────────────────────────────────────────
+
+function LanguageSection() {
+  const { t, language, setLanguage } = useTranslation();
+
+  return (
+    <section className="rounded-xl border border-border bg-card p-6">
+      <div className="flex items-center gap-3 mb-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10">
+          <Globe className="h-4 w-4 text-indigo-500" />
+        </div>
+        <div>
+          <h2 className="text-base font-semibold text-foreground">{t("settings.language")}</h2>
+          <p className="text-xs text-muted-foreground">{t("settings.selectLanguage")}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {LANGUAGES.map((lang) => (
+          <button
+            key={lang.code}
+            onClick={() => setLanguage(lang.code)}
+            className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-colors ${
+              language === lang.code
+                ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                : "border-border hover:bg-muted/50"
+            }`}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-medium text-foreground">{lang.nativeName}</div>
+              <div className="text-xs text-muted-foreground">{lang.name}</div>
+            </div>
+            {language === lang.code && (
+              <Check className="h-4 w-4 shrink-0 text-primary" />
+            )}
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
