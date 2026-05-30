@@ -96,6 +96,11 @@ const features = [
     title: "Batch & Course Management",
     desc: "Student batch requests, instructor approval, self-service enrollment, and canvas editor.",
   },
+  {
+    icon: Users,
+    title: "Avatar System (18+ Styles)",
+    desc: "Choose from DiceBear, Avvvatars, and Boring Avatars. 18+ unique styles with randomization.",
+  },
 ];
 
 export function Features() {
