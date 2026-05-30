@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UserCheck } from "lucide-react";
+import { markProfileAsCompleted } from "@/components/ProfileCompletionGuard";
 
 export const Route = createFileRoute("/dashboard/student/complete-profile")({
   head: () => ({ meta: [{ title: "Complete Your Profile — EliteClass" }] }),
@@ -189,6 +190,7 @@ function CompleteProfilePage() {
       }
 
       toast.success("Profile completed successfully!");
+      markProfileAsCompleted();
       navigate({ to: "/dashboard/student" });
     } catch (err) {
       toast.error("An unexpected error occurred. Please try again.");
