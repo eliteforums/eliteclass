@@ -3,14 +3,35 @@
 //
 // Shared AI service for generating student remarks, exam analytics,
 // and communication drafts using the Groq API.
+//
+// API key resolution order:
+// 1. User-provided key from the AI Key Setup UI (stored in localStorage)
+// 2. Environment variable VITE_GROQ_API_KEY (for development/deployment)
 // ---------------------------------------------------------------------------
+
+import { useAIKeyStore } from "@/store/aiKeyStore";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "llama-3.1-8b-instant";
 
+/**
+ * Resolves the Groq API key from the user store (UI-provided) or env variable.
+ */
+function getApiKey(): string | null {
+  // First: check the user-provided key (from AI Key Setup UI)
+  const storeKey = useAIKeyStore.getState().apiKey;
+  if (storeKey) return storeKey;
+
+  // Fallback: environment variable
+  const envKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (envKey) return envKey;
+
+  return null;
+}
+
 async function callGroq(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
-  if (!apiKey) throw new Error("AI features require VITE_GROQ_API_KEY in your .env file.");
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Please add your Groq API key in AI Insights → Settings, or set VITE_GROQ_API_KEY in your .env file.");
 
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
@@ -30,6 +51,10 @@ async function callGroq(systemPrompt: string, userPrompt: string): Promise<strin
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      useAIKeyStore.getState().setKeyValid(false);
+      throw new Error("Invalid API key. Please re-enter your Groq API key in AI settings.");
+    }
     if (response.status === 429) throw new Error("Rate limit exceeded. Please wait and try again.");
     throw new Error(`AI service error (${response.status})`);
   }
