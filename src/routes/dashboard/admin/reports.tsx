@@ -150,7 +150,7 @@ function LoginsTab() {
             <LogIn className="h-4 w-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium truncate">{s.user_id.slice(0, 8)}...</p>
+            <p className="font-medium truncate">{s.user_name || s.user_id.slice(0, 8) + "..."}</p>
             <p className="text-xs text-muted-foreground">{s.event_type} • {s.browser || "Unknown"} on {s.os || "Unknown"} ({s.device_type || "unknown"})</p>
           </div>
           <div className="text-right shrink-0">
@@ -185,7 +185,7 @@ function ActivityTrailTab() {
             <Activity className="h-4 w-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium">{log.action}</p>
+            <p className="font-medium">{log.user_name || "Unknown"} — {log.action}</p>
             <p className="text-xs text-muted-foreground truncate">{log.description || log.category}{log.target_name ? ` → ${log.target_name}` : ""}</p>
           </div>
           <div className="text-right shrink-0">
@@ -216,24 +216,37 @@ function LocationsTab() {
     <div className="space-y-3 mt-4">
       <p className="text-sm text-muted-foreground">{locations.length} user(s) online</p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {locations.map((loc) => (
-          <Card key={loc.id}>
-            <CardContent className="py-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
-                <span className="text-sm font-medium">{loc.user_id.slice(0, 8)}...</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>{loc.city || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`}</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>Last seen: {new Date(loc.last_seen_at).toLocaleTimeString()}</span>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+        {locations.map((loc) => {
+          const mapsUrl = `https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+          const placeName = loc.city || loc.address || `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`;
+          return (
+            <Card key={loc.id}>
+              <CardContent className="py-4 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="h-2.5 w-2.5 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-sm font-medium">{loc.user_name || loc.user_id.slice(0, 8) + "..."}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span>{placeName}</span>
+                </div>
+                <a
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <MapPin className="h-3 w-3" />
+                  View on Google Maps →
+                </a>
+                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                  <Clock className="h-3 w-3" />
+                  <span>Last seen: {new Date(loc.last_seen_at).toLocaleTimeString()}</span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
