@@ -84,10 +84,14 @@ Whether you're managing student enrollments, tracking attendance, conducting sec
 ### 📱 Modern UX
 | Feature | Details |
 |---------|---------|
-| **Progressive Web App (PWA)** | Installable app, offline support via service workers |
+| **Progressive Web App (PWA)** | Installable app, offline support, background sync, app shortcuts, cached API responses |
+| **Multilingual (i18n)** | 5 languages (EN, HI, MR, ES, FR) with browser detection, language switcher, dynamic content translation |
+| **Real-Time Notifications** | Supabase Realtime subscriptions, unread badges (99+), polling fallback, admin/instructor compose UI |
+| **WhatsApp-Style Chat** | Emoji picker, GIF picker (GIPHY), optimistic updates, retry on failure, message grouping |
+| **Direct Messaging** | 1:1 private messaging between batch students with common-batch validation |
 | **Responsive Design** | Mobile-first, works on desktop, tablet, phone |
 | **Dark Mode** | Theme toggle for user preference |
-| **Real-Time Updates** | Supabase subscriptions for live notifications |
+| **Canvas Editor** | Drawing board for teachers with auto-save, undo/redo, pen/eraser tools, PDF export |
 
 ---
 
@@ -586,30 +590,44 @@ Built with modern web technologies:
 
 Planned features and improvements:
 
-- [ ] Multi-language support (Hindi, Marathi, Tamil, Telugu + more)
-- [ ] Advanced AI analytics (predictive student performance, dropout risk scoring, revenue forecasting)
-- [ ] Enhanced reporting dashboards (custom report builder, scheduled exports, visual charts)
+- [x] Multi-language support (English, Hindi, Marathi, Spanish, French)
+- [x] Real-time notifications system (Supabase Realtime + polling fallback)
+- [x] WhatsApp-style batch chat with emoji/GIF support
+- [x] Direct messaging between batch students
+- [x] Advanced AI analytics (real data, per-student insights)
+- [x] Dynamic content translation (Google Translate API)
+- [x] Comprehensive PWA with offline support & background sync
 - [ ] Mobile app (React Native)
 - [ ] Payment gateway integration (Razorpay/Stripe)
-- [ ] SMS/WhatsApp notifications
+- [ ] SMS/WhatsApp push notifications
 - [ ] Video conferencing integration
-- [ ] Mobile app for teachers
+- [ ] Custom report builder with scheduled exports
+- [ ] Multi-institute management (super admin)
+- [ ] API documentation & webhooks
 
 ---
 
 ## 📈 Recent Updates
 
+- ✅ **Multilingual Platform** — Full i18n support with 5 languages (English, Hindi, Marathi, Spanish, French) via react-i18next with language switcher in topbar
+- ✅ **Live Notifications** — Real-time notification system with Supabase Realtime, unread badges, admin/instructor compose UI
+- ✅ **WhatsApp-Style Chat** — Emoji picker, GIF picker (GIPHY), optimistic updates, 2000 char limit, retry on failure
+- ✅ **Direct Messaging** — 1:1 private chat between batch students with common-batch validation
+- ✅ **Real Analytics Data** — Analytics page uses actual Supabase RPC data for all students (no dummy data)
+- ✅ **Per-Student AI Analytics** — Individual student performance panel with attendance, fees, courses, weekly trends
+- ✅ **Dynamic Content Translation** — Google Translate API integration with 24-hour caching for user-generated content
+- ✅ **Comprehensive PWA** — Offline support with background sync, cached API responses, app shortcuts, offline page
+- ✅ **Institute Logo Upload** — Admins can upload institute logo via Settings for use on certificates
+- ✅ **Canvas Auto-Save** — Teacher canvas now auto-saves to localStorage with draft persistence
+- ✅ **Certificate Templates** — User-uploaded logos, blank seal placeholder for physical stamping
 - ✅ AI-powered PDF to MCQ generator (upload PDF → AI generates questions)
 - ✅ 9 AI features: notes summarization, study tips, lesson plans, doubt solver, remarks, exam analytics, communication drafts, assignment feedback, course descriptions
-- ✅ Bulk certificate generator with Elite Forums template (PDF generation)
+- ✅ Bulk certificate generator with custom templates (PDF generation)
 - ✅ Student onboarding guard (mandatory profile completion)
 - ✅ Batch join requests (student self-service with admin approval)
 - ✅ Exam proctoring (camera/mic, tab detection, deterrent UI)
-- ✅ Settings page (profile, password, institute management)
-- ✅ Real-time AI insights dashboard (live data, no dummy content)
-- ✅ Tab-switch page refresh fix (no more false logouts)
-- ✅ Rate-limit-proof bulk student import (277+ students)
-- ✅ PWA offline support
+- ✅ Settings page (profile, password, institute management, logo upload)
+- ✅ Real-time AI insights dashboard (live data from Supabase)
 - ✅ Parent portal with student tracking
 
 ---
