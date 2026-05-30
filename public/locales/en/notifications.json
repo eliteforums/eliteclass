@@ -1,0 +1,33 @@
+{
+  "title": "Notifications",
+  "noNotifications": "No notifications yet",
+  "markAllRead": "Mark all as read",
+  "markAsRead": "Mark as read",
+  "unreadCount": "{{count}} unread",
+  "unreadCountOverflow": "99+",
+  "viewAll": "View all notifications",
+  "compose": {
+    "title": "Send Notification",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Enter notification title",
+    "bodyLabel": "Message",
+    "bodyPlaceholder": "Enter notification message",
+    "target": "Send to",
+    "targetAll": "All Students",
+    "targetBatch": "Specific Batch",
+    "targetIndividual": "Individual Students",
+    "selectBatch": "Select a batch",
+    "selectStudents": "Select students",
+    "send": "Send Notification",
+    "sending": "Sending...",
+    "success": "Notification sent to {{count}} students",
+    "titleTooLong": "Title must be 100 characters or less",
+    "bodyTooLong": "Message must be 500 characters or less",
+    "titleRequired": "Title is required",
+    "bodyRequired": "Message is required",
+    "permissionDenied": "You do not have permission to send to this batch"
+  },
+  "empty": "You're all caught up!",
+  "loadingError": "Failed to load notifications",
+  "reconnecting": "Reconnecting..."
+}
