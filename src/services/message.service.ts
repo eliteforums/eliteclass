@@ -57,10 +57,10 @@ export async function getUserBatches(
     let batches: ChatBatch[] = [];
 
     if (role === "student") {
-      // Student: get batches via student_batch_assignments
+      // Student: get batches via student_batch_assignments + fallback to students.batch_id
       const { data: studentData } = await supabase
         .from("students")
-        .select("id")
+        .select("id, batch_id")
         .eq("user_id", userId)
         .single();
 
@@ -68,24 +68,58 @@ export async function getUserBatches(
         return { data: [], error: null, success: true };
       }
 
-      const { data, error } = await supabase
+      // Try student_batch_assignments first
+      const { data: sbaData } = await supabase
         .from("student_batch_assignments")
         .select("batch_id, batches(id, name, course_name)")
         .eq("student_id", studentData.id)
         .eq("is_active", true);
 
-      if (error) return { data: null, error: error.message, success: false };
+      if (sbaData && sbaData.length > 0) {
+        batches = sbaData
+          .filter((row: Record<string, unknown>) => row.batches)
+          .map((row: Record<string, unknown>) => {
+            const batch = row.batches as { id: string; name: string; course_name: string | null };
+            return { id: batch.id, name: batch.name, course_name: batch.course_name };
+          });
+      }
 
-      batches = (data ?? [])
-        .filter((row: Record<string, unknown>) => row.batches)
-        .map((row: Record<string, unknown>) => {
-          const batch = row.batches as { id: string; name: string; course_name: string | null };
-          return {
-            id: batch.id,
-            name: batch.name,
-            course_name: batch.course_name,
-          };
-        });
+      // Fallback: if no assignments found, try the direct batch_id on students table
+      if (batches.length === 0 && studentData.batch_id) {
+        const { data: directBatch } = await supabase
+          .from("batches")
+          .select("id, name, course_name")
+          .eq("id", studentData.batch_id)
+          .eq("is_active", true)
+          .single();
+
+        if (directBatch) {
+          batches = [{
+            id: directBatch.id as string,
+            name: directBatch.name as string,
+            course_name: (directBatch.course_name as string | null) ?? null,
+          }];
+        }
+      }
+
+      // Last resort: get all active batches in the institute (if student has no assignments)
+      if (batches.length === 0) {
+        const { data: instituteBatches } = await supabase
+          .from("batches")
+          .select("id, name, course_name")
+          .eq("institute_id", instituteId)
+          .eq("is_active", true)
+          .order("name")
+          .limit(20);
+
+        if (instituteBatches && instituteBatches.length > 0) {
+          batches = instituteBatches.map((b) => ({
+            id: b.id as string,
+            name: b.name as string,
+            course_name: (b.course_name as string | null) ?? null,
+          }));
+        }
+      }
     } else if (role === "staff") {
       // Staff: get batches via staff_assignments
       const { data: staffData } = await supabase
