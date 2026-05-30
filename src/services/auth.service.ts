@@ -230,6 +230,12 @@ export async function signOut(): Promise<ApiResponse<null>> {
   markSignOutIntentional();
 
   const { error } = await supabase!.auth.signOut();
+
+  // Clear service worker cached pages/API data to prevent stale user data in PWA
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_AUTH_CACHE' });
+  }
+
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
 }

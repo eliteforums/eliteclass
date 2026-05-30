@@ -29,8 +29,11 @@ const authStoreImpl = persist<AuthState>(
     setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
     login: (user, institute) =>
       set({ user, institute, isAuthenticated: true, isLoading: false }),
-    logout: () =>
-      set({ user: null, institute: null, isAuthenticated: false, isLoading: false }),
+    logout: () => {
+      // Clear persisted auth data on logout to prevent stale state in PWA
+      try { sessionStorage.removeItem("eliteclass-profile-completed"); } catch {}
+      set({ user: null, institute: null, isAuthenticated: false, isLoading: false });
+    },
     getRole: () => get().user?.role ?? null,
     getInstituteId: () => get().user?.institute_id ?? null,
   }),
@@ -42,8 +45,13 @@ const authStoreImpl = persist<AuthState>(
       isAuthenticated: state.isAuthenticated,
     }) as unknown as AuthState,
     onRehydrateStorage: () => (state) => {
-      if (state?.isAuthenticated) {
-        state.isLoading = false;
+      // IMPORTANT: After rehydrating from localStorage, do NOT mark as
+      // fully loaded. Keep isLoading = true so the AuthProvider can validate
+      // the session with Supabase before showing any UI.
+      // This prevents the "dummy user" bug in PWA where stale localStorage
+      // data shows an old user before the session is verified.
+      if (state) {
+        state.isLoading = true; // Always start loading — AuthProvider resolves this
       }
     },
   },

@@ -95,7 +95,14 @@ registerRoute(
 // 6. Network First — Supabase API requests (with offline fallback to cache)
 //    Tries network first with a 5s timeout. Falls back to cached response.
 //    This gives offline access to previously loaded data.
+//    EXCLUDES auth endpoints — those should never be cached.
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// Never cache Supabase auth requests
+registerRoute(
+  ({ url }) => /^https:\/\/[a-z0-9]+\.supabase\.co\/auth\//.test(url.href),
+  new NetworkOnly()
+);
 
 registerRoute(
   ({ url }) => /^https:\/\/[a-z0-9]+\.supabase\.co\/rest\/v1\//.test(url.href),
@@ -162,21 +169,23 @@ registerRoute(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 9. Navigation — Stale While Revalidate for HTML pages
-//    Serves cached page shell immediately while checking for updates.
-//    If fully offline and no cache, serves offline fallback page.
+// 9. Navigation — NetworkFirst for HTML pages
+//    Always tries to fetch fresh HTML from the server first.
+//    Falls back to cached shell only when offline.
+//    This prevents stale auth state from being served to users.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const navigationHandler = new StaleWhileRevalidate({
+const navigationHandler = new NetworkFirst({
   cacheName: 'eliteclass-pages-v2',
+  networkTimeoutSeconds: 3,
   plugins: [
     new CacheableResponsePlugin({ statuses: [0, 200] }),
   ],
 });
 
 registerRoute(new NavigationRoute(navigationHandler, {
-  // Don't cache auth callback URLs
-  denylist: [/\/auth\/callback/, /\/api\//],
+  // Don't cache auth-related URLs at all
+  denylist: [/\/auth\/callback/, /\/api\//, /\/auth\/login/, /\/auth\/register/],
 }));
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -198,12 +207,18 @@ registerRoute(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 11. Skip Waiting — respond to client message to activate new SW immediately
+// 11. Message handlers — Skip Waiting + Clear Auth Cache
 // ═══════════════════════════════════════════════════════════════════════════════
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+
+  // Clear cached pages and API data on logout to prevent stale user data
+  if (event.data?.type === 'CLEAR_AUTH_CACHE') {
+    caches.delete('eliteclass-pages-v2');
+    caches.delete('eliteclass-api-v2');
   }
 });
 
