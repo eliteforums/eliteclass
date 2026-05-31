@@ -36,11 +36,14 @@ export function CanvasModal({ isOpen, onClose }: CanvasModalProps) {
           if (Array.isArray(parsed) && parsed.length > 0) {
             setPages(parsed);
             setLastSaved("Loaded from saved draft");
+            return;
           }
         }
       } catch {
         // Ignore parse errors
       }
+      // Initialize with a blank page so the canvas renders and save button works
+      setPages([{ id: `canvas-init-${Date.now()}`, objects: [] }]);
     }
   }, [isOpen]);
 
