@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { AuthGuard } from "@/components/AuthGuard";
 import { LoginForm } from "@/modules/auth/components/LoginForm";
@@ -20,17 +19,6 @@ function LoginPage() {
       <AuthLayout
         title="Welcome back"
         subtitle="Sign in to your institute account"
-        footer={
-          <p>
-            Don't have an account?{" "}
-            <Link
-              to="/auth/register-institute"
-              className="font-medium text-primary hover:text-primary/80 transition-colors"
-            >
-              Start free trial
-            </Link>
-          </p>
-        }
       >
         <LoginForm />
       </AuthLayout>
