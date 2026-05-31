@@ -69,6 +69,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
           login(result.data.user, result.data.institute);
           // Log session (fire-and-forget)
           import("@/services/activity.service").then((m) => m.logSession("login")).catch(() => {});
+          // Sync AI key from DB if not in localStorage
+          import("@/store/aiKeyStore").then((m) => m.useAIKeyStore.getState().syncFromDb()).catch(() => {});
         } else {
           // Check if there's still a valid session in storage
           const { data: { session } } = await supabase!.auth.getSession();
