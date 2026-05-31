@@ -11,6 +11,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Loader2, User as UserIcon, Building2, Lock, Check, Globe } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslation } from "react-i18next";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ import {
   updateInstitute,
   changePassword,
 } from "@/services/profile.service";
+import { LANGUAGE_OPTIONS } from "@/lib/i18n-config";
 import { AvatarPicker } from "@/components/avatars/AvatarPicker";
 import { AvatarDisplay } from "@/components/avatars/AvatarPreview";
 
@@ -96,9 +98,7 @@ function SettingsContent() {
 // ── Language Section ──────────────────────────────────────────────────────────
 
 function LanguageSection() {
-  // Use the same react-i18next instance as the header LanguageSwitcher
-  const { i18n } = require("react-i18next").useTranslation();
-  const { LANGUAGE_OPTIONS } = require("@/lib/i18n-config");
+  const { i18n } = useTranslation();
 
   const currentLang = i18n.language;
 
@@ -120,7 +120,7 @@ function LanguageSection() {
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {LANGUAGE_OPTIONS.map((lang: { code: string; name: string; nativeName: string }) => (
+        {LANGUAGE_OPTIONS.map((lang) => (
           <button
             key={lang.code}
             onClick={() => handleSetLanguage(lang.code)}
