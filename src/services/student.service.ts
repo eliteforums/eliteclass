@@ -713,10 +713,74 @@ export async function restoreStudent(id: string): Promise<ApiResponse<Student>> 
  *   3. Optionally create parent auth account via Admin API.
  *   4. Call create_student_profile() RPC — DB records only, no password logic.
  */
+
+/**
+ * Fallback: admit student via the database RPC (admit_student function).
+ * Used when supabaseAdmin is not available (client-side).
+ */
+async function admitStudentViaRPC(
+  payload: AdmitStudentPayload,
+): Promise<ApiResponse<AdmitStudentResult>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  try {
+    const { data, error } = await supabase.rpc("admit_student", {
+      p_institute_id: payload.institute_id,
+      p_name: payload.student_name,
+      p_email: payload.student_email || null,
+      p_phone: payload.phone || null,
+      p_admission_no: payload.admission_number || `ADM-${Date.now().toString(36).toUpperCase()}`,
+      p_batch_id: payload.batch_id || null,
+      p_aadhaar_last4: payload.aadhaar_last4 || null,
+      p_emergency_contact: payload.emergency_contact ? JSON.stringify(payload.emergency_contact) : null,
+    });
+
+    if (error) {
+      return { data: null, error: error.message, success: false };
+    }
+
+    // The RPC returns a JSON object
+    const result = data as {
+      student_id: string;
+      user_id: string;
+      login_id: string;
+      temp_password: string;
+      admission_no: string;
+    };
+
+    return {
+      data: {
+        student_id: result.student_id,
+        user_id: result.user_id,
+        login_id: result.login_id,
+        admission_no: result.admission_no,
+        generated_email: `${result.login_id}@eduos.student`,
+        temporary_password: result.temp_password,
+        parent_account_status: "not_provided",
+        parent_email_delivery_status: "not_applicable",
+        parent_email: null,
+        parent_temporary_password: null,
+        parent_user_id: null,
+        parent_first_login_change_required: false,
+      },
+      error: null,
+      success: true,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Failed to admit student.";
+    return { data: null, error: msg, success: false };
+  }
+}
+
 export async function admitStudent(
   payload: AdmitStudentPayload,
 ): Promise<ApiResponse<AdmitStudentResult>> {
-  if (!supabase || !supabaseAdmin) return SUPABASE_NOT_CONFIGURED;
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // If supabaseAdmin is not available (client-side), use the database RPC
+  if (!supabaseAdmin) {
+    return admitStudentViaRPC(payload);
+  }
 
   try {
     // ── Step 1: Generate student credentials ──────────────────────────────────
