@@ -31,7 +31,7 @@ export function StudentAttendancePopup() {
   // Only show for students
   if (user?.role !== "student") return null;
 
-  // Fetch student record ID
+  // Fetch student record ID and their batch assignments
   useEffect(() => {
     if (!user?.id || !supabase) return;
     supabase
@@ -44,7 +44,7 @@ export function StudentAttendancePopup() {
       });
   }, [user?.id]);
 
-  // Poll for active prompts and subscribe to Realtime
+  // Poll for active prompts and subscribe to Realtime with fallback polling
   useEffect(() => {
     if (!user?.id || !supabase) return;
 
@@ -55,7 +55,22 @@ export function StudentAttendancePopup() {
       }
     });
 
-    // Subscribe to new prompts via Realtime
+    // Fallback polling every 3 seconds to catch prompts if Realtime is delayed
+    const pollInterval = setInterval(() => {
+      getActivePrompts(user.id).then((res) => {
+        if (res.success && res.data && res.data.length > 0) {
+          const latestPrompt = res.data[0];
+          // Only update if we don't already have this prompt
+          if (!activePrompt || activePrompt.id !== latestPrompt.id) {
+            setActivePrompt(latestPrompt);
+            setResponseState("idle");
+            setDistance(null);
+          }
+        }
+      });
+    }, 3000);
+
+    // Subscribe to new prompts via Realtime with proper RLS filtering
     const channel = supabase
       .channel("attendance-prompts-student")
       .on(
@@ -67,12 +82,12 @@ export function StudentAttendancePopup() {
         },
         (payload) => {
           const newPrompt = payload.new as AttendancePrompt;
-          // Check if this prompt is for one of the student's batches
-          // (RLS already filters, but double-check status)
+          // RLS policy already filters by batch_id, but verify status is active
           if (newPrompt.status === "active") {
             setActivePrompt(newPrompt);
             setResponseState("idle");
             setDistance(null);
+            console.log("✓ New attendance prompt received:", newPrompt.id);
           }
         }
       )
@@ -87,15 +102,23 @@ export function StudentAttendancePopup() {
           const updated = payload.new as AttendancePrompt;
           if (activePrompt?.id === updated.id && updated.status !== "active") {
             setActivePrompt(null);
+            console.log("✓ Prompt closed:", updated.id);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("✓ Subscribed to attendance prompts");
+        } else if (status === "CHANNEL_ERROR") {
+          console.error("✗ Subscription error: Failed to subscribe to attendance prompts. Polling fallback active.");
+        }
+      });
 
     return () => {
+      clearInterval(pollInterval);
       supabase!.removeChannel(channel);
     };
-  }, [user?.id]);
+  }, [user?.id, activePrompt?.id]);
 
   // Countdown timer
   useEffect(() => {

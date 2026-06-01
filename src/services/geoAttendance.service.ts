@@ -156,25 +156,30 @@ export async function getActivePrompts(
 
   try {
     // Get student's active batch IDs
-    const { data: student } = await supabase
+    const { data: student, error: studentError } = await supabase
       .from("students")
       .select("id")
       .eq("user_id", userId)
       .single();
 
-    if (!student) return { data: [], error: null, success: true };
+    if (!student) {
+      console.log("✗ No student record found for user:", userId);
+      return { data: [], error: null, success: true };
+    }
 
-    const { data: assignments } = await supabase
+    const { data: assignments, error: assignError } = await supabase
       .from("student_batch_assignments")
       .select("batch_id")
       .eq("student_id", student.id)
       .eq("is_active", true);
 
     if (!assignments || assignments.length === 0) {
+      console.log("✗ Student has no active batch assignments:", student.id);
       return { data: [], error: null, success: true };
     }
 
     const batchIds = assignments.map((a) => a.batch_id as string);
+    console.log("✓ Student has active batches:", batchIds);
 
     // Get active prompts for those batches
     const { data: prompts, error } = await supabase
@@ -185,10 +190,16 @@ export async function getActivePrompts(
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false });
 
-    if (error) return { data: null, error: error.message, success: false };
+    if (error) {
+      console.error("✗ Error fetching prompts:", error.message);
+      return { data: null, error: error.message, success: false };
+    }
+    console.log("✓ Found active prompts:", prompts?.length ?? 0);
     return { data: (prompts ?? []) as AttendancePrompt[], error: null, success: true };
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Failed to fetch prompts", success: false };
+    const errorMsg = err instanceof Error ? err.message : "Failed to fetch prompts";
+    console.error("✗ Unexpected error:", errorMsg);
+    return { data: null, error: errorMsg, success: false };
   }
 }
 
