@@ -81,33 +81,85 @@ export async function generateMCQsFromText(
 
   console.log("Raw Groq response (first 500 chars):", content.substring(0, 500));
 
-  // Parse JSON from response with multiple strategies
-  let jsonStr = content.trim();
+  // Helper function to clean and fix common JSON issues
+  function cleanJSON(str: string): string {
+    let cleaned = str.trim();
 
-  // Strategy 1: Extract from markdown code blocks
-  if (jsonStr.includes("```")) {
-    const match = jsonStr.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-    if (match && match[1]) {
-      jsonStr = match[1].trim();
-      console.log("✓ Extracted JSON from markdown code block");
+    // Remove markdown code blocks
+    if (cleaned.includes("```")) {
+      const match = cleaned.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+      if (match && match[1]) {
+        cleaned = match[1].trim();
+        console.log("✓ Removed markdown code blocks");
+      }
     }
+
+    // Remove text before first [ or {
+    const startIndex = Math.max(cleaned.indexOf("["), cleaned.indexOf("{"));
+    if (startIndex > 0) {
+      cleaned = cleaned.substring(startIndex);
+      console.log("✓ Removed text before JSON");
+    }
+
+    // Remove text after last ] or }
+    const lastBracket = Math.max(cleaned.lastIndexOf("]"), cleaned.lastIndexOf("}"));
+    if (lastBracket >= 0 && lastBracket < cleaned.length - 1) {
+      cleaned = cleaned.substring(0, lastBracket + 1);
+      console.log("✓ Removed text after JSON");
+    }
+
+    // Replace smart quotes with regular quotes BEFORE any other processing
+    cleaned = cleaned.replace(/[""]/g, '"');
+    cleaned = cleaned.replace(/['']/g, "'");
+    console.log("✓ Fixed smart quotes");
+
+    // Fix trailing commas before ] and }
+    cleaned = cleaned.replace(/,(\s*[}\]])/g, "$1");
+    console.log("✓ Removed trailing commas");
+
+    // Fix single quotes used instead of double quotes (but only in specific contexts)
+    // This is risky but helps with some AI outputs
+    // Only fix if it looks like a field name pattern: 'field_name':
+    cleaned = cleaned.replace(/'([a-zA-Z_][a-zA-Z0-9_]*)'\s*:/g, '"$1":');
+    console.log("✓ Fixed single-quoted field names");
+
+    // Remove any null bytes or control characters (except newlines and tabs)
+    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, " ");
+    console.log("✓ Removed control characters");
+
+    // Try to fix unclosed strings by looking for patterns
+    // This is a last resort attempt
+    let quoteCount = 0;
+    let inEscape = false;
+    for (let i = 0; i < cleaned.length; i++) {
+      if (cleaned[i] === "\\" && !inEscape) {
+        inEscape = true;
+      } else if (cleaned[i] === '"' && !inEscape) {
+        quoteCount++;
+      } else {
+        inEscape = false;
+      }
+    }
+
+    // If odd number of quotes, we might have an unclosed string
+    if (quoteCount % 2 !== 0) {
+      console.warn("⚠ Detected odd number of quotes - may have unclosed strings");
+      // Try to find and close unclosed strings at the end
+      const lastQuoteIndex = cleaned.lastIndexOf('"');
+      if (lastQuoteIndex < cleaned.length - 10) {
+        // If last quote is far from the end, there might be an unclosed string
+        cleaned = cleaned.substring(0, lastQuoteIndex + 1);
+        console.log("✓ Trimmed possible unclosed string");
+      }
+    }
+
+    return cleaned;
   }
 
-  // Strategy 2: Find JSON array in text
-  if (!jsonStr.startsWith("[")) {
-    const arrayMatch = jsonStr.match(/\[\s*{[\s\S]*}\s*\]/);
-    if (arrayMatch) {
-      jsonStr = arrayMatch[0];
-      console.log("✓ Found JSON array in text");
-    }
-  }
-
-  // Strategy 3: Remove common prefixes/suffixes
-  jsonStr = jsonStr
-    .replace(/^[^[\{]*/, "") // Remove everything before first [ or {
-    .replace(/[^}\]]*$/, ""); // Remove everything after last } or ]
-
+  let jsonStr = cleanJSON(content);
   console.log("Cleaned JSON (first 300 chars):", jsonStr.substring(0, 300));
+  console.log("Cleaned JSON (last 300 chars):", jsonStr.substring(Math.max(0, jsonStr.length - 300)));
+  console.log("Total JSON length:", jsonStr.length);
 
   try {
     const questions: GeneratedQuestion[] = JSON.parse(jsonStr);
@@ -117,6 +169,8 @@ export async function generateMCQsFromText(
     if (questions.length === 0) {
       throw new Error("No questions in response");
     }
+
+    console.log(`✓ Successfully parsed ${questions.length} questions`);
 
     // Validate and normalize
     return questions
@@ -133,9 +187,50 @@ export async function generateMCQsFromText(
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Unknown parse error";
     console.error("✗ JSON parsing failed:", errorMsg);
-    console.error("✗ Attempted to parse:", jsonStr.substring(0, 200));
+
+    // Try to find and log the problematic area
+    if (errorMsg.includes("position")) {
+      const posMatch = errorMsg.match(/position (\d+)/);
+      if (posMatch) {
+        const pos = parseInt(posMatch[1]);
+        const start = Math.max(0, pos - 100);
+        const end = Math.min(jsonStr.length, pos + 100);
+        console.error("✗ Problem area (chars", start, "-", end, "):");
+        console.error(jsonStr.substring(start, end));
+        console.error(" ".repeat(pos - start) + "^ Error here");
+      }
+    }
+
+    console.error("✗ Full JSON (first 300 chars):", jsonStr.substring(0, 300));
+    console.error("✗ Full JSON (chars 7700-7900):", jsonStr.substring(7700, 7900));
+
+    // Fallback: Try line-by-line salvaging
+    console.log("🔧 Attempting to salvage valid questions from response...");
+    const salvaged: GeneratedQuestion[] = [];
+    
+    // Try to find individual JSON objects
+    const objectPattern = /\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g;
+    const matches = jsonStr.match(objectPattern) || [];
+    
+    for (const match of matches) {
+      try {
+        const obj = JSON.parse(match);
+        if (obj.question_text && obj.options && Array.isArray(obj.options)) {
+          salvaged.push(obj);
+          console.log("✓ Salvaged question:", obj.question_text.substring(0, 50));
+        }
+      } catch {
+        // Skip this object
+      }
+    }
+
+    if (salvaged.length > 0) {
+      console.log(`✓ Salvaged ${salvaged.length} questions from malformed JSON`);
+      return salvaged;
+    }
+
     throw new Error(
-      `Failed to parse AI response: ${errorMsg}. The AI may not have returned valid JSON. Please try again with different settings.`
+      `Failed to parse AI response: ${errorMsg}. Try with fewer questions or simpler content.`
     );
   }
 }
