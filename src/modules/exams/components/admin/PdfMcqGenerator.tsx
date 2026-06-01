@@ -160,7 +160,10 @@ export function PdfMcqGenerator({ examId, onQuestionsAdded }: PdfMcqGeneratorPro
       setIsGenerating(false);
       setStep("review");
     } catch (err: any) {
-      setError(err.message || "Failed to generate questions");
+      const errorMsg = err.message || "Failed to generate questions";
+      console.error("❌ MCQ Generation Error:", errorMsg);
+      console.error("Full error:", err);
+      setError(errorMsg);
       setIsGenerating(false);
     }
   };
@@ -275,7 +278,17 @@ export function PdfMcqGenerator({ examId, onQuestionsAdded }: PdfMcqGeneratorPro
           <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm flex items-start gap-2">
             <X className="h-4 w-4 mt-0.5 shrink-0" />
             <div className="flex-1">
-              <p>{error}</p>
+              <p className="font-medium">{error}</p>
+              {error.includes("JSON") && (
+                <p className="text-xs mt-1 opacity-75">
+                  💡 Try with fewer questions or simpler PDF content. Check browser console for details.
+                </p>
+              )}
+              {error.includes("too large") && (
+                <p className="text-xs mt-1 opacity-75">
+                  💡 Your PDF is too large. Try a smaller PDF or extract from specific pages only.
+                </p>
+              )}
               {step === "configure" && (
                 <Button
                   variant="outline"
