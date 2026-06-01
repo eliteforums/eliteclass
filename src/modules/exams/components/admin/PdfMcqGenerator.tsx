@@ -102,6 +102,11 @@ export function PdfMcqGenerator({ examId, onQuestionsAdded }: PdfMcqGeneratorPro
         return;
       }
 
+      // Warn if text is very large (will be truncated to 5000 chars for API)
+      if (text.length > 50000) {
+        toast.warning("This PDF is very large. Only the first ~5000 characters will be processed for best results.");
+      }
+
       setExtractedText(text);
       setIsExtracting(false);
       setStep("configure");

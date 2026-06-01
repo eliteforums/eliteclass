@@ -39,7 +39,7 @@ export async function generateMCQsFromText(
       ? `You are an MCQ extraction expert. Extract all multiple-choice questions from the given text. For each question, identify the question text, all options (A, B, C, D), and mark the correct answer. Return ONLY valid JSON.`
       : `You are an MCQ generation expert. Generate ${options.count || 10} multiple-choice questions from the given text content. Difficulty: ${options.difficulty || "medium"}. Each question should have 4 options with exactly one correct answer. Return ONLY valid JSON.`;
 
-  const userPrompt = `${options.mode === "extract" ? "Extract all MCQs from" : "Generate MCQs from"} the following text:\n\n${text.slice(0, 8000)}\n\nReturn a JSON array of objects with this exact structure:\n[{"question_text": "...", "options": [{"option_text": "...", "is_correct": true/false}, ...], "marks": 1, "explanation": "..."}]\n\nReturn ONLY the JSON array, no other text.`;
+  const userPrompt = `${options.mode === "extract" ? "Extract all MCQs from" : "Generate MCQs from"} the following text:\n\n${text.slice(0, 5000)}\n\nReturn a JSON array of objects with this exact structure:\n[{"question_text": "...", "options": [{"option_text": "...", "is_correct": true/false}, ...], "marks": 1, "explanation": "..."}]\n\nReturn ONLY the JSON array, no other text.`;
 
   const response = await fetch(GROQ_API_URL, {
     method: "POST",
@@ -54,11 +54,15 @@ export async function generateMCQsFromText(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
-      max_tokens: 4096,
+      max_tokens: 2048,
     }),
   });
 
   if (!response.ok) {
+    if (response.status === 413)
+      throw new Error(
+        "PDF content is too large. Please try with a smaller PDF or extract from specific pages only."
+      );
     if (response.status === 429)
       throw new Error(
         "Rate limit exceeded. Please wait a moment and try again."
