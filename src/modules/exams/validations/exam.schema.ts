@@ -5,6 +5,7 @@ export const examSchema = z.object({
   description: z.string().optional(),
   instructions: z.string().optional(),
   duration_mins: z.coerce.number().min(1, "Duration must be at least 1 minute"),
+  time_per_question_seconds: z.coerce.number().min(0).nullable().default(null),
   total_marks: z.coerce.number().min(0),
   passing_marks: z.coerce.number().min(0),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
