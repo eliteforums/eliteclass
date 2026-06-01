@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Plus, Trash, Check, Sparkles } from "lucide-react";
+import { Plus, Trash, Check, Sparkles, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { addQuestion, deleteQuestion } from "../../services/exam.service";
 import { cn } from "@/lib/utils";
 import { PdfMcqGenerator } from "./PdfMcqGenerator";
+import { CSVMcqUploader } from "./CSVMcqUploader";
 
 interface QuestionManagerProps {
   examId: string;
@@ -21,6 +22,7 @@ interface QuestionManagerProps {
 export function QuestionManager({ examId, questions, onRefresh }: QuestionManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [showPdfGenerator, setShowPdfGenerator] = useState(false);
+  const [showCSVUploader, setShowCSVUploader] = useState(false);
   const [newQuestion, setNewQuestion] = useState({
     question_text: "",
     marks: 1,
@@ -97,6 +99,14 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
                 <Sparkles className="mr-2 h-4 w-4" />
                 {showPdfGenerator ? "Hide AI Generator" : "Generate from PDF"}
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCSVUploader(!showCSVUploader)}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {showCSVUploader ? "Hide CSV Upload" : "Upload CSV"}
+              </Button>
               <Button onClick={() => setIsAdding(true)} size="sm">
                 <Plus className="mr-2 h-4 w-4" /> Add Question
               </Button>
@@ -111,6 +121,16 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
           onQuestionsAdded={() => {
             onRefresh();
             setShowPdfGenerator(false);
+          }}
+        />
+      )}
+
+      {showCSVUploader && (
+        <CSVMcqUploader
+          examId={examId}
+          onQuestionsAdded={() => {
+            onRefresh();
+            setShowCSVUploader(false);
           }}
         />
       )}
