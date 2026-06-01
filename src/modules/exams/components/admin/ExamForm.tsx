@@ -57,6 +57,7 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       description: "",
       instructions: "",
       duration_mins: 60,
+      time_per_question_seconds: null,
       total_marks: 100,
       passing_marks: 35,
       status: "draft",
@@ -139,10 +140,30 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                   name="duration_mins"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Duration (Minutes)</FormLabel>
+                      <FormLabel>Total Duration (Minutes)</FormLabel>
                       <FormControl>
                         <Input type="number" {...field} />
                       </FormControl>
+                      <FormDescription>Total time for the entire exam</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="time_per_question_seconds"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Time Per Question (Seconds)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="Leave empty for no per-question limit"
+                          value={field.value ?? ""}
+                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                        />
+                      </FormControl>
+                      <FormDescription>Auto-advances to next question when time expires. Leave empty to use only total duration.</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
