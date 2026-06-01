@@ -46,12 +46,19 @@ export function StudentAttendancePopup() {
 
   // Poll for active prompts and subscribe to Realtime with fallback polling
   useEffect(() => {
-    if (!user?.id || !supabase) return;
+    if (!user?.id || !supabase) {
+      console.log("✗ Missing user or supabase:", { user: !!user, supabase: !!supabase });
+      return;
+    }
+
+    console.log("📍 Setting up attendance prompt listener for user:", user.id);
 
     // Initial fetch
     getActivePrompts(user.id).then((res) => {
+      console.log("📍 Initial prompt fetch:", res);
       if (res.success && res.data && res.data.length > 0) {
         setActivePrompt(res.data[0]); // Show the most recent active prompt
+        console.log("✓ Active prompt found:", res.data[0].id);
       }
     });
 
@@ -60,19 +67,23 @@ export function StudentAttendancePopup() {
       getActivePrompts(user.id).then((res) => {
         if (res.success && res.data && res.data.length > 0) {
           const latestPrompt = res.data[0];
-          // Only update if we don't already have this prompt
-          if (!activePrompt || activePrompt.id !== latestPrompt.id) {
-            setActivePrompt(latestPrompt);
-            setResponseState("idle");
-            setDistance(null);
-          }
+          setActivePrompt((prev) => {
+            // Only update if we don't already have this prompt
+            if (!prev || prev.id !== latestPrompt.id) {
+              console.log("✓ Polling found new prompt:", latestPrompt.id);
+              return latestPrompt;
+            }
+            return prev;
+          });
+          setResponseState("idle");
+          setDistance(null);
         }
       });
     }, 3000);
 
     // Subscribe to new prompts via Realtime with proper RLS filtering
     const channel = supabase
-      .channel("attendance-prompts-student")
+      .channel("attendance-prompts-student", { config: { broadcast: { self: true } } })
       .on(
         "postgres_changes",
         {
@@ -82,12 +93,13 @@ export function StudentAttendancePopup() {
         },
         (payload) => {
           const newPrompt = payload.new as AttendancePrompt;
+          console.log("📡 Realtime INSERT received:", newPrompt.id, "status:", newPrompt.status);
           // RLS policy already filters by batch_id, but verify status is active
           if (newPrompt.status === "active") {
             setActivePrompt(newPrompt);
             setResponseState("idle");
             setDistance(null);
-            console.log("✓ New attendance prompt received:", newPrompt.id);
+            console.log("✓ New attendance prompt activated:", newPrompt.id);
           }
         }
       )
@@ -100,25 +112,31 @@ export function StudentAttendancePopup() {
         },
         (payload) => {
           const updated = payload.new as AttendancePrompt;
-          if (activePrompt?.id === updated.id && updated.status !== "active") {
-            setActivePrompt(null);
-            console.log("✓ Prompt closed:", updated.id);
-          }
+          console.log("📡 Realtime UPDATE received:", updated.id, "status:", updated.status);
+          setActivePrompt((prev) => {
+            if (prev?.id === updated.id && updated.status !== "active") {
+              console.log("✓ Prompt closed:", updated.id);
+              return null;
+            }
+            return prev;
+          });
         }
       )
       .subscribe((status) => {
+        console.log("📡 Subscription status:", status);
         if (status === "SUBSCRIBED") {
-          console.log("✓ Subscribed to attendance prompts");
+          console.log("✓ Successfully subscribed to attendance prompts");
         } else if (status === "CHANNEL_ERROR") {
           console.error("✗ Subscription error: Failed to subscribe to attendance prompts. Polling fallback active.");
         }
       });
 
     return () => {
+      console.log("🧹 Cleaning up attendance prompt listener");
       clearInterval(pollInterval);
       supabase!.removeChannel(channel);
     };
-  }, [user?.id, activePrompt?.id]);
+  }, [user?.id]);
 
   // Countdown timer
   useEffect(() => {

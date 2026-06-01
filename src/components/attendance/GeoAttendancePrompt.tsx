@@ -76,15 +76,19 @@ export function GeoAttendancePrompt({ batchId, batchName }: GeoAttendancePromptP
         },
         (payload) => {
           const newResponse = payload.new as AttendanceResponse;
+          console.log("📡 New attendance response received:", newResponse.id, "status:", newResponse.status);
           setResponses((prev) => {
             if (prev.some((r) => r.id === newResponse.id)) return prev;
             return [...prev, newResponse];
           });
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("📡 Response subscription status:", status);
+      });
 
     return () => {
+      console.log("🧹 Cleaning up response listener");
       supabase!.removeChannel(channel);
     };
   }, [activePrompt?.id]);
