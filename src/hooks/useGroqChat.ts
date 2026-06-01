@@ -19,7 +19,7 @@ const SYSTEM_PROMPT =
   "You are an EliteClass AI study assistant. Help students with their coursework, explain concepts, and provide educational support. Be concise and helpful.";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.1-8b-instant";
+const MODEL = "Llama-3.3-70B-Versatile model";
 const MAX_CONTEXT_MESSAGES = 20;
 
 function generateId(): string {
