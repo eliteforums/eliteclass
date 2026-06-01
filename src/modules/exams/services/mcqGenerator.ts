@@ -1,4 +1,5 @@
 import type { ExamQuestion, ExamOption } from "../types";
+import { useAIKeyStore } from "@/store/aiKeyStore";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -9,6 +10,16 @@ interface GeneratedQuestion {
   explanation: string;
 }
 
+function getGroqApiKey(): string | null {
+  // 1. User-provided key from AI Key Setup (localStorage)
+  const storeKey = useAIKeyStore.getState().apiKey;
+  if (storeKey) return storeKey;
+  // 2. Fallback: environment variable
+  const envKey = import.meta.env.VITE_GROQ_API_KEY;
+  if (envKey) return envKey;
+  return null;
+}
+
 export async function generateMCQsFromText(
   text: string,
   options: {
@@ -17,10 +28,10 @@ export async function generateMCQsFromText(
     difficulty?: "easy" | "medium" | "hard";
   }
 ): Promise<GeneratedQuestion[]> {
-  const apiKey = import.meta.env.VITE_GROQ_API_KEY;
+  const apiKey = getGroqApiKey();
   if (!apiKey)
     throw new Error(
-      "Groq API key not configured. Add VITE_GROQ_API_KEY to your .env file."
+      "Please add your Groq API key in AI Assistant → Settings first."
     );
 
   const systemPrompt =
