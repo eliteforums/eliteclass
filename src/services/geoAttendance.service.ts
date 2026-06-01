@@ -89,6 +89,14 @@ export async function createAttendancePrompt(params: {
   const duration = params.durationMinutes ?? 5;
   const expiresAt = new Date(Date.now() + duration * 60 * 1000).toISOString();
 
+  console.log("🎯 Creating attendance prompt:", {
+    batch_id: params.batchId,
+    teacher_id: params.teacherId,
+    radius_meters: radius,
+    duration_minutes: duration,
+    expires_at: expiresAt,
+  });
+
   try {
     const { data, error } = await supabase
       .from("attendance_prompts")
@@ -107,10 +115,17 @@ export async function createAttendancePrompt(params: {
       .select("*")
       .single();
 
-    if (error) return { data: null, error: error.message, success: false };
+    if (error) {
+      console.error("✗ Failed to create prompt:", error.message);
+      return { data: null, error: error.message, success: false };
+    }
+
+    console.log("✓ Attendance prompt created:", data?.id);
     return { data: data as AttendancePrompt, error: null, success: true };
   } catch (err) {
-    return { data: null, error: err instanceof Error ? err.message : "Failed to create prompt", success: false };
+    const errorMsg = err instanceof Error ? err.message : "Failed to create prompt";
+    console.error("✗ Error creating prompt:", errorMsg);
+    return { data: null, error: errorMsg, success: false };
   }
 }
 
@@ -155,23 +170,36 @@ export async function getActivePrompts(
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   try {
-    // Get student's active batch IDs
+    console.log("🔍 Fetching active prompts for user:", userId);
+
+    // Get student's record
     const { data: student, error: studentError } = await supabase
       .from("students")
       .select("id")
       .eq("user_id", userId)
       .single();
 
+    if (studentError) {
+      console.error("✗ Student lookup error:", studentError.message);
+    }
+
     if (!student) {
       console.log("✗ No student record found for user:", userId);
       return { data: [], error: null, success: true };
     }
 
+    console.log("✓ Found student record:", student.id);
+
+    // Get student's active batch IDs
     const { data: assignments, error: assignError } = await supabase
       .from("student_batch_assignments")
       .select("batch_id")
       .eq("student_id", student.id)
       .eq("is_active", true);
+
+    if (assignError) {
+      console.error("✗ Batch assignment lookup error:", assignError.message);
+    }
 
     if (!assignments || assignments.length === 0) {
       console.log("✗ Student has no active batch assignments:", student.id);
@@ -182,23 +210,33 @@ export async function getActivePrompts(
     console.log("✓ Student has active batches:", batchIds);
 
     // Get active prompts for those batches
+    const now = new Date().toISOString();
+    console.log("⏰ Current time:", now);
+
     const { data: prompts, error } = await supabase
       .from("attendance_prompts")
       .select("*")
       .in("batch_id", batchIds)
       .eq("status", "active")
-      .gt("expires_at", new Date().toISOString())
+      .gt("expires_at", now)
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("✗ Error fetching prompts:", error.message);
+      console.error("✗ Error fetching prompts:", error.message, error.code);
       return { data: null, error: error.message, success: false };
     }
+
     console.log("✓ Found active prompts:", prompts?.length ?? 0);
+    if (prompts && prompts.length > 0) {
+      prompts.forEach((p) => {
+        console.log(`  - Prompt ${p.id}: batch_id=${p.batch_id}, expires_at=${p.expires_at}`);
+      });
+    }
+
     return { data: (prompts ?? []) as AttendancePrompt[], error: null, success: true };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : "Failed to fetch prompts";
-    console.error("✗ Unexpected error:", errorMsg);
+    console.error("✗ Unexpected error:", errorMsg, err);
     return { data: null, error: errorMsg, success: false };
   }
 }
