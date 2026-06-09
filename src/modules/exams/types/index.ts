@@ -1,5 +1,55 @@
 import { Student } from "@/types";
 
+export type ExamType = "mcq" | "coding";
+export type CodingLanguage = "python" | "javascript" | "java" | "cpp" | "c";
+
+export interface TestCase {
+  id?: string;
+  input: string;
+  expected_output: string;
+  is_hidden: boolean;
+}
+
+export interface StarterCode {
+  python?: string;
+  javascript?: string;
+  java?: string;
+  cpp?: string;
+  c?: string;
+}
+
+export interface TestResult {
+  passed: boolean;
+  input?: string;
+  expected_output?: string;
+  actual_output?: string;
+  stderr?: string;
+  time?: number;
+}
+
+export interface CodingSubmission {
+  id: string;
+  attempt_id: string;
+  question_id: string;
+  student_id: string;
+  institute_id: string;
+  language: CodingLanguage;
+  code: string;
+  status:
+    | "pending"
+    | "running"
+    | "accepted"
+    | "wrong_answer"
+    | "runtime_error"
+    | "compilation_error"
+    | "time_limit_exceeded";
+  test_results: TestResult[] | null;
+  passed_tests: number;
+  total_tests: number;
+  score: number;
+  submitted_at: string;
+}
+
 export type ExamStatus = "draft" | "published" | "archived";
 export type ExamAttemptStatus =
   | "in_progress"
@@ -16,6 +66,7 @@ export interface Exam {
   description: string | null;
   instructions: string | null;
   duration_mins: number;
+  time_per_question_seconds?: number | null;
   start_time: string | null;
   end_time: string | null;
   total_marks: number;
@@ -25,6 +76,7 @@ export interface Exam {
   negative_marking: boolean;
   negative_marks_per_question: number;
   randomize_questions: boolean;
+  exam_type?: ExamType;
   enable_tab_detection: boolean;
   enable_camera_mic: boolean;
   enable_deterrent_ui: boolean;
@@ -44,6 +96,14 @@ export interface ExamQuestion {
   explanation: string | null;
   position: number;
   created_at: string;
+  question_type?: "mcq" | "coding";
+  problem_statement?: string | null;
+  constraints_text?: string | null;
+  examples?: Array<{ input: string; output: string; explanation?: string }> | null;
+  test_cases?: TestCase[] | null;
+  starter_code?: StarterCode | null;
+  time_limit_seconds?: number;
+  memory_limit_mb?: number;
   options?: ExamOption[];
 }
 

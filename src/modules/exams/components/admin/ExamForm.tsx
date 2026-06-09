@@ -37,15 +37,15 @@ const formatDateForInput = (dateString?: string | null) => {
   if (!dateString) return "";
   const date = new Date(dateString);
   if (isNaN(date.getTime())) return "";
-  
+
   // Format to YYYY-MM-DDTHH:mm
-  const pad = (num: number) => num.toString().padStart(2, '0');
+  const pad = (num: number) => num.toString().padStart(2, "0");
   const year = date.getFullYear();
   const month = pad(date.getMonth() + 1);
   const day = pad(date.getDate());
   const hours = pad(date.getHours());
   const minutes = pad(date.getMinutes());
-  
+
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
@@ -65,6 +65,7 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       negative_marking: false,
       negative_marks_per_question: 0,
       randomize_questions: false,
+      exam_type: "mcq" as const,
       enable_tab_detection: false,
       enable_camera_mic: false,
       enable_deterrent_ui: false,
@@ -117,10 +118,10 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                     <FormItem>
                       <FormLabel>Instructions</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          placeholder="Instructions for students (e.g. Do not switch tabs)" 
+                        <Textarea
+                          placeholder="Instructions for students (e.g. Do not switch tabs)"
                           className="min-h-[100px]"
-                          {...field} 
+                          {...field}
                         />
                       </FormControl>
                       <FormMessage />
@@ -160,10 +161,15 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                           type="number"
                           placeholder="Leave empty for no per-question limit"
                           value={field.value ?? ""}
-                          onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                          onChange={(e) =>
+                            field.onChange(e.target.value ? Number(e.target.value) : null)
+                          }
                         />
                       </FormControl>
-                      <FormDescription>Auto-advances to next question when time expires. Leave empty to use only total duration.</FormDescription>
+                      <FormDescription>
+                        Auto-advances to next question when time expires. Leave empty to use only
+                        total duration.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -201,15 +207,17 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                           <FormLabel>
                             Start Time
                             {isPublished && (
-                              <span className="ml-2 text-xs text-amber-600 font-normal">(Locked)</span>
+                              <span className="ml-2 text-xs text-amber-600 font-normal">
+                                (Locked)
+                              </span>
                             )}
                           </FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Input 
-                                type="datetime-local" 
-                                {...field} 
-                                value={field.value || ""} 
+                              <Input
+                                type="datetime-local"
+                                {...field}
+                                value={field.value || ""}
                                 disabled={isPublished}
                                 className={isPublished ? "bg-muted cursor-not-allowed" : ""}
                               />
@@ -243,15 +251,17 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                           <FormLabel>
                             End Time
                             {isPublished && (
-                              <span className="ml-2 text-xs text-amber-600 font-normal">(Locked)</span>
+                              <span className="ml-2 text-xs text-amber-600 font-normal">
+                                (Locked)
+                              </span>
                             )}
                           </FormLabel>
                           <FormControl>
                             <div className="relative">
-                              <Input 
-                                type="datetime-local" 
-                                {...field} 
-                                value={field.value || ""} 
+                              <Input
+                                type="datetime-local"
+                                {...field}
+                                value={field.value || ""}
                                 disabled={isPublished}
                                 className={isPublished ? "bg-muted cursor-not-allowed" : ""}
                               />
@@ -284,6 +294,30 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                 <CardTitle>Grading & Settings</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="exam_type"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Exam Type</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value ?? "mcq"}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select exam type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="mcq">MCQ (Multiple Choice)</SelectItem>
+                          <SelectItem value="coding">Coding (Programming)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        MCQ tests are multiple-choice; Coding tests require students to write code.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -321,7 +355,9 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                       <FormItem className="flex items-center justify-between rounded-lg border p-3">
                         <div className="space-y-0.5">
                           <FormLabel>Auto-submit on timeout</FormLabel>
-                          <FormDescription>Automatically submit test when time runs out</FormDescription>
+                          <FormDescription>
+                            Automatically submit test when time runs out
+                          </FormDescription>
                         </div>
                         <FormControl>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />

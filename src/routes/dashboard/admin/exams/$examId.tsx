@@ -1,6 +1,10 @@
 import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getExamDetail, updateExam, assignExamToStudents } from "@/modules/exams/services/exam.service";
+import {
+  getExamDetail,
+  updateExam,
+  assignExamToStudents,
+} from "@/modules/exams/services/exam.service";
 import { ExamForm } from "@/modules/exams/components/admin/ExamForm";
 import { QuestionManager } from "@/modules/exams/components/admin/QuestionManager";
 import { ExamAssigneeSelector } from "@/modules/exams/components/admin/ExamAssigneeSelector";
@@ -10,7 +14,16 @@ import { ProctoringStatusBadges } from "@/modules/exams/components/admin/Proctor
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Users, Settings, FileQuestion, BarChart3, Loader2, Send, ChevronLeft, Activity } from "lucide-react";
+import {
+  Users,
+  Settings,
+  FileQuestion,
+  BarChart3,
+  Loader2,
+  Send,
+  ChevronLeft,
+  Activity,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -43,7 +56,7 @@ function ManageExamPage() {
       start_time: data.start_time ? new Date(data.start_time).toISOString() : null,
       end_time: data.end_time ? new Date(data.end_time).toISOString() : null,
     };
-    
+
     const { success } = await updateExam(examId, payload);
     if (success) {
       toast.success("Exam updated successfully");
@@ -99,10 +112,7 @@ function ManageExamPage() {
               enableCameraMic={exam.enable_camera_mic}
               enableDeterrentUi={exam.enable_deterrent_ui}
             />
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: "/dashboard/admin/exams" })}
-            >
+            <Button variant="outline" onClick={() => navigate({ to: "/dashboard/admin/exams" })}>
               <ChevronLeft className="mr-2 h-4 w-4" /> Back
             </Button>
             {exam.status === "draft" && (
@@ -134,7 +144,12 @@ function ManageExamPage() {
         </TabsList>
 
         <TabsContent value="questions">
-          <QuestionManager examId={examId} questions={exam.questions || []} onRefresh={fetchDetail} />
+          <QuestionManager
+            examId={examId}
+            questions={exam.questions || []}
+            onRefresh={fetchDetail}
+            examType={exam.exam_type ?? "mcq"}
+          />
         </TabsContent>
 
         <TabsContent value="settings">

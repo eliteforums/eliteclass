@@ -1161,3 +1161,313 @@ export async function revokeReattempt(attemptId: string): Promise<ApiResponse<nu
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: null, error: null, success: true };
 }
+
+// ── Coding Exam Services ────────────────────────────────────────────────────
+
+const PISTON_API_URL = "https://emkc.org/api/v2/piston";
+
+const CODING_LANGUAGE_CONFIG: Record<string, { name: string; version: string; filename: string }> =
+  {
+    python: { name: "python", version: "3.10.0", filename: "solution.py" },
+    javascript: { name: "javascript", version: "18.15.0", filename: "solution.js" },
+    java: { name: "java", version: "15.0.2", filename: "Main.java" },
+    cpp: { name: "cpp", version: "10.2.0", filename: "solution.cpp" },
+    c: { name: "c", version: "10.2.0", filename: "solution.c" },
+  };
+
+/**
+ * Add a coding question (with test cases) to an exam.
+ */
+export async function addCodingQuestion(payload: {
+  exam_id: string;
+  question_text: string;
+  problem_statement: string;
+  marks: number;
+  position: number;
+  constraints_text?: string;
+  examples?: Array<{ input: string; output: string; explanation?: string }>;
+  test_cases?: Array<{ input: string; expected_output: string; is_hidden: boolean }>;
+  starter_code?: Record<string, string>;
+  time_limit_seconds?: number;
+  memory_limit_mb?: number;
+}): Promise<ApiResponse<ExamQuestion>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_questions")
+    .insert({
+      exam_id: payload.exam_id,
+      question_text: payload.question_text,
+      marks: payload.marks,
+      position: payload.position,
+      question_type: "coding",
+      problem_statement: payload.problem_statement,
+      constraints_text: payload.constraints_text ?? null,
+      examples: payload.examples ?? null,
+      test_cases: payload.test_cases ?? null,
+      starter_code: payload.starter_code ?? null,
+      time_limit_seconds: payload.time_limit_seconds ?? 5,
+      memory_limit_mb: payload.memory_limit_mb ?? 256,
+    })
+    .select()
+    .single();
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: data as ExamQuestion, error: null, success: true };
+}
+
+/**
+ * Execute code via Piston API (no API key needed).
+ */
+export async function executeCode(
+  language: string,
+  code: string,
+  stdin: string,
+): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+  const config = CODING_LANGUAGE_CONFIG[language] ?? CODING_LANGUAGE_CONFIG.python;
+  try {
+    const response = await fetch(`${PISTON_API_URL}/execute`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: config.name,
+        version: config.version,
+        files: [{ name: config.filename, content: code }],
+        stdin,
+      }),
+    });
+    if (!response.ok) throw new Error(`Piston API returned ${response.status}`);
+    const result = await response.json();
+    const run = result.run ?? {};
+    return {
+      stdout: (run.stdout ?? "").trim(),
+      stderr: (run.stderr ?? "").trim(),
+      exitCode: run.code ?? (run.stderr ? 1 : 0),
+    };
+  } catch (err) {
+    return { stdout: "", stderr: String(err), exitCode: 1 };
+  }
+}
+
+/**
+ * Run only the VISIBLE test cases and return results (used for the "Run" button).
+ */
+export async function runVisibleTests(
+  language: string,
+  code: string,
+  testCases: Array<{ input: string; expected_output: string; is_hidden: boolean }>,
+): Promise<
+  {
+    passed: boolean;
+    input: string;
+    expected_output: string;
+    actual_output: string;
+    stderr: string;
+  }[]
+> {
+  const visible = testCases.filter((tc) => !tc.is_hidden);
+  const results = await Promise.all(
+    visible.map(async (tc) => {
+      const { stdout, stderr } = await executeCode(language, code, tc.input);
+      return {
+        passed: stdout === tc.expected_output.trim(),
+        input: tc.input,
+        expected_output: tc.expected_output,
+        actual_output: stdout,
+        stderr,
+      };
+    }),
+  );
+  return results;
+}
+
+/**
+ * Submit a coding question: run ALL test cases (including hidden), save result to DB.
+ */
+export async function submitCodingAnswer(
+  attemptId: string,
+  questionId: string,
+  studentId: string,
+  instituteId: string,
+  language: string,
+  code: string,
+  testCases: Array<{ input: string; expected_output: string; is_hidden: boolean }>,
+  marks: number,
+): Promise<
+  ApiResponse<{ passed_tests: number; total_tests: number; score: number; status: string }>
+> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // Run all test cases
+  const rawResults = await Promise.all(
+    testCases.map(async (tc) => {
+      const { stdout, stderr, exitCode } = await executeCode(language, code, tc.input);
+      const passed = exitCode === 0 && stdout === tc.expected_output.trim();
+      return {
+        passed,
+        input: tc.is_hidden ? undefined : tc.input,
+        expected_output: tc.is_hidden ? undefined : tc.expected_output,
+        actual_output: tc.is_hidden ? undefined : stdout,
+        stderr: stderr || undefined,
+      };
+    }),
+  );
+
+  const passedCount = rawResults.filter((r) => r.passed).length;
+  const totalCount = testCases.length;
+  const score = totalCount > 0 ? (passedCount / totalCount) * marks : 0;
+  const status = passedCount === totalCount ? "accepted" : "wrong_answer";
+
+  const { error } = await supabase.from("coding_submissions").upsert(
+    {
+      attempt_id: attemptId,
+      question_id: questionId,
+      student_id: studentId,
+      institute_id: instituteId,
+      language,
+      code,
+      status,
+      test_results: rawResults,
+      passed_tests: passedCount,
+      total_tests: totalCount,
+      score,
+      submitted_at: new Date().toISOString(),
+    },
+    { onConflict: "attempt_id,question_id" },
+  );
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return {
+    data: { passed_tests: passedCount, total_tests: totalCount, score, status },
+    error: null,
+    success: true,
+  };
+}
+
+/**
+ * Fetch all coding submissions for an attempt (used to restore state on resume).
+ */
+export async function getCodingSubmissions(attemptId: string): Promise<
+  ApiResponse<
+    Array<{
+      question_id: string;
+      language: string;
+      code: string;
+      passed_tests: number;
+      total_tests: number;
+      score: number;
+      status: string;
+    }>
+  >
+> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("coding_submissions")
+    .select("question_id, language, code, passed_tests, total_tests, score, status")
+    .eq("attempt_id", attemptId);
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return {
+    data: (data ?? []) as Array<{
+      question_id: string;
+      language: string;
+      code: string;
+      passed_tests: number;
+      total_tests: number;
+      score: number;
+      status: string;
+    }>,
+    error: null,
+    success: true,
+  };
+}
+
+/**
+ * Submit a CODING exam attempt: sum scores from coding_submissions.
+ */
+export async function submitCodingExamAttempt(
+  attemptId: string,
+  options?: { autoSubmitReason?: string | null },
+): Promise<ApiResponse<ExamAttempt>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // Get attempt basics
+  const { data: attemptRow, error: ae } = await supabase
+    .from("exam_attempts")
+    .select("exam_id")
+    .eq("id", attemptId)
+    .single();
+  if (ae || !attemptRow) return { data: null, error: getErrorMessage(ae), success: false };
+
+  // Get exam metadata
+  const { data: examRow } = await supabase
+    .from("exams")
+    .select("total_marks, passing_marks")
+    .eq("id", attemptRow.exam_id)
+    .single();
+
+  // Get all questions for this exam
+  const { data: questions } = await supabase
+    .from("exam_questions")
+    .select("id, marks")
+    .eq("exam_id", attemptRow.exam_id);
+
+  // Get coding submissions
+  const { data: submissions } = await supabase
+    .from("coding_submissions")
+    .select("question_id, passed_tests, total_tests, score, status")
+    .eq("attempt_id", attemptId);
+
+  const submissionMap = new Map(
+    (submissions ?? []).map(
+      (s: {
+        question_id: string;
+        passed_tests: number;
+        total_tests: number;
+        score: number;
+        status: string;
+      }) => [s.question_id, s] as const,
+    ),
+  );
+  const totalQ = (questions ?? []).length;
+  let score = 0;
+  let correctCount = 0;
+  let unansweredCount = 0;
+
+  for (const q of questions ?? []) {
+    const sub = submissionMap.get(q.id);
+    if (!sub) {
+      unansweredCount++;
+    } else {
+      score += Number(sub.score);
+      if (sub.status === "accepted") correctCount++;
+    }
+  }
+
+  const totalMarks = examRow?.total_marks ?? 100;
+  const passingMarks = examRow?.passing_marks ?? 40;
+  const percentage = totalMarks > 0 ? (score / totalMarks) * 100 : 0;
+  const passed = percentage >= passingMarks;
+
+  const { data: updated, error: ue } = await supabase
+    .from("exam_attempts")
+    .update({
+      status: "submitted",
+      submitted_at: new Date().toISOString(),
+      auto_submit_reason: options?.autoSubmitReason ?? null,
+      score,
+      total_questions: totalQ,
+      correct_answers: correctCount,
+      wrong_answers: totalQ - correctCount - unansweredCount,
+      unanswered_questions: unansweredCount,
+      percentage,
+      passed,
+    })
+    .eq("id", attemptId)
+    .select()
+    .single();
+
+  if (ue) return { data: null, error: getErrorMessage(ue), success: false };
+  return { data: updated as ExamAttempt, error: null, success: true };
+}

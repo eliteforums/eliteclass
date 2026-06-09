@@ -46,6 +46,26 @@ import { generateBrowserFingerprint, getOrCreateDeviceId } from "../../utils/exa
 import { useProctoring } from "../../hooks/useProctoring";
 import { ProctoringOverlay } from "./ProctoringOverlay";
 
+/** Seeded Fisher-Yates shuffle. Given the same seed (attempt ID) produces the same order every time, so a student who resumes the exam sees questions in the same order. */
+function seededShuffle<T>(array: T[], seed: string): T[] {
+  const arr = [...array];
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0;
+  }
+  const rand = () => {
+    hash ^= hash << 13;
+    hash ^= hash >> 17;
+    hash ^= hash << 5;
+    return (hash >>> 0) / 0xffffffff;
+  };
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 interface ExamPlayerProps {
   examId: string;
 }
@@ -68,6 +88,8 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
   // Refs for debounced answer saving
   const pendingAnswersRef = useRef<Set<string>>(new Set());
   const answersRef = useRef<Record<string, string>>({});
+  const [perQTimeLeft, setPerQTimeLeft] = useState<number | null>(null);
+  const perQTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   // ── Validation Hooks ────────────────────────────────────────────────────────
 
@@ -150,6 +172,15 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
         {
           const newAttempt = attemptRes.data;
           setAttempt(newAttempt);
+
+          // Apply deterministic per-student shuffle AFTER we have the attempt ID as seed
+          if (examRes.data.randomize_questions && examRes.data.questions?.length) {
+            examRes.data = {
+              ...examRes.data,
+              questions: seededShuffle(examRes.data.questions, newAttempt.id),
+            };
+            setExam(examRes.data);
+          }
 
           // Check if attempt is locked or already submitted
           if (newAttempt.is_locked) {
@@ -235,14 +266,6 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     return () => clearInterval(activityInterval);
   }, [attempt?.id]);
 
-  // ── Timer Expiry Handler ─────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (isExpired && attempt) {
-      handleSubmit(true);
-    }
-  }, [isExpired]);
-
   // ── Debounced Batch Answer Save ────────────────────────────────────────────
   // Answers are saved to localStorage immediately on every click.
   // Every 3 seconds, pending dirty answers are batch-flushed to Supabase.
@@ -269,6 +292,49 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
     return () => clearInterval(flushInterval);
   }, [attempt?.id]);
+
+  // ── Per-Question Timer ────────────────────────────────────────────────────
+  // When time_per_question_seconds is set on the exam, each question gets its
+  // own countdown that resets every time the student navigates to a new question.
+
+  useEffect(() => {
+    const tpq = exam?.time_per_question_seconds;
+    if (!tpq || !attempt || attempt.status !== "in_progress") {
+      setPerQTimeLeft(null);
+      return;
+    }
+
+    if (perQTimerRef.current) clearInterval(perQTimerRef.current);
+    setPerQTimeLeft(tpq);
+
+    perQTimerRef.current = setInterval(() => {
+      setPerQTimeLeft((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (perQTimerRef.current) clearInterval(perQTimerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (perQTimerRef.current) clearInterval(perQTimerRef.current);
+    };
+  }, [currentQuestionIdx, exam?.time_per_question_seconds, attempt?.status]);
+
+  // Auto-advance (or auto-submit on last question) when per-question timer reaches 0
+  useEffect(() => {
+    if (perQTimeLeft !== 0 || !exam?.time_per_question_seconds) return;
+    const totalQ = exam?.questions?.length ?? 0;
+    if (currentQuestionIdx < totalQ - 1) {
+      setCurrentQuestionIdx((prev) => prev + 1);
+    } else {
+      // Last question — auto-submit the whole exam
+      handleSubmit(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perQTimeLeft]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -470,16 +536,34 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             <h1 className="font-bold text-lg truncate max-w-[200px] sm:max-w-md">{exam.title}</h1>
           </div>
 
-          <div
-            className={cn(
-              "flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-lg font-bold border",
-              timeLeft < 300
-                ? "bg-red-50 text-red-600 border-red-200 animate-pulse"
-                : "bg-primary/5 text-primary border-primary/20",
+          <div className="flex items-center gap-3">
+            {/* Main exam timer */}
+            <div
+              className={cn(
+                "flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-lg font-bold border",
+                timeLeft < 300
+                  ? "bg-red-50 text-red-600 border-red-200 animate-pulse"
+                  : "bg-primary/5 text-primary border-primary/20",
+              )}
+            >
+              <Clock className="h-5 w-5" />
+              {formatTime(timeLeft)}
+            </div>
+            {/* Per-question timer (only visible when exam has time_per_question_seconds) */}
+            {exam?.time_per_question_seconds && perQTimeLeft !== null && (
+              <div
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full font-mono text-sm font-bold border",
+                  perQTimeLeft <= 10
+                    ? "bg-orange-50 text-orange-600 border-orange-200 animate-pulse"
+                    : "bg-muted text-muted-foreground border-border",
+                )}
+                title="Time for this question"
+              >
+                <Clock className="h-3.5 w-3.5" />
+                {perQTimeLeft}s
+              </div>
             )}
-          >
-            <Clock className="h-5 w-5" />
-            {formatTime(timeLeft)}
           </div>
 
           <Button
