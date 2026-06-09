@@ -12,14 +12,21 @@ import { addQuestion, deleteQuestion } from "../../services/exam.service";
 import { cn } from "@/lib/utils";
 import { PdfMcqGenerator } from "./PdfMcqGenerator";
 import { CSVMcqUploader } from "./CSVMcqUploader";
+import { CodingQuestionForm } from "./CodingQuestionForm";
 
 interface QuestionManagerProps {
   examId: string;
   questions: ExamQuestion[];
   onRefresh: () => void;
+  examType?: "mcq" | "coding";
 }
 
-export function QuestionManager({ examId, questions, onRefresh }: QuestionManagerProps) {
+export function QuestionManager({
+  examId,
+  questions,
+  onRefresh,
+  examType = "mcq",
+}: QuestionManagerProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [showPdfGenerator, setShowPdfGenerator] = useState(false);
   const [showCSVUploader, setShowCSVUploader] = useState(false);
@@ -27,6 +34,7 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
     question_text: "",
     marks: 1,
     explanation: "",
+    code_snippet: "",
     options: [
       { option_text: "", is_correct: false, position: 0 },
       { option_text: "", is_correct: false, position: 1 },
@@ -40,11 +48,11 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
       toast.error("Question text is required");
       return;
     }
-    if (!newQuestion.options.some(o => o.is_correct)) {
+    if (!newQuestion.options.some((o) => o.is_correct)) {
       toast.error("Please select at least one correct option");
       return;
     }
-    if (newQuestion.options.some(o => !o.option_text)) {
+    if (newQuestion.options.some((o) => !o.option_text)) {
       toast.error("All options must have text");
       return;
     }
@@ -62,6 +70,7 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
         question_text: "",
         marks: 1,
         explanation: "",
+        code_snippet: "",
         options: [
           { option_text: "", is_correct: false, position: 0 },
           { option_text: "", is_correct: false, position: 1 },
@@ -108,7 +117,8 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
                 {showCSVUploader ? "Hide CSV Upload" : "Upload CSV"}
               </Button>
               <Button onClick={() => setIsAdding(true)} size="sm">
-                <Plus className="mr-2 h-4 w-4" /> Add Question
+                <Plus className="mr-2 h-4 w-4" />
+                {examType === "coding" ? "Add Coding Problem" : "Add Question"}
               </Button>
             </>
           )}
@@ -135,7 +145,19 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
         />
       )}
 
-      {isAdding && (
+      {isAdding && examType === "coding" && (
+        <CodingQuestionForm
+          examId={examId}
+          position={questions.length}
+          onSuccess={() => {
+            setIsAdding(false);
+            onRefresh();
+          }}
+          onCancel={() => setIsAdding(false)}
+        />
+      )}
+
+      {isAdding && examType !== "coding" && (
         <Card className="border-primary/50 shadow-md">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">New MCQ Question</CardTitle>
@@ -149,14 +171,16 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
                 onChange={(e) => setNewQuestion({ ...newQuestion, question_text: e.target.value })}
               />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Marks</Label>
                 <Input
                   type="number"
                   value={newQuestion.marks}
-                  onChange={(e) => setNewQuestion({ ...newQuestion, marks: Number(e.target.value) })}
+                  onChange={(e) =>
+                    setNewQuestion({ ...newQuestion, marks: Number(e.target.value) })
+                  }
                 />
               </div>
             </div>
@@ -170,7 +194,7 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
                     onCheckedChange={(checked) => {
                       const newOptions = [...newQuestion.options];
                       if (checked) {
-                        newOptions.forEach((o, i) => o.is_correct = i === idx);
+                        newOptions.forEach((o, i) => (o.is_correct = i === idx));
                       } else {
                         newOptions[idx].is_correct = false;
                       }
@@ -199,6 +223,19 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
               />
             </div>
 
+            <div className="space-y-2">
+              <Label>Code Snippet (Optional)</Label>
+              <Textarea
+                placeholder="Paste code snippet here (Python, JavaScript, Java, etc.)..."
+                value={newQuestion.code_snippet}
+                onChange={(e) => setNewQuestion({ ...newQuestion, code_snippet: e.target.value })}
+                className="font-mono text-xs"
+              />
+              <p className="text-xs text-muted-foreground">
+                Use this for programming-related questions
+              </p>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="ghost" size="sm" onClick={() => setIsAdding(false)}>
                 Cancel
@@ -217,30 +254,49 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
             <CardContent className="pt-6">
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1 space-y-4">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold">
                       {qIdx + 1}
                     </span>
+                    {(q as any).question_type === "coding" && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300">
+                        CODING
+                      </span>
+                    )}
                     <p className="font-medium text-foreground">{q.question_text}</p>
                     <span className="text-xs font-medium text-muted-foreground ml-auto bg-muted px-2 py-0.5 rounded">
                       {q.marks} Marks
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ml-8">
-                    {q.options?.map((opt) => (
-                      <div
-                        key={opt.id}
-                        className={cn(
-                          "flex items-center gap-2 p-2 rounded-md border text-sm",
-                          opt.is_correct ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30" : "border-border"
-                        )}
-                      >
-                        {opt.is_correct ? <Check className="h-4 w-4" /> : <div className="h-4 w-4 border rounded-full" />}
-                        {opt.option_text}
-                      </div>
-                    ))}
-                  </div>
+                  {(q as any).question_type !== "coding" && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 ml-8">
+                      {q.options?.map((opt) => (
+                        <div
+                          key={opt.id}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-md border text-sm",
+                            opt.is_correct
+                              ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30"
+                              : "border-border",
+                          )}
+                        >
+                          {opt.is_correct ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <div className="h-4 w-4 border rounded-full" />
+                          )}
+                          {opt.option_text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {(q as any).question_type === "coding" && (q as any).problem_statement && (
+                    <div className="ml-8 p-3 rounded-md bg-muted/30 text-xs text-muted-foreground line-clamp-2">
+                      {(q as any).problem_statement}
+                    </div>
+                  )}
 
                   {q.explanation && (
                     <div className="ml-8 p-3 rounded-md bg-muted/50 text-xs italic text-muted-foreground">
@@ -248,7 +304,12 @@ export function QuestionManager({ examId, questions, onRefresh }: QuestionManage
                     </div>
                   )}
                 </div>
-                <Button variant="ghost" size="icon" className="text-destructive h-8 w-8" onClick={() => handleDeleteQuestion(q.id)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="text-destructive h-8 w-8"
+                  onClick={() => handleDeleteQuestion(q.id)}
+                >
                   <Trash className="h-4 w-4" />
                 </Button>
               </div>

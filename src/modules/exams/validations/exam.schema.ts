@@ -15,6 +15,7 @@ export const examSchema = z.object({
   negative_marking: z.boolean().default(false),
   negative_marks_per_question: z.coerce.number().default(0),
   randomize_questions: z.boolean().default(false),
+  exam_type: z.enum(["mcq", "coding"]).default("mcq"),
   enable_tab_detection: z.boolean().default(false),
   enable_camera_mic: z.boolean().default(false),
   enable_deterrent_ui: z.boolean().default(false),
@@ -28,11 +29,15 @@ export const questionSchema = z.object({
   marks: z.coerce.number().min(0.5, "Marks must be at least 0.5"),
   explanation: z.string().optional(),
   position: z.number().default(0),
-  options: z.array(z.object({
-    option_text: z.string().min(1, "Option text is required"),
-    is_correct: z.boolean().default(false),
-    position: z.number(),
-  })).min(2, "At least 2 options are required"),
+  options: z
+    .array(
+      z.object({
+        option_text: z.string().min(1, "Option text is required"),
+        is_correct: z.boolean().default(false),
+        position: z.number(),
+      }),
+    )
+    .min(2, "At least 2 options are required"),
 });
 
 export type QuestionFormData = z.infer<typeof questionSchema>;
