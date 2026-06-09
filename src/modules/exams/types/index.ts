@@ -1,7 +1,12 @@
 import { Student } from "@/types";
 
-export type ExamStatus = 'draft' | 'published' | 'archived';
-export type ExamAttemptStatus = 'in_progress' | 'submitted' | 'graded' | 'auto_submitted' | 'expired';
+export type ExamStatus = "draft" | "published" | "archived";
+export type ExamAttemptStatus =
+  | "in_progress"
+  | "submitted"
+  | "graded"
+  | "auto_submitted"
+  | "expired";
 
 export interface Exam {
   id: string;
@@ -34,6 +39,7 @@ export interface ExamQuestion {
   exam_id: string;
   question_text: string;
   image_url: string | null;
+  code_snippet: string | null;
   marks: number;
   explanation: string | null;
   position: number;
@@ -77,6 +83,7 @@ export interface ExamAttempt {
   unanswered_questions: number;
   percentage: number;
   passed: boolean;
+  reattempt_granted?: boolean;
   violation_count: number;
   created_at: string;
   exam?: Exam;
@@ -123,6 +130,7 @@ export interface CreateQuestionPayload {
   exam_id: string;
   question_text: string;
   image_url?: string;
+  code_snippet?: string;
   marks: number;
   explanation?: string;
   position: number;

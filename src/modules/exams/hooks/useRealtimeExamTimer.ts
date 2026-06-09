@@ -5,8 +5,8 @@
  * Auto-submits when timer expires
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { useEffect, useState, useCallback, useRef } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface UseRealtimeExamTimerProps {
   examId: string;
@@ -46,13 +46,13 @@ export function useRealtimeExamTimer({
     try {
       // Use database NOW() function via RPC or direct query
       const { data, error } = await supabase
-        .from('exam_attempts')
-        .select('started_at')
-        .eq('id', attemptId)
+        .from("exam_attempts")
+        .select("started_at")
+        .eq("id", attemptId)
         .single();
 
       if (error || !data) {
-        if (onSyncError) onSyncError('Failed to sync server time');
+        if (onSyncError) onSyncError("Failed to sync server time");
         return false;
       }
 
@@ -72,7 +72,7 @@ export function useRealtimeExamTimer({
 
       return true;
     } catch (error) {
-      if (onSyncError) onSyncError('Time sync error: ' + String(error));
+      if (onSyncError) onSyncError("Time sync error: " + String(error));
       return false;
     }
   }, [attemptId, durationMs, onSyncError]);
@@ -83,7 +83,7 @@ export function useRealtimeExamTimer({
 
     const resyncInterval = setInterval(() => {
       syncWithServerTime();
-    }, 30000); // Resync every 30 seconds
+    }, 90000); // Resync every 90 seconds to reduce DB load
 
     return () => clearInterval(resyncInterval);
   }, [enabled, syncWithServerTime]);
@@ -114,7 +114,7 @@ export function useRealtimeExamTimer({
       if (remaining <= 0) {
         setIsExpired(true);
         if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
-        
+
         if (onTimeExpired) {
           onTimeExpired();
         }
@@ -148,8 +148,8 @@ export async function getServerTime(): Promise<number> {
   try {
     // Get current server time from database
     const { data, error } = await supabase
-      .from('exam_attempts')
-      .select('created_at')
+      .from("exam_attempts")
+      .select("created_at")
       .limit(1)
       .single();
 
@@ -170,7 +170,7 @@ export async function getServerTime(): Promise<number> {
 export function formatTimeDisplay(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 /**

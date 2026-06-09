@@ -3,12 +3,12 @@
  * Validates attempt status and enforces single attempt policy
  */
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from "react";
 import {
   validateSingleAttempt,
   validateExamTiming,
   getActiveAttempt,
-} from '../services/exam.service';
+} from "../services/exam.service";
 
 interface UseAttemptValidationProps {
   examId: string;
@@ -25,17 +25,13 @@ interface AttemptValidationState {
   isLoading: boolean;
 }
 
-export function useAttemptValidation({
-  examId,
-  userId,
-  enabled,
-}: UseAttemptValidationProps) {
+export function useAttemptValidation({ examId, userId, enabled }: UseAttemptValidationProps) {
   const [validationState, setValidationState] = useState<AttemptValidationState>({
     isValid: false,
     canAttempt: false,
     isLocked: false,
-    timingMessage: '',
-    reason: '',
+    timingMessage: "",
+    reason: "",
     isLoading: true,
   });
 
@@ -52,8 +48,8 @@ export function useAttemptValidation({
           isValid: false,
           canAttempt: false,
           isLocked: false,
-          timingMessage: '',
-          reason: timingRes.error || 'Failed to validate timing',
+          timingMessage: "",
+          reason: timingRes.error || "Failed to validate timing",
           isLoading: false,
         });
         return;
@@ -81,8 +77,8 @@ export function useAttemptValidation({
           isValid: false,
           canAttempt: false,
           isLocked: false,
-          timingMessage: '',
-          reason: attemptRes.error || 'Failed to validate attempt',
+          timingMessage: "",
+          reason: attemptRes.error || "Failed to validate attempt",
           isLoading: false,
         });
         return;
@@ -95,7 +91,7 @@ export function useAttemptValidation({
           isValid: false,
           canAttempt: false,
           isLocked: false,
-          timingMessage: '',
+          timingMessage: "",
           reason: attemptReason,
           isLoading: false,
         });
@@ -109,8 +105,8 @@ export function useAttemptValidation({
           isValid: false,
           canAttempt: false,
           isLocked: false,
-          timingMessage: '',
-          reason: 'Failed to check active attempt',
+          timingMessage: "",
+          reason: "Failed to check active attempt",
           isLoading: false,
         });
         return;
@@ -122,8 +118,8 @@ export function useAttemptValidation({
         isValid: true,
         canAttempt: true,
         isLocked: activeAttempt ? activeAttempt.isLocked : false,
-        timingMessage: '',
-        reason: 'OK',
+        timingMessage: "",
+        reason: "OK",
         isLoading: false,
       });
     } catch (error) {
@@ -131,23 +127,17 @@ export function useAttemptValidation({
         isValid: false,
         canAttempt: false,
         isLocked: false,
-        timingMessage: '',
-        reason: 'Validation error: ' + String(error),
+        timingMessage: "",
+        reason: "Validation error: " + String(error),
         isLoading: false,
       });
     }
   }, [examId, userId, enabled]);
 
-  // Validate on mount and periodically
+  // Validate once on mount
   useEffect(() => {
     if (!enabled) return;
-
     validate();
-
-    // Re-validate every 30 seconds
-    const interval = setInterval(validate, 30000);
-
-    return () => clearInterval(interval);
   }, [enabled, validate]);
 
   return {
