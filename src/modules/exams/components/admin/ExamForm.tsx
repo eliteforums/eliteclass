@@ -69,6 +69,7 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       enable_tab_detection: false,
       enable_camera_mic: false,
       enable_deterrent_ui: false,
+      enable_screen_capture: false,
       ...initialData,
       start_time: formatDateForInput(initialData?.start_time),
       end_time: formatDateForInput(initialData?.end_time),

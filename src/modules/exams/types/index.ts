@@ -80,6 +80,7 @@ export interface Exam {
   enable_tab_detection: boolean;
   enable_camera_mic: boolean;
   enable_deterrent_ui: boolean;
+  enable_screen_capture?: boolean;
   created_at: string;
   updated_at: string;
   questions?: ExamQuestion[];
@@ -184,6 +185,27 @@ export interface CreateExamPayload {
   negative_marking?: boolean;
   negative_marks_per_question?: number;
   randomize_questions?: boolean;
+  enable_screen_capture?: boolean;
+}
+
+export interface ProctoringCapture {
+  id: string;
+  attempt_id: string;
+  student_id: string;
+  institute_id: string;
+  exam_id: string;
+  capture_type: "webcam" | "screenshot";
+  storage_path: string;
+  capture_index: number;
+  captured_at: string;
+  metadata?: {
+    question_idx?: number;
+    time_remaining?: number;
+  };
+  // Populated when fetched by admin (signed URL, 1-hour TTL):
+  signed_url?: string | null;
+  student_name?: string;
+  admission_no?: string;
 }
 
 export interface CreateQuestionPayload {

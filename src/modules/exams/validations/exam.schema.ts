@@ -19,6 +19,7 @@ export const examSchema = z.object({
   enable_tab_detection: z.boolean().default(false),
   enable_camera_mic: z.boolean().default(false),
   enable_deterrent_ui: z.boolean().default(false),
+  enable_screen_capture: z.boolean().default(false),
 });
 
 export type ExamFormData = z.infer<typeof examSchema>;
