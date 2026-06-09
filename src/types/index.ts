@@ -265,8 +265,6 @@ export interface UpdateStaffPayload {
   assigned_course_ids?: string[];
 }
 
-
-
 // ── Auth ───────────────────────────────────────────────────────────────────
 
 /** Shape of global authentication state (used in Zustand + context). */
@@ -1764,11 +1762,7 @@ export interface InstituteAnalyticsBundle {
 
 // ── Teacher students (staff portal) ───────────────────────────────────────────
 
-export type TeacherStudentPerformanceStatus =
-  | "excellent"
-  | "good"
-  | "needs_attention"
-  | "unknown";
+export type TeacherStudentPerformanceStatus = "excellent" | "good" | "needs_attention" | "unknown";
 
 export interface TeacherStudentListItem {
   id: string;
@@ -1808,6 +1802,7 @@ export interface TeacherStudentsListResponse {
 
 export type AssignmentStatus = "draft" | "published" | "archived";
 export type SubmissionStatus = "pending" | "submitted" | "late" | "reviewed" | "graded";
+export type SubmissionType = "any" | "file_upload" | "text" | "url_link";
 
 export interface Assignment {
   id: string;
@@ -1820,9 +1815,10 @@ export interface Assignment {
   due_date: string | null;
   status: AssignmentStatus;
   allow_late: boolean;
+  submission_type?: SubmissionType;
   created_at: string;
   updated_at: string;
-  
+
   // Joined/Computed
   resources?: AssignmentResource[];
   assignees_count?: number;
@@ -1856,7 +1852,7 @@ export interface AssignmentSubmission {
   feedback: string | null;
   graded_at: string | null;
   graded_by: string | null;
-  
+
   // Joined
   assignment?: Assignment;
   student?: Student;
@@ -1883,6 +1879,7 @@ export interface CreateAssignmentPayload {
   due_date?: string | null;
   status?: AssignmentStatus;
   allow_late?: boolean;
+  submission_type?: SubmissionType;
 }
 
 /**
@@ -1899,7 +1896,7 @@ export interface AssignmentResourceSchema {
 
 // ── Batch Join Requests ──────────────────────────────────────────────────────
 
-export type BatchJoinRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+export type BatchJoinRequestStatus = "pending" | "approved" | "rejected" | "cancelled";
 
 export interface BatchJoinRequest {
   id: string;
@@ -1914,7 +1911,7 @@ export interface BatchJoinRequest {
   updated_at: string;
   student?: any;
   batch?: any;
-  reviewer?: Pick<User, 'id' | 'name' | 'role'>;
+  reviewer?: Pick<User, "id" | "name" | "role">;
 }
 
 export interface CreateBatchJoinRequestPayload {
@@ -1937,7 +1934,6 @@ export interface AvailableBatch {
   has_pending_request: boolean;
   is_already_member: boolean;
 }
-
 
 // ── Certificates ─────────────────────────────────────────────────────────────
 

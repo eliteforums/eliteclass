@@ -1,10 +1,7 @@
 import { z } from "zod";
 
 export const assignmentSchema = z.object({
-  title: z
-    .string()
-    .min(3, "Title must be at least 3 characters")
-    .max(200, "Title is too long"),
+  title: z.string().min(3, "Title must be at least 3 characters").max(200, "Title is too long"),
   description: z.string().optional(),
   instructions: z.string().optional(),
   total_marks: z.coerce
@@ -14,6 +11,7 @@ export const assignmentSchema = z.object({
     .default(100),
   due_date: z.string().optional().nullable(),
   allow_late: z.boolean().default(true),
+  submission_type: z.enum(["any", "file_upload", "text", "url_link"]).default("any"),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
 });
 
@@ -26,9 +24,7 @@ export const submissionSchema = z.object({
 export type SubmissionSchema = z.infer<typeof submissionSchema>;
 
 export const gradingSchema = z.object({
-  grade: z.coerce
-    .number()
-    .min(0, "Grade cannot be negative"),
+  grade: z.coerce.number().min(0, "Grade cannot be negative"),
   feedback: z.string().min(1, "Please provide feedback"),
 });
 
