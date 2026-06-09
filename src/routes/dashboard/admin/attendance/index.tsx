@@ -26,6 +26,7 @@ import {
   Plus,
   Calendar,
   Lock,
+  Unlock,
   Users,
   AlertCircle,
   ChevronDown,
@@ -47,6 +48,7 @@ import {
   getSessionWithRecords,
   bulkMarkAttendance,
   lockAttendanceSession,
+  unlockAttendanceSession,
   getAttendanceSummary,
 } from "@/services/attendance.service";
 import { CreateSessionModal } from "@/modules/attendance/components/CreateSessionModal";
@@ -120,11 +122,21 @@ interface SessionCardProps {
   session: AttendanceSession;
   isExpanded: boolean;
   isLocking: boolean;
+  isUnlocking: boolean;
   onExpand: () => void;
   onLock: () => void;
+  onUnlock: () => void;
 }
 
-function SessionCard({ session, isExpanded, isLocking, onExpand, onLock }: SessionCardProps) {
+function SessionCard({
+  session,
+  isExpanded,
+  isLocking,
+  isUnlocking,
+  onExpand,
+  onLock,
+  onUnlock,
+}: SessionCardProps) {
   return (
     <div
       className={`rounded-xl border bg-card transition-shadow hover:shadow-sm ${
@@ -160,7 +172,25 @@ function SessionCard({ session, isExpanded, isLocking, onExpand, onLock }: Sessi
         {/* Right — action buttons */}
         <div className="flex shrink-0 items-center gap-2">
           {/* Lock / Unlock button */}
-          {!session.is_locked && (
+          {session.is_locked ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onUnlock();
+              }}
+              disabled={isUnlocking}
+              title="Unlock session to allow editing again"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 disabled:opacity-50 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900"
+            >
+              {isUnlocking ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Unlock className="h-3.5 w-3.5" aria-hidden="true" />
+              )}
+              Unlock
+            </button>
+          ) : (
             <button
               type="button"
               onClick={(e) => {
@@ -168,7 +198,7 @@ function SessionCard({ session, isExpanded, isLocking, onExpand, onLock }: Sessi
                 onLock();
               }}
               disabled={isLocking}
-              title="Lock session (no more edits after locking)"
+              title="Lock session — no edits allowed after locking"
               className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-amber-400 hover:bg-amber-50 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-50 dark:hover:bg-amber-950 dark:hover:text-amber-400"
             >
               {isLocking ? (
@@ -236,6 +266,7 @@ function AttendancePage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   /** Tracks which session is currently being locked (to show a spinner). */
   const [lockingSessionId, setLockingSessionId] = useState<string | null>(null);
+  const [unlockingSessionId, setUnlockingSessionId] = useState<string | null>(null);
 
   // ── Reports tab state ────────────────────────────────────────────────────
   const [reportBatchId, setReportBatchId] = useState("");
@@ -278,7 +309,9 @@ function AttendancePage() {
           id: a.batch!.id,
           name: a.batch!.name,
           course_name: a.batch!.course_name,
-          label: a.batch!.course_name ? `${a.batch!.name} • ${a.batch!.course_name}` : a.batch!.name,
+          label: a.batch!.course_name
+            ? `${a.batch!.name} • ${a.batch!.course_name}`
+            : a.batch!.name,
         }));
 
       const deduped = Array.from(new Map(scopedBatches.map((row) => [row.id, row])).values());
@@ -346,47 +379,50 @@ function AttendancePage() {
   }, [isStaffUser, batches, sessionBatchFilter, reportBatchId]);
 
   // ── Fetch sessions whenever date or batch filter changes ─────────────────
-  const fetchSessions = useCallback(async (abortSignal?: AbortSignal) => {
-    if (!instituteId) return;
+  const fetchSessions = useCallback(
+    async (abortSignal?: AbortSignal) => {
+      if (!instituteId) return;
 
-    setIsLoadingSessions(true);
-    setSessionsError(null);
+      setIsLoadingSessions(true);
+      setSessionsError(null);
 
-    try {
-      const result = await getAttendanceSessions(
-        instituteId,
-        {
-          dateFrom: selectedDate,
-          dateTo: selectedDate,
-          batchId: sessionBatchFilter || undefined,
-        },
-        abortSignal,
-      );
+      try {
+        const result = await getAttendanceSessions(
+          instituteId,
+          {
+            dateFrom: selectedDate,
+            dateTo: selectedDate,
+            batchId: sessionBatchFilter || undefined,
+          },
+          abortSignal,
+        );
 
-      if (result.success && result.data) {
-        if (isStaffUser) {
-          const allowed = new Set(staffAssignedBatchIds);
-          const scoped = result.data.filter((session) => {
-            const batchId = resolveSessionBatchId(session);
-            return Boolean(batchId && allowed.has(batchId));
-          });
-          setSessions(scoped);
-        } else {
-          setSessions(result.data);
+        if (result.success && result.data) {
+          if (isStaffUser) {
+            const allowed = new Set(staffAssignedBatchIds);
+            const scoped = result.data.filter((session) => {
+              const batchId = resolveSessionBatchId(session);
+              return Boolean(batchId && allowed.has(batchId));
+            });
+            setSessions(scoped);
+          } else {
+            setSessions(result.data);
+          }
+        } else if (result.error !== "Aborted") {
+          setSessionsError(result.error ?? "Failed to load sessions.");
         }
-      } else if (result.error !== "Aborted") {
-        setSessionsError(result.error ?? "Failed to load sessions.");
+      } catch (err) {
+        if (!isAbortError(err)) {
+          const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+          console.error("[fetchSessions] exception:", err);
+          setSessionsError(msg);
+        }
+      } finally {
+        setIsLoadingSessions(false);
       }
-    } catch (err) {
-      if (!isAbortError(err)) {
-        const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
-        console.error("[fetchSessions] exception:", err);
-        setSessionsError(msg);
-      }
-    } finally {
-      setIsLoadingSessions(false);
-    }
-  }, [instituteId, selectedDate, sessionBatchFilter, isStaffUser, staffAssignedBatchIds]);
+    },
+    [instituteId, selectedDate, sessionBatchFilter, isStaffUser, staffAssignedBatchIds],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -506,13 +542,39 @@ function AttendancePage() {
     if (result.success && result.data) {
       // Update the session in local state without a full refetch.
       setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, is_locked: true } : s)));
+      toast.success("Session locked. No further edits allowed.");
+    } else if (result.error) {
+      toast.error(result.error);
     }
 
     setLockingSessionId(null);
   }
 
+  async function handleUnlockSession(sessionId: string) {
+    setUnlockingSessionId(sessionId);
+
+    const result = await unlockAttendanceSession(sessionId);
+
+    if (result.success && result.data) {
+      // Update the session in local state without a full refetch.
+      setSessions((prev) => prev.map((s) => (s.id === sessionId ? { ...s, is_locked: false } : s)));
+      toast.success("Session unlocked. You can now edit attendance.");
+    } else if (result.error) {
+      toast.error(result.error ?? "Failed to unlock session.");
+    }
+
+    setUnlockingSessionId(null);
+  }
+
   async function handleSaveAttendance(records: BulkAttendanceEntry[]): Promise<boolean> {
     if (!expandedSessionId || !user?.id) return false;
+
+    // Guard: refuse to save if session is locked
+    const currentSession = sessions.find((s) => s.id === expandedSessionId);
+    if (currentSession?.is_locked) {
+      toast.error("This session is locked. Unlock it first before making changes.");
+      return false;
+    }
 
     setIsSaving(true);
     setSaveError(null);
@@ -606,7 +668,7 @@ function AttendancePage() {
         <div className="mt-4">
           <GeoAttendancePrompt
             batchId={sessionBatchFilter}
-            batchName={batches.find(b => b.id === sessionBatchFilter)?.name ?? "Selected Batch"}
+            batchName={batches.find((b) => b.id === sessionBatchFilter)?.name ?? "Selected Batch"}
           />
         </div>
       )}
@@ -736,8 +798,10 @@ function AttendancePage() {
                       session={session}
                       isExpanded={isExpanded}
                       isLocking={lockingSessionId === session.id}
+                      isUnlocking={unlockingSessionId === session.id}
                       onExpand={() => handleExpandSession(session.id)}
                       onLock={() => handleLockSession(session.id)}
+                      onUnlock={() => handleUnlockSession(session.id)}
                     />
 
                     {/* Inline AttendanceMarkingTable */}

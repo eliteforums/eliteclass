@@ -23,7 +23,7 @@ const SUPABASE_NOT_CONFIGURED = {
 function logAssignmentSupabaseError(
   context: string,
   error: unknown,
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown>,
 ) {
   const err = error as Record<string, unknown> | null;
   console.error(`[assignments] ${context}`, {
@@ -48,7 +48,7 @@ function assignmentUploadErrorMessage(error: unknown): string {
 const ASSIGNMENT_RESOURCE_SIGNED_URL_TTL = 3600;
 
 async function resolveStudentResourceDownloadUrls(
-  resources: AssignmentResource[] | null | undefined
+  resources: AssignmentResource[] | null | undefined,
 ): Promise<AssignmentResource[]> {
   if (!resources?.length || !supabase) return resources ?? [];
 
@@ -72,7 +72,7 @@ async function resolveStudentResourceDownloadUrls(
       }
 
       return { ...resource, file_url: data.signedUrl };
-    })
+    }),
   );
 
   return resolved;
@@ -87,7 +87,7 @@ export async function uploadAssignmentFile(
   instituteId: string,
   bucket: "assignment-resources" | "assignment-submissions",
   file: File,
-  path: string
+  path: string,
 ): Promise<ApiResponse<{ url: string; path: string }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -101,7 +101,9 @@ export async function uploadAssignmentFile(
     return { data: null, error: assignmentUploadErrorMessage(error), success: false };
   }
 
-  const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(data.path);
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(bucket).getPublicUrl(data.path);
 
   return {
     data: { url: publicUrl, path: data.path },
@@ -117,7 +119,7 @@ export async function uploadAssignmentFile(
  */
 export async function listAssignments(
   instituteId: string,
-  filters: { status?: string; page?: number; pageSize?: number } = {}
+  filters: { status?: string; page?: number; pageSize?: number } = {},
 ): Promise<ApiResponse<PaginatedResponse<Assignment>>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -127,7 +129,7 @@ export async function listAssignments(
   const to = from + pageSize - 1;
 
   // We need to fetch assignments with counts for assignees and submissions
-  // This is best done with a view or separate counts if RLS allows, 
+  // This is best done with a view or separate counts if RLS allows,
   // but for now we'll fetch basic data and handle counts in a more efficient way if needed.
   let query = supabase
     .from("assignments")
@@ -143,7 +145,7 @@ export async function listAssignments(
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const formattedData = (data as any[]).map(item => ({
+  const formattedData = (data as any[]).map((item) => ({
     ...item,
     assignees_count: item.assignment_assignees?.[0]?.count ?? 0,
     submissions_count: item.assignment_submissions?.[0]?.count ?? 0,
@@ -167,17 +169,17 @@ export async function listAssignments(
 /**
  * Get assignment details with resources
  */
-export async function getAssignmentDetail(
-  assignmentId: string
-): Promise<ApiResponse<Assignment>> {
+export async function getAssignmentDetail(assignmentId: string): Promise<ApiResponse<Assignment>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("assignments")
-    .select(`
+    .select(
+      `
       *,
       resources:assignment_resources(*)
-    `)
+    `,
+    )
     .eq("id", assignmentId)
     .single();
 
@@ -192,7 +194,13 @@ export async function createAssignment(
   instituteId: string,
   createdBy: string,
   payload: CreateAssignmentPayload,
-  resources?: { file_name: string; file_url: string; storage_path: string; file_type?: string; file_size?: number }[]
+  resources?: {
+    file_name: string;
+    file_url: string;
+    storage_path: string;
+    file_type?: string;
+    file_size?: number;
+  }[],
 ): Promise<ApiResponse<Assignment>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -206,10 +214,11 @@ export async function createAssignment(
     .select()
     .single();
 
-  if (assignmentError) return { data: null, error: getErrorMessage(assignmentError), success: false };
+  if (assignmentError)
+    return { data: null, error: getErrorMessage(assignmentError), success: false };
 
   if (resources && resources.length > 0) {
-    const resourcePayload = resources.map(res => ({
+    const resourcePayload = resources.map((res) => ({
       ...res,
       assignment_id: assignment.id,
       institute_id: instituteId,
@@ -241,7 +250,7 @@ export async function createAssignment(
  */
 export async function updateAssignment(
   assignmentId: string,
-  payload: Partial<CreateAssignmentPayload>
+  payload: Partial<CreateAssignmentPayload>,
 ): Promise<ApiResponse<Assignment>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -259,16 +268,11 @@ export async function updateAssignment(
 /**
  * Delete an assignment
  */
-export async function deleteAssignment(
-  assignmentId: string
-): Promise<ApiResponse<void>> {
+export async function deleteAssignment(assignmentId: string): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // RLS and ON DELETE CASCADE will handle resources and assignees
-  const { error } = await supabase
-    .from("assignments")
-    .delete()
-    .eq("id", assignmentId);
+  const { error } = await supabase.from("assignments").delete().eq("id", assignmentId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: undefined, error: null, success: true };
@@ -278,17 +282,19 @@ export async function deleteAssignment(
  * List submissions for an assignment
  */
 export async function listSubmissions(
-  assignmentId: string
+  assignmentId: string,
 ): Promise<ApiResponse<AssignmentSubmission[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("assignment_submissions")
-    .select(`
+    .select(
+      `
       *,
-      student:students(id, user:users(id, name, avatar_url, email)),
+      student:students(id, admission_no, user:users(id, name, avatar_url, email)),
       files:submission_files(*)
-    `)
+    `,
+    )
     .eq("assignment_id", assignmentId)
     .order("submitted_at", { ascending: false });
 
@@ -302,7 +308,7 @@ export async function listSubmissions(
 export async function assignToStudents(
   assignmentId: string,
   instituteId: string,
-  studentIds: string[]
+  studentIds: string[],
 ): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -324,9 +330,7 @@ export async function assignToStudents(
 /**
  * Get assignees for an assignment
  */
-export async function getAssignees(
-  assignmentId: string
-): Promise<ApiResponse<string[]>> {
+export async function getAssignees(assignmentId: string): Promise<ApiResponse<string[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
@@ -335,7 +339,7 @@ export async function getAssignees(
     .eq("assignment_id", assignmentId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
-  return { data: data.map(d => d.student_id), error: null, success: true };
+  return { data: data.map((d) => d.student_id), error: null, success: true };
 }
 
 /**
@@ -345,7 +349,7 @@ export async function gradeSubmission(
   submissionId: string,
   grade: number,
   feedback: string,
-  gradedBy: string
+  gradedBy: string,
 ): Promise<ApiResponse<AssignmentSubmission>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -371,9 +375,7 @@ export async function gradeSubmission(
 /**
  * List all assignments assigned to the current student
  */
-export async function getStudentAssignments(
-  userId: string
-): Promise<ApiResponse<Assignment[]>> {
+export async function getStudentAssignments(userId: string): Promise<ApiResponse<Assignment[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // First, get the student record for this user
@@ -389,18 +391,20 @@ export async function getStudentAssignments(
 
   const { data, error } = await supabase
     .from("assignments")
-    .select(`
+    .select(
+      `
       *,
       assignment_assignees!inner(student_id),
       submissions:assignment_submissions(id, status, grade, submitted_at, feedback)
-    `)
+    `,
+    )
     .eq("assignment_assignees.student_id", student.id)
     .eq("status", "published")
     .order("due_date", { ascending: true });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
-  
-  const formattedData = (data as any[]).map(item => ({
+
+  const formattedData = (data as any[]).map((item) => ({
     ...item,
     submission: item.submissions?.[0] ?? null,
   }));
@@ -413,7 +417,7 @@ export async function getStudentAssignments(
  */
 export async function getStudentAssignmentDetail(
   assignmentId: string,
-  userId: string
+  userId: string,
 ): Promise<ApiResponse<Assignment & { submission: AssignmentSubmission | null }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -430,25 +434,28 @@ export async function getStudentAssignmentDetail(
 
   const { data: assignment, error: assignmentError } = await supabase
     .from("assignments")
-    .select(`
+    .select(
+      `
       *,
       resources:assignment_resources(*)
-    `)
+    `,
+    )
     .eq("id", assignmentId)
     .single();
 
-  if (assignmentError) return { data: null, error: getErrorMessage(assignmentError), success: false };
+  if (assignmentError)
+    return { data: null, error: getErrorMessage(assignmentError), success: false };
 
-  const resources = await resolveStudentResourceDownloadUrls(
-    (assignment as Assignment).resources
-  );
+  const resources = await resolveStudentResourceDownloadUrls((assignment as Assignment).resources);
 
   const { data: submission } = await supabase
     .from("assignment_submissions")
-    .select(`
+    .select(
+      `
       *,
       files:submission_files(*)
-    `)
+    `,
+    )
     .eq("assignment_id", assignmentId)
     .eq("student_id", student.id)
     .maybeSingle();
@@ -472,7 +479,13 @@ export async function submitAssignment(
   userId: string,
   instituteId: string,
   content?: string,
-  files?: { file_name: string; file_url: string; storage_path: string; file_type?: string; file_size?: number }[]
+  files?: {
+    file_name: string;
+    file_url: string;
+    storage_path: string;
+    file_type?: string;
+    file_size?: number;
+  }[],
 ): Promise<ApiResponse<AssignmentSubmission>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -495,30 +508,32 @@ export async function submitAssignment(
 
   const { data: submission, error: submissionError } = await supabase
     .from("assignment_submissions")
-    .upsert({
-      assignment_id: assignmentId,
-      student_id: student.id,
-      institute_id: instituteId,
-      content,
-      status: isLate ? "late" : "submitted",
-      submitted_at: new Date().toISOString(),
-      is_late: isLate,
-    }, { onConflict: "assignment_id,student_id" })
+    .upsert(
+      {
+        assignment_id: assignmentId,
+        student_id: student.id,
+        institute_id: instituteId,
+        content,
+        status: isLate ? "late" : "submitted",
+        submitted_at: new Date().toISOString(),
+        is_late: isLate,
+      },
+      { onConflict: "assignment_id,student_id" },
+    )
     .select()
     .single();
 
-  if (submissionError) return { data: null, error: getErrorMessage(submissionError), success: false };
+  if (submissionError)
+    return { data: null, error: getErrorMessage(submissionError), success: false };
 
   if (files && files.length > 0) {
-    const filePayload = files.map(f => ({
+    const filePayload = files.map((f) => ({
       ...f,
       submission_id: submission.id,
       institute_id: instituteId,
     }));
 
-    const { error: fileError } = await supabase
-      .from("submission_files")
-      .insert(filePayload);
+    const { error: fileError } = await supabase.from("submission_files").insert(filePayload);
 
     if (fileError) {
       logAssignmentSupabaseError("submission_files insert failed", fileError, {

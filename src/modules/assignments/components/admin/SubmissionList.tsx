@@ -1,41 +1,32 @@
-import { 
-  FileText, 
-  Search, 
-  Filter, 
-  ArrowLeft, 
-  CheckCircle2, 
-  Clock, 
-  AlertCircle, 
+import {
+  FileText,
+  Search,
+  Filter,
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
   MoreVertical,
   ChevronRight,
   Download,
   User,
   GraduationCap,
-  Calendar
+  Calendar,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
-import { 
-  useSubmissions, 
-  useAssignmentDetail 
-} from "@/modules/assignments/hooks/useAssignments";
-import { 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  CardTitle, 
-  CardDescription 
-} from "@/components/ui/card";
+import { useSubmissions, useAssignmentDetail } from "@/modules/assignments/hooks/useAssignments";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { SubmissionReviewModal } from "./SubmissionReviewModal";
@@ -49,17 +40,21 @@ interface SubmissionListProps {
 export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSubmission, setSelectedSubmission] = useState<AssignmentSubmission | null>(null);
-  
-  const { data: assignmentData, isLoading: isLoadingAssignment } = useAssignmentDetail(assignmentId);
+
+  const { data: assignmentData, isLoading: isLoadingAssignment } =
+    useAssignmentDetail(assignmentId);
   const { data: submissionsData, isLoading: isLoadingSubmissions } = useSubmissions(assignmentId);
 
   const assignment = assignmentData?.data;
   const submissions = submissionsData?.data ?? [];
 
-  const filteredSubmissions = submissions.filter((s) =>
-    s.student?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.student?.admission_no?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSubmissions = searchTerm.trim()
+    ? submissions.filter(
+        (s) =>
+          s.student?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          s.student?.admission_no?.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    : submissions;
 
   if (isLoadingAssignment || isLoadingSubmissions) {
     return (
@@ -84,7 +79,10 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
           <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
-              Due {assignment.due_date ? format(new Date(assignment.due_date), "MMM d, yyyy") : "No due date"}
+              Due{" "}
+              {assignment.due_date
+                ? format(new Date(assignment.due_date), "MMM d, yyyy")
+                : "No due date"}
             </div>
             <div className="flex items-center gap-1.5">
               <GraduationCap className="h-3.5 w-3.5" />
@@ -95,28 +93,28 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatsCard 
-          label="Total Assigned" 
-          value={assignment.assignees_count ?? 0} 
-          icon={User} 
+        <StatsCard
+          label="Total Assigned"
+          value={assignment.assignees_count ?? 0}
+          icon={User}
           className="bg-primary/5 text-primary border-primary/10"
         />
-        <StatsCard 
-          label="Submitted" 
-          value={submissions.length} 
-          icon={CheckCircle2} 
+        <StatsCard
+          label="Submitted"
+          value={submissions.length}
+          icon={CheckCircle2}
           className="bg-green-500/5 text-green-600 border-green-500/10"
         />
-        <StatsCard 
-          label="Pending" 
-          value={(assignment.assignees_count ?? 0) - submissions.length} 
-          icon={Clock} 
+        <StatsCard
+          label="Pending"
+          value={(assignment.assignees_count ?? 0) - submissions.length}
+          icon={Clock}
           className="bg-orange-500/5 text-orange-600 border-orange-500/10"
         />
-        <StatsCard 
-          label="Graded" 
-          value={submissions.filter(s => s.status === 'graded').length} 
-          icon={FileText} 
+        <StatsCard
+          label="Graded"
+          value={submissions.filter((s) => s.status === "graded").length}
+          icon={FileText}
           className="bg-blue-500/5 text-blue-600 border-blue-500/10"
         />
       </div>
@@ -158,23 +156,33 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
                             {submission.student?.user?.name?.[0] || <User className="h-4 w-4" />}
                           </div>
                           <div>
-                            <p className="font-semibold text-sm">{submission.student?.user?.name}</p>
-                            <p className="text-[10px] text-muted-foreground uppercase">{submission.student?.admission_no}</p>
+                            <p className="font-semibold text-sm">
+                              {submission.student?.user?.name}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground uppercase">
+                              {submission.student?.admission_no}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-center text-xs">
                         {format(new Date(submission.submitted_at), "MMM d, yyyy")}
-                        <p className="text-[10px] text-muted-foreground">{format(new Date(submission.submitted_at), "h:mm a")}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {format(new Date(submission.submitted_at), "h:mm a")}
+                        </p>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={`
                             text-[10px] font-bold uppercase tracking-wider
-                            ${submission.status === 'graded' ? 'bg-green-50 text-green-600 border-green-200' : 
-                              submission.is_late ? 'bg-destructive/5 text-destructive border-destructive/20' : 
-                              'bg-blue-50 text-blue-600 border-blue-200'}
+                            ${
+                              submission.status === "graded"
+                                ? "bg-green-50 text-green-600 border-green-200"
+                                : submission.is_late
+                                  ? "bg-destructive/5 text-destructive border-destructive/20"
+                                  : "bg-blue-50 text-blue-600 border-blue-200"
+                            }
                           `}
                         >
                           {submission.status} {submission.is_late && "(LATE)"}
@@ -182,15 +190,17 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
                       </TableCell>
                       <TableCell className="text-center">
                         {submission.grade !== null ? (
-                          <span className="font-bold text-sm">{submission.grade} / {assignment.total_marks}</span>
+                          <span className="font-bold text-sm">
+                            {submission.grade} / {assignment.total_marks}
+                          </span>
                         ) : (
                           <span className="text-xs text-muted-foreground italic">Ungraded</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="h-8 font-bold text-xs border-primary/20 hover:bg-primary/5 hover:text-primary hover:border-primary/50"
                           onClick={() => setSelectedSubmission(submission)}
                         >
@@ -207,7 +217,11 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
               <EmptyState
                 icon={<FileText />}
                 title="No submissions found"
-                description={searchTerm ? "Try adjusting your search filters." : "No students have submitted this assignment yet."}
+                description={
+                  searchTerm
+                    ? "Try adjusting your search filters."
+                    : "No students have submitted this assignment yet."
+                }
               />
             </div>
           )}
