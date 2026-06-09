@@ -1,15 +1,9 @@
 import React from "react";
 import type { UseFormReturn } from "react-hook-form";
-import {
-  FormControl,
-  FormDescription,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
+import { FormControl, FormDescription, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, Camera, Shield } from "lucide-react";
+import { Eye, Camera, Shield, Monitor } from "lucide-react";
 import type { ExamFormData } from "../../validations/exam.schema";
 
 interface ProctoringSettingsCardProps {
@@ -74,6 +68,27 @@ export function ProctoringSettingsCard({ form }: ProctoringSettingsCardProps) {
                   <FormLabel>Proctoring Overlay</FormLabel>
                   <FormDescription>
                     Show a visual "recording active" indicator to students
+                  </FormDescription>
+                </div>
+              </div>
+              <FormControl>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </FormControl>
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="enable_screen_capture"
+          render={({ field }) => (
+            <FormItem className="flex items-center justify-between rounded-lg border p-3">
+              <div className="flex items-center gap-3">
+                <Monitor className="h-4 w-4 text-muted-foreground" />
+                <div className="space-y-0.5">
+                  <FormLabel>Screen Capture</FormLabel>
+                  <FormDescription>
+                    Capture 1–2 screenshots of the student's screen during the exam (requires
+                    student consent)
                   </FormDescription>
                 </div>
               </div>

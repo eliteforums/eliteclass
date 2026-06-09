@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Users, AlertTriangle, RotateCcw } from "lucide-react";
+import { Users, AlertTriangle, RotateCcw, Camera } from "lucide-react";
+import { ProctoringCapturesGallery } from "./ProctoringCapturesGallery";
 import type { ExamViolation } from "../../types";
 import { grantReattempt, revokeReattempt } from "../../services/exam.service";
 import { toast } from "sonner";
@@ -24,6 +25,8 @@ export function AttemptList({ examId }: AttemptListProps) {
   const [violations, setViolations] = useState<ExamViolation[]>([]);
   const [violationsLoading, setViolationsLoading] = useState(false);
   const [reattemptLoadingId, setReattemptLoadingId] = useState<string | null>(null);
+  const [capturesAttemptId, setCapturesAttemptId] = useState<string | null>(null);
+  const [capturesStudentName, setCapturesStudentName] = useState<string>("");
 
   useEffect(() => {
     const fetch = async () => {
@@ -194,6 +197,34 @@ export function AttemptList({ examId }: AttemptListProps) {
         );
       },
     },
+    {
+      key: "captures",
+      header: "Captures",
+      render: (attempt: any) => {
+        const isTerminal = ["submitted", "auto_submitted", "graded"].includes(attempt.status);
+        if (!isTerminal) return <span className="text-muted-foreground text-xs">—</span>;
+        const isOpen = capturesAttemptId === attempt.id;
+        return (
+          <Button
+            size="sm"
+            variant={isOpen ? "default" : "ghost"}
+            className="h-7 gap-1 text-xs"
+            onClick={() => {
+              if (isOpen) {
+                setCapturesAttemptId(null);
+                setCapturesStudentName("");
+              } else {
+                setCapturesAttemptId(attempt.id);
+                setCapturesStudentName(attempt.student?.user?.name ?? "");
+              }
+            }}
+          >
+            <Camera className="h-3.5 w-3.5" />
+            {isOpen ? "Hide" : "Captures"}
+          </Button>
+        );
+      },
+    },
   ];
 
   return (
@@ -211,6 +242,34 @@ export function AttemptList({ examId }: AttemptListProps) {
           />
         }
       />
+      {capturesAttemptId && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Camera className="h-4 w-4 text-muted-foreground" />
+              Proctoring Captures
+              {capturesStudentName && (
+                <span className="text-muted-foreground font-normal">— {capturesStudentName}</span>
+              )}
+            </h4>
+            <button
+              type="button"
+              onClick={() => {
+                setCapturesAttemptId(null);
+                setCapturesStudentName("");
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Close
+            </button>
+          </div>
+          <ProctoringCapturesGallery
+            attemptId={capturesAttemptId}
+            studentName={capturesStudentName}
+          />
+        </div>
+      )}
+
       {expandedAttemptId && (
         <div className="rounded-lg border bg-card p-4">
           <div className="mb-3 flex items-center justify-between">

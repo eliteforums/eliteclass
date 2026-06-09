@@ -10,6 +10,7 @@ import type {
   ExamViolation,
   CreateExamPayload,
   CreateQuestionPayload,
+  ProctoringCapture,
 } from "../types";
 
 const SUPABASE_NOT_CONFIGURED = {
@@ -1470,4 +1471,124 @@ export async function submitCodingExamAttempt(
 
   if (ue) return { data: null, error: getErrorMessage(ue), success: false };
   return { data: updated as ExamAttempt, error: null, success: true };
+}
+
+// ── Proctoring Capture Services ─────────────────────────────────────────────
+
+const EXAM_PROCTORING_BUCKET = "exam-proctoring";
+
+/**
+ * Upload a webcam/screenshot blob to Supabase Storage and record the capture.
+ * Called from useProctoringCapture — fires in background, never blocks the exam UI.
+ */
+export async function uploadProctoringCapture(
+  attemptId: string,
+  studentId: string,
+  examId: string,
+  instituteId: string,
+  captureType: "webcam" | "screenshot",
+  imageBlob: Blob,
+  captureIndex: number,
+  metadata?: { question_idx?: number; time_remaining?: number },
+): Promise<{ success: boolean; error?: string }> {
+  if (!supabase) return { success: false, error: "Supabase not configured" };
+
+  const timestamp = Date.now();
+  const storagePath = `${instituteId}/${examId}/${attemptId}/${captureType}_${captureIndex}_${timestamp}.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(EXAM_PROCTORING_BUCKET)
+    .upload(storagePath, imageBlob, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (uploadError) return { success: false, error: getErrorMessage(uploadError) };
+
+  const { error: insertError } = await supabase.from("exam_proctoring_captures").insert({
+    attempt_id: attemptId,
+    student_id: studentId,
+    institute_id: instituteId,
+    exam_id: examId,
+    capture_type: captureType,
+    storage_path: storagePath,
+    capture_index: captureIndex,
+    captured_at: new Date().toISOString(),
+    metadata: metadata ?? null,
+  });
+
+  if (insertError) return { success: false, error: getErrorMessage(insertError) };
+  return { success: true };
+}
+
+/**
+ * Fetch all proctoring captures for a specific attempt with signed URLs (admin use).
+ */
+export async function getAttemptCaptures(
+  attemptId: string,
+): Promise<ApiResponse<ProctoringCapture[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_proctoring_captures")
+    .select("*")
+    .eq("attempt_id", attemptId)
+    .order("captured_at", { ascending: true });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+
+  // Generate short-lived signed URLs so images are viewable by admin only
+  const client = supabase;
+  const withUrls = await Promise.all(
+    (data ?? []).map(async (row: any) => {
+      const { data: urlData } = await client.storage
+        .from(EXAM_PROCTORING_BUCKET)
+        .createSignedUrl(row.storage_path, 3600);
+      return { ...row, signed_url: urlData?.signedUrl ?? null };
+    }),
+  );
+
+  return { data: withUrls as ProctoringCapture[], error: null, success: true };
+}
+
+/**
+ * Fetch all captures for an entire exam, with student info attached (admin exam overview).
+ */
+export async function getExamCaptures(examId: string): Promise<ApiResponse<ProctoringCapture[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_proctoring_captures")
+    .select(
+      `
+      *,
+      attempt:exam_attempts(
+        student:students(
+          admission_no,
+          user:users(name)
+        )
+      )
+    `,
+    )
+    .eq("exam_id", examId)
+    .order("captured_at", { ascending: true });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+
+  const client = supabase;
+  const withUrls = await Promise.all(
+    (data ?? []).map(async (row: any) => {
+      const { data: urlData } = await client.storage
+        .from(EXAM_PROCTORING_BUCKET)
+        .createSignedUrl(row.storage_path, 3600);
+      return {
+        ...row,
+        signed_url: urlData?.signedUrl ?? null,
+        student_name: row.attempt?.student?.user?.name ?? undefined,
+        admission_no: row.attempt?.student?.admission_no ?? undefined,
+      };
+    }),
+  );
+
+  return { data: withUrls as ProctoringCapture[], error: null, success: true };
 }

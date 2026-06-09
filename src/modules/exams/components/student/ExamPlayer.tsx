@@ -9,6 +9,7 @@ import {
   Info,
   Loader2,
   RefreshCw,
+  Monitor,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -44,6 +45,7 @@ import { useRealtimeExamTimer } from "../../hooks/useRealtimeExamTimer";
 import { useAttemptValidation } from "../../hooks/useAttemptValidation";
 import { generateBrowserFingerprint, getOrCreateDeviceId } from "../../utils/exam-security";
 import { useProctoring } from "../../hooks/useProctoring";
+import { useProctoringCapture } from "../../hooks/useProctoringCapture";
 import { ProctoringOverlay } from "./ProctoringOverlay";
 
 /** Seeded Fisher-Yates shuffle. Given the same seed (attempt ID) produces the same order every time, so a student who resumes the exam sees questions in the same order. */
@@ -83,6 +85,10 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
   const [securityEnabled, setSecurityEnabled] = useState(false);
   const [isSubmitDialogOpen, setIsSubmitDialogOpen] = useState(false);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [screenShareStatus, setScreenShareStatus] = useState<
+    "not_required" | "pending" | "granted" | "denied"
+  >("not_required");
   const sessionTokenRef = useRef<string>("");
   const submissionLockRef = useRef(false);
   // Refs for debounced answer saving
@@ -111,6 +117,22 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     enableCameraMic,
     enableDeterrentUi,
     attemptId: attempt?.id || "",
+  });
+
+  // ── Proctoring Capture Hook ───────────────────────────────────────────────
+  // Schedules silent webcam photos (×2) and optional screen screenshots (×1)
+  // at randomised intervals. Uploads in background — never blocks the exam.
+  useProctoringCapture({
+    enabled: !!attempt && attempt.status === "in_progress" && securityEnabled,
+    attemptId: attempt?.id ?? "",
+    studentId: attempt?.student_id ?? "",
+    examId,
+    instituteId: institute?.id ?? "",
+    cameraStream: proctoring.cameraStream,
+    screenStream,
+    durationMs: (exam?.duration_mins || 60) * 60 * 1000,
+    currentQuestionIdx,
+    timeRemaining: timeLeft,
   });
 
   const { timeRemaining, isExpired } = useRealtimeExamTimer({
@@ -199,6 +221,11 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
           // Proctoring only after the attempt row exists in exam_attempts.
           setSecurityEnabled(true);
+
+          // Trigger screen-share prompt if the exam requires it
+          if (examRes.data.enable_screen_capture) {
+            setScreenShareStatus("pending");
+          }
 
           // 4. Create secure exam session
           const browserFingerprint = generateBrowserFingerprint();
@@ -400,6 +427,8 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
       // Stop proctoring streams before submission
       proctoring.stopStreams();
+      screenStream?.getTracks().forEach((t) => t.stop());
+      setScreenStream(null);
 
       // Lock attempt before submission
       await lockExamAttempt(attempt.id);
@@ -433,6 +462,26 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
       executeSubmit(true);
     } else {
       setIsSubmitDialogOpen(true);
+    }
+  };
+
+  const handleRequestScreenShare = async () => {
+    try {
+      const stream = await (navigator.mediaDevices as any).getDisplayMedia({
+        video: { displaySurface: "browser" },
+        audio: false,
+      });
+      setScreenStream(stream);
+      setScreenShareStatus("granted");
+      // If user manually stops sharing via the browser's "Stop sharing" button
+      stream.getVideoTracks()[0]?.addEventListener("ended", () => {
+        setScreenStream(null);
+        // Don't re-prompt — capture whatever we have from this point
+      });
+    } catch {
+      // User dismissed the browser picker
+      setScreenShareStatus("denied");
+      toast.warning("Screen monitoring was skipped. This exam session has been flagged.");
     }
   };
 
@@ -528,6 +577,40 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             </div>
           </div>
         )}
+
+        {/* Screen-Share Consent Overlay */}
+        {exam?.enable_screen_capture &&
+          screenShareStatus === "pending" &&
+          !proctoring.showBlockingOverlay && (
+            <div className="fixed inset-0 z-[9998] bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 text-center">
+              <div className="max-w-md space-y-6">
+                <div className="mx-auto size-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Monitor className="size-8 text-primary" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold">Screen Monitoring</h2>
+                  <p className="text-muted-foreground">
+                    This exam uses screen monitoring. Your screen will be captured once during the
+                    exam as part of the proctoring process. Please click{" "}
+                    <strong>Share Screen</strong> and select your full screen or browser window.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <Button size="lg" className="w-full" onClick={handleRequestScreenShare}>
+                    <Monitor className="mr-2 h-4 w-4" />
+                    Share Screen &amp; Continue
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setScreenShareStatus("denied")}
+                    className="text-sm text-muted-foreground hover:text-foreground underline"
+                  >
+                    Skip — I understand this will be flagged
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
         {/* Header */}
         <header className="bg-card border-b border-border h-16 px-6 flex items-center justify-between sticky top-0 z-10">
