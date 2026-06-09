@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { Clock, FileText, Calendar, ArrowRight, CheckCircle2, AlertCircle } from "lucide-react";
+import {
+  Clock,
+  FileText,
+  Calendar,
+  ArrowRight,
+  CheckCircle2,
+  AlertCircle,
+  RotateCcw,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +38,27 @@ export function StudentExamDashboard() {
   }, [user?.id]);
 
   const getExamStatus = (exam: Exam, attempt?: ExamAttempt | null) => {
-    if (attempt?.status === "submitted" || attempt?.status === "graded" || attempt?.status === "auto_submitted" || attempt?.status === "expired") return "completed";
+    // Check reattempt before marking as completed
+    if (
+      attempt?.reattempt_granted &&
+      (attempt.status === "submitted" ||
+        attempt.status === "graded" ||
+        attempt.status === "auto_submitted" ||
+        attempt.status === "expired")
+    ) {
+      return "reattempt_available";
+    }
+    if (
+      attempt?.status === "submitted" ||
+      attempt?.status === "graded" ||
+      attempt?.status === "auto_submitted" ||
+      attempt?.status === "expired"
+    )
+      return "completed";
     if (attempt?.status === "in_progress") return "active";
-    
+
     const now = new Date();
-    
+
     // If start_time is set and is in the future, it's upcoming
     if (exam.start_time) {
       const startTime = new Date(exam.start_time);
@@ -51,7 +75,7 @@ export function StudentExamDashboard() {
         return "missed";
       }
     }
-    
+
     // Default to active if published and not restricted by time
     return "active";
   };
@@ -67,13 +91,29 @@ export function StudentExamDashboard() {
         {exams.map((item) => {
           const status = getExamStatus(item, item.attempt);
           const isStarted = !!item.attempt;
-          
+
           return (
-            <Card key={item.id} className="overflow-hidden border-border/50 hover:shadow-md transition-shadow">
+            <Card
+              key={item.id}
+              className="overflow-hidden border-border/50 hover:shadow-md transition-shadow"
+            >
               <CardHeader className="pb-3 bg-muted/20">
                 <div className="flex justify-between items-start mb-2">
-                  <Badge variant={status === "active" ? "default" : status === "completed" ? "secondary" : "outline"}>
-                    {status.toUpperCase()}
+                  <Badge
+                    variant={
+                      status === "active"
+                        ? "default"
+                        : status === "completed"
+                          ? "secondary"
+                          : status === "reattempt_available"
+                            ? "default"
+                            : "outline"
+                    }
+                    className={
+                      status === "reattempt_available" ? "bg-orange-500 hover:bg-orange-600" : ""
+                    }
+                  >
+                    {status === "reattempt_available" ? "REATTEMPT" : status.toUpperCase()}
                   </Badge>
                   {item.attempt && <ExamStatusBadge status={item.attempt.status} size="sm" />}
                 </div>
@@ -94,29 +134,44 @@ export function StudentExamDashboard() {
                     <span>Deadline: {format(new Date(item.end_time), "MMM d, h:mm a")}</span>
                   </div>
                 )}
-                
+
                 {(item.attempt?.status === "submitted" || item.attempt?.status === "graded") && (
-                   <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/10">
-                      <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-medium text-muted-foreground">Score</span>
-                        <span className="text-sm font-bold text-primary">{item.attempt.score} / {item.total_marks}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-medium text-muted-foreground">Result</span>
-                        <span className={cn("text-xs font-bold", item.attempt.passed ? "text-green-600" : "text-red-600")}>
-                          {item.attempt.passed ? "PASSED" : "FAILED"}
-                        </span>
-                      </div>
-                   </div>
+                  <div className="mt-4 p-3 rounded-lg bg-primary/5 border border-primary/10">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-xs font-medium text-muted-foreground">Score</span>
+                      <span className="text-sm font-bold text-primary">
+                        {item.attempt.score} / {item.total_marks}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs font-medium text-muted-foreground">Result</span>
+                      <span
+                        className={cn(
+                          "text-xs font-bold",
+                          item.attempt.passed ? "text-green-600" : "text-red-600",
+                        )}
+                      >
+                        {item.attempt.passed ? "PASSED" : "FAILED"}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </CardContent>
               <CardFooter className="bg-muted/10 border-t border-border/50">
                 {status === "active" ? (
-                  <Button 
-                    className="w-full" 
+                  <Button
+                    className="w-full"
                     onClick={() => navigate({ to: `/dashboard/student/exams/${item.id}/attempt` })}
                   >
-                    {isStarted ? "Resume Test" : "Start Test"} <ArrowRight className="ml-2 h-4 w-4" />
+                    {isStarted ? "Resume Test" : "Start Test"}{" "}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                ) : status === "reattempt_available" ? (
+                  <Button
+                    className="w-full bg-orange-500 hover:bg-orange-600"
+                    onClick={() => navigate({ to: `/dashboard/student/exams/${item.id}/attempt` })}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4" /> Reattempt Test
                   </Button>
                 ) : status === "completed" ? (
                   <Button variant="outline" className="w-full" disabled>
@@ -124,7 +179,8 @@ export function StudentExamDashboard() {
                   </Button>
                 ) : (
                   <Button variant="ghost" className="w-full" disabled>
-                    <AlertCircle className="mr-2 h-4 w-4" /> {status === "upcoming" ? "Not Started" : "Missed"}
+                    <AlertCircle className="mr-2 h-4 w-4" />{" "}
+                    {status === "upcoming" ? "Not Started" : "Missed"}
                   </Button>
                 )}
               </CardFooter>
@@ -137,7 +193,9 @@ export function StudentExamDashboard() {
         <div className="bg-card rounded-xl border border-dashed p-20 text-center">
           <FileText className="h-12 w-12 mx-auto text-muted-foreground opacity-20 mb-4" />
           <h3 className="text-lg font-medium text-muted-foreground">No tests assigned</h3>
-          <p className="text-sm text-muted-foreground/60">When your teachers assign MCQ tests, they will appear here.</p>
+          <p className="text-sm text-muted-foreground/60">
+            When your teachers assign MCQ tests, they will appear here.
+          </p>
         </div>
       )}
     </div>

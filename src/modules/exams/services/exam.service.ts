@@ -25,7 +25,7 @@ const SUPABASE_NOT_CONFIGURED = {
  */
 export async function listExams(
   instituteId: string,
-  filters: { status?: string; page?: number; pageSize?: number } = {}
+  filters: { status?: string; page?: number; pageSize?: number } = {},
 ): Promise<ApiResponse<PaginatedResponse<Exam>>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -48,7 +48,7 @@ export async function listExams(
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const formattedData = (data as any[]).map(item => ({
+  const formattedData = (data as any[]).map((item) => ({
     ...item,
     assignments_count: item.exam_assignments?.[0]?.count ?? 0,
     attempts_count: item.exam_attempts?.[0]?.count ?? 0,
@@ -72,23 +72,23 @@ export async function listExams(
 /**
  * Get exam details with questions and options
  */
-export async function getExamDetail(
-  examId: string
-): Promise<ApiResponse<Exam>> {
+export async function getExamDetail(examId: string): Promise<ApiResponse<Exam>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("exams")
-    .select(`
+    .select(
+      `
       *,
       questions:exam_questions(
         *,
         options:exam_options(*)
       )
-    `)
+    `,
+    )
     .eq("id", examId)
-    .order('position', { foreignTable: 'exam_questions', ascending: true })
-    .order('position', { foreignTable: 'exam_questions.exam_options', ascending: true })
+    .order("position", { foreignTable: "exam_questions", ascending: true })
+    .order("position", { foreignTable: "exam_questions.exam_options", ascending: true })
     .single();
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
@@ -98,15 +98,10 @@ export async function getExamDetail(
 /**
  * Delete an exam
  */
-export async function deleteExam(
-  examId: string
-): Promise<ApiResponse<void>> {
+export async function deleteExam(examId: string): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase
-    .from("exams")
-    .delete()
-    .eq("id", examId);
+  const { error } = await supabase.from("exams").delete().eq("id", examId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: undefined, error: null, success: true };
@@ -115,15 +110,10 @@ export async function deleteExam(
 /**
  * Delete a question
  */
-export async function deleteQuestion(
-  questionId: string
-): Promise<ApiResponse<void>> {
+export async function deleteQuestion(questionId: string): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase
-    .from("exam_questions")
-    .delete()
-    .eq("id", questionId);
+  const { error } = await supabase.from("exam_questions").delete().eq("id", questionId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: undefined, error: null, success: true };
@@ -132,16 +122,10 @@ export async function deleteQuestion(
 /**
  * Create a new exam
  */
-export async function createExam(
-  payload: CreateExamPayload
-): Promise<ApiResponse<Exam>> {
+export async function createExam(payload: CreateExamPayload): Promise<ApiResponse<Exam>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
-    .from("exams")
-    .insert(payload)
-    .select()
-    .single();
+  const { data, error } = await supabase.from("exams").insert(payload).select().single();
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: data as Exam, error: null, success: true };
@@ -152,7 +136,7 @@ export async function createExam(
  */
 export async function updateExam(
   examId: string,
-  payload: Partial<CreateExamPayload>
+  payload: Partial<CreateExamPayload>,
 ): Promise<ApiResponse<Exam>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -171,7 +155,7 @@ export async function updateExam(
  * Add a question with options to an exam
  */
 export async function addQuestion(
-  payload: CreateQuestionPayload
+  payload: CreateQuestionPayload,
 ): Promise<ApiResponse<ExamQuestion>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -185,14 +169,12 @@ export async function addQuestion(
 
   if (qError) return { data: null, error: getErrorMessage(qError), success: false };
 
-  const optionsPayload = options.map(opt => ({
+  const optionsPayload = options.map((opt) => ({
     ...opt,
     question_id: question.id,
   }));
 
-  const { error: oError } = await supabase
-    .from("exam_options")
-    .insert(optionsPayload);
+  const { error: oError } = await supabase.from("exam_options").insert(optionsPayload);
 
   if (oError) {
     // Cleanup question if options fail
@@ -209,7 +191,7 @@ export async function addQuestion(
 export async function assignExamToStudents(
   examId: string,
   instituteId: string,
-  studentIds: string[]
+  studentIds: string[],
 ): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -231,9 +213,7 @@ export async function assignExamToStudents(
 /**
  * Get assignees for an exam
  */
-export async function getAssignees(
-  examId: string
-): Promise<ApiResponse<string[]>> {
+export async function getAssignees(examId: string): Promise<ApiResponse<string[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
@@ -242,7 +222,7 @@ export async function getAssignees(
     .eq("exam_id", examId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
-  return { data: data.map(d => d.student_id), error: null, success: true };
+  return { data: data.map((d) => d.student_id), error: null, success: true };
 }
 
 // ── Student Services ────────────────────────────────────────────────────────
@@ -251,7 +231,7 @@ export async function getAssignees(
  * List all exams assigned to the current student
  */
 export async function listStudentExams(
-  userId: string
+  userId: string,
 ): Promise<ApiResponse<(Exam & { attempt?: ExamAttempt | null })[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -265,21 +245,30 @@ export async function listStudentExams(
 
   const { data, error } = await supabase
     .from("exams")
-    .select(`
+    .select(
+      `
       *,
       exam_assignments!inner(student_id),
-      attempts:exam_attempts(id, status, score, percentage, passed, submitted_at, violation_count, last_violation_at, auto_submit_reason)
-    `)
+      attempts:exam_attempts(id, status, score, percentage, passed, submitted_at, violation_count, last_violation_at, auto_submit_reason, reattempt_granted, started_at)
+    `,
+    )
     .eq("exam_assignments.student_id", student.id)
     .eq("status", "published")
     .order("start_time", { ascending: true });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const formattedData = (data as any[]).map(item => ({
-    ...item,
-    attempt: item.attempts?.[0] ?? null,
-  }));
+  const formattedData = (data as any[]).map((item) => {
+    // Sort attempts by started_at descending to get the most recent
+    const sortedAttempts = (item.attempts ?? []).sort(
+      (a: { started_at?: string | null }, b: { started_at?: string | null }) =>
+        new Date(b.started_at ?? 0).getTime() - new Date(a.started_at ?? 0).getTime(),
+    );
+    return {
+      ...item,
+      attempt: sortedAttempts[0] ?? null,
+    };
+  });
 
   return { data: formattedData, error: null, success: true };
 }
@@ -290,7 +279,7 @@ export async function listStudentExams(
 export async function startExamAttempt(
   examId: string,
   userId: string,
-  instituteId: string
+  instituteId: string,
 ): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -305,7 +294,7 @@ export async function startExamAttempt(
   // Check if attempt already exists (latest row if duplicates exist)
   const { data: existingAttempts, error: existingError } = await supabase
     .from("exam_attempts")
-    .select("*")
+    .select("*, reattempt_granted")
     .eq("exam_id", examId)
     .eq("student_id", student.id)
     .order("created_at", { ascending: false })
@@ -318,10 +307,23 @@ export async function startExamAttempt(
   const existingAttempt = existingAttempts?.[0];
 
   if (existingAttempt) {
-    if (existingAttempt.status === 'submitted' || existingAttempt.status === 'graded') {
-      return { data: null, error: "Test already submitted. Multiple attempts are not allowed.", success: false };
+    // If reattempt was granted, fall through to create a new attempt row
+    if ((existingAttempt as ExamAttempt).reattempt_granted) {
+      // Fall through to create new attempt below
+    } else if (
+      existingAttempt.status === "submitted" ||
+      existingAttempt.status === "graded" ||
+      existingAttempt.status === "auto_submitted"
+    ) {
+      return {
+        data: null,
+        error: "Test already submitted. Multiple attempts are not allowed.",
+        success: false,
+      };
+    } else {
+      // Resume in-progress or expired attempt
+      return { data: existingAttempt as ExamAttempt, error: null, success: true };
     }
-    return { data: existingAttempt as ExamAttempt, error: null, success: true };
   }
 
   // Create new attempt
@@ -347,18 +349,21 @@ export async function startExamAttempt(
 export async function saveExamAnswer(
   attemptId: string,
   questionId: string,
-  selectedOptionId: string
+  selectedOptionId: string,
 ): Promise<ApiResponse<ExamAnswer>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("exam_answers")
-    .upsert({
-      attempt_id: attemptId,
-      question_id: questionId,
-      selected_option_id: selectedOptionId,
-      answered_at: new Date().toISOString(),
-    }, { onConflict: "attempt_id,question_id" })
+    .upsert(
+      {
+        attempt_id: attemptId,
+        question_id: questionId,
+        selected_option_id: selectedOptionId,
+        answered_at: new Date().toISOString(),
+      },
+      { onConflict: "attempt_id,question_id" },
+    )
     .select()
     .single();
 
@@ -367,12 +372,39 @@ export async function saveExamAnswer(
 }
 
 /**
+ * Batch upsert answers — used by the debounced save system to reduce DB calls
+ */
+export async function batchSaveAnswers(
+  attemptId: string,
+  answers: Record<string, string>,
+): Promise<ApiResponse<null>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const entries = Object.entries(answers).filter(([, v]) => Boolean(v));
+  if (entries.length === 0) return { data: null, error: null, success: true };
+
+  const payload = entries.map(([questionId, optionId]) => ({
+    attempt_id: attemptId,
+    question_id: questionId,
+    selected_option_id: optionId,
+    answered_at: new Date().toISOString(),
+  }));
+
+  const { error } = await supabase
+    .from("exam_answers")
+    .upsert(payload, { onConflict: "attempt_id,question_id" });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: null, error: null, success: true };
+}
+
+/**
  * Record a violation (tab switch, etc.)
  */
 export async function recordViolation(
   attemptId: string,
   violationType: string,
-  violationData?: any
+  violationData?: any,
 ): Promise<ApiResponse<ExamViolation>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -389,7 +421,7 @@ export async function recordViolation(
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
   // Update violation count in attempt
-  await supabase.rpc('increment_violation_count', { attempt_id: attemptId });
+  await supabase.rpc("increment_violation_count", { attempt_id: attemptId });
 
   return { data: data as ExamViolation, error: null, success: true };
 }
@@ -399,14 +431,15 @@ export async function recordViolation(
  */
 export async function submitExamAttempt(
   attemptId: string,
-  options?: { autoSubmitReason?: string | null }
+  options?: { autoSubmitReason?: string | null },
 ): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // Fetch all questions and answers for this attempt
   const { data: attempt, error: attemptError } = await supabase
     .from("exam_attempts")
-    .select(`
+    .select(
+      `
       *,
       exam:exams(
         *,
@@ -416,7 +449,8 @@ export async function submitExamAttempt(
         )
       ),
       answers:exam_answers(*)
-    `)
+    `,
+    )
     .eq("id", attemptId)
     .single();
 
@@ -477,14 +511,13 @@ export async function submitExamAttempt(
 /**
  * Get attempt details with answers
  */
-export async function getAttemptDetail(
-  attemptId: string
-): Promise<ApiResponse<ExamAttempt>> {
+export async function getAttemptDetail(attemptId: string): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
     .from("exam_attempts")
-    .select(`
+    .select(
+      `
       *,
       exam:exams(
         *,
@@ -495,7 +528,8 @@ export async function getAttemptDetail(
       ),
       answers:exam_answers(*),
       violations:exam_violations(*)
-    `)
+    `,
+    )
     .eq("id", attemptId)
     .single();
 
@@ -507,9 +541,7 @@ export async function getAttemptDetail(
  * List all attempts/results for an exam.
  * Returns all assigned students and their attempt status.
  */
-export async function listAttempts(
-  examId: string
-): Promise<ApiResponse<any[]>> {
+export async function listAttempts(examId: string): Promise<ApiResponse<any[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // 1. Fetch the exam total marks first
@@ -524,14 +556,16 @@ export async function listAttempts(
   // 2. Fetch all assigned students
   const { data: assignments, error: aError } = await supabase
     .from("exam_assignments")
-    .select(`
+    .select(
+      `
       student_id,
       student:students(
         id,
         admission_no,
         user:users(id, name, email)
       )
-    `)
+    `,
+    )
     .eq("exam_id", examId);
 
   if (aError) return { data: null, error: getErrorMessage(aError), success: false };
@@ -559,7 +593,7 @@ export async function listAttempts(
       auto_submit_reason: attempt?.auto_submit_reason ?? null,
       started_at: attempt?.started_at ?? null,
       submitted_at: attempt?.submitted_at ?? null,
-      exam: { total_marks: totalMarks }
+      exam: { total_marks: totalMarks },
     };
   });
 
@@ -576,7 +610,7 @@ export async function listAttempts(
     const orderA = statusOrder[a.status] ?? 99;
     const orderB = statusOrder[b.status] ?? 99;
     if (orderA !== orderB) return orderA - orderB;
-    
+
     const dateA = new Date(a.submitted_at || a.started_at || 0).getTime();
     const dateB = new Date(b.submitted_at || b.started_at || 0).getTime();
     return dateB - dateA;
@@ -591,19 +625,21 @@ export async function listAttempts(
  * Validate exam timing using server-side time
  * Prevents frontend time manipulation
  */
-export async function validateExamTiming(examId: string): Promise<ApiResponse<{
-  isAvailable: boolean;
-  currentServerTime: string;
-  startTime: string | null;
-  endTime: string | null;
-  reason: string;
-}>> {
+export async function validateExamTiming(examId: string): Promise<
+  ApiResponse<{
+    isAvailable: boolean;
+    currentServerTime: string;
+    startTime: string | null;
+    endTime: string | null;
+    reason: string;
+  }>
+> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc('validate_exam_timing', { exam_id: examId });
+  const { data, error } = await supabase.rpc("validate_exam_timing", { exam_id: examId });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
-  
+
   if (!data || data.length === 0) {
     return { data: null, error: "Exam not found", success: false };
   }
@@ -628,14 +664,16 @@ export async function validateExamTiming(examId: string): Promise<ApiResponse<{
  */
 export async function getActiveAttempt(
   examId: string,
-  userId: string
-): Promise<ApiResponse<{
-  attemptId: string;
-  status: string;
-  isLocked: boolean;
-  startedAt: string;
-  canResume: boolean;
-} | null>> {
+  userId: string,
+): Promise<
+  ApiResponse<{
+    attemptId: string;
+    status: string;
+    isLocked: boolean;
+    startedAt: string;
+    canResume: boolean;
+  } | null>
+> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data: student } = await supabase
@@ -646,7 +684,7 @@ export async function getActiveAttempt(
 
   if (!student) return { data: null, error: "Student profile not found", success: false };
 
-  const { data, error } = await supabase.rpc('get_active_student_attempt', {
+  const { data, error } = await supabase.rpc("get_active_student_attempt", {
     p_exam_id: examId,
     p_student_id: student.id,
   });
@@ -676,7 +714,7 @@ export async function getActiveAttempt(
  */
 export async function validateSingleAttempt(
   examId: string,
-  userId: string
+  userId: string,
 ): Promise<ApiResponse<{ canAttempt: boolean; reason: string }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -688,19 +726,24 @@ export async function validateSingleAttempt(
 
   if (!student) return { data: null, error: "Student profile not found", success: false };
 
-  // Check for existing submitted attempts
+  // Check for existing submitted attempts (excluding reattempt-granted ones)
   const { data: submissions, error } = await supabase
     .from("exam_attempts")
-    .select("id, status, is_locked")
+    .select("id, status, is_locked, reattempt_granted")
     .eq("exam_id", examId)
     .eq("student_id", student.id)
     .in("status", ["submitted", "auto_submitted", "graded", "expired"]);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  if (submissions && submissions.length > 0) {
+  // If all submitted attempts have reattempt_granted=true, the student can attempt again
+  const blockedSubmissions = submissions?.filter((s) => !s.reattempt_granted) ?? [];
+  if (blockedSubmissions.length > 0) {
     return {
-      data: { canAttempt: false, reason: "You have already submitted this test. Multiple attempts are not allowed." },
+      data: {
+        canAttempt: false,
+        reason: "You have already submitted this test. Multiple attempts are not allowed.",
+      },
       error: null,
       success: true,
     };
@@ -726,7 +769,7 @@ export async function createExamSession(
     deviceId?: string;
     ipAddress?: string;
     userAgent?: string;
-  }
+  },
 ): Promise<ApiResponse<{ sessionToken: string; sessionId: string }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -772,16 +815,20 @@ export async function createExamSession(
  * Validate session token to prevent multiple device access
  */
 export async function validateSessionToken(
-  token: string
+  token: string,
 ): Promise<ApiResponse<{ isValid: boolean; attemptId?: string; reason: string }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc('validate_session_token', { token });
+  const { data, error } = await supabase.rpc("validate_session_token", { token });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
   if (!data || data.length === 0) {
-    return { data: { isValid: false, reason: "Session token not found" }, error: null, success: true };
+    return {
+      data: { isValid: false, reason: "Session token not found" },
+      error: null,
+      success: true,
+    };
   }
 
   const result = data[0];
@@ -799,10 +846,14 @@ export async function validateSessionToken(
 /**
  * Count active sessions for an attempt (prevent multiple devices)
  */
-export async function countActiveSessionsForAttempt(attemptId: string): Promise<ApiResponse<number>> {
+export async function countActiveSessionsForAttempt(
+  attemptId: string,
+): Promise<ApiResponse<number>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc('count_active_sessions_for_attempt', { attempt_id: attemptId });
+  const { data, error } = await supabase.rpc("count_active_sessions_for_attempt", {
+    attempt_id: attemptId,
+  });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
@@ -816,13 +867,15 @@ export async function countActiveSessionsForAttempt(attemptId: string): Promise<
 async function recordViolationWithCheckFallback(
   attemptId: string,
   violationType: string,
-  metadata?: any
-): Promise<ApiResponse<{
-  violationId: string;
-  totalViolations: number;
-  shouldAutoSubmit: boolean;
-  reason: string;
-}>> {
+  metadata?: any,
+): Promise<
+  ApiResponse<{
+    violationId: string;
+    totalViolations: number;
+    shouldAutoSubmit: boolean;
+    reason: string;
+  }>
+> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data: attemptRow, error: attemptError } = await supabase
@@ -921,13 +974,15 @@ function shouldUseViolationRpcFallback(errorMessage: string): boolean {
 export async function recordViolationWithCheck(
   attemptId: string,
   violationType: string,
-  metadata?: any
-): Promise<ApiResponse<{
-  violationId: string;
-  totalViolations: number;
-  shouldAutoSubmit: boolean;
-  reason: string;
-}>> {
+  metadata?: any,
+): Promise<
+  ApiResponse<{
+    violationId: string;
+    totalViolations: number;
+    shouldAutoSubmit: boolean;
+    reason: string;
+  }>
+> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase.rpc("record_and_check_violations", {
@@ -967,7 +1022,7 @@ export async function recordViolationWithCheck(
 export async function lockExamAttempt(attemptId: string): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { error } = await supabase.rpc('lock_exam_attempt', { attempt_id: attemptId });
+  const { error } = await supabase.rpc("lock_exam_attempt", { attempt_id: attemptId });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: undefined, error: null, success: true };
@@ -979,7 +1034,7 @@ export async function lockExamAttempt(attemptId: string): Promise<ApiResponse<vo
 export async function getExamAttemptViolations(examId: string): Promise<ApiResponse<any[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc('get_exam_attempt_violations', {
+  const { data, error } = await supabase.rpc("get_exam_attempt_violations", {
     p_exam_id: examId,
   });
 
@@ -994,7 +1049,7 @@ export async function getExamAttemptViolations(examId: string): Promise<ApiRespo
 export async function autoSubmitExpiredAttempts(): Promise<ApiResponse<number>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase.rpc('auto_submit_expired_attempts');
+  const { data, error } = await supabase.rpc("auto_submit_expired_attempts");
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
@@ -1038,9 +1093,7 @@ export async function updateAttemptActivity(attemptId: string): Promise<ApiRespo
 /**
  * Fetch all violations for an attempt (for admin results view)
  */
-export async function getViolationLog(
-  attemptId: string
-): Promise<ApiResponse<ExamViolation[]>> {
+export async function getViolationLog(attemptId: string): Promise<ApiResponse<ExamViolation[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   const { data, error } = await supabase
@@ -1059,7 +1112,7 @@ export async function getViolationLog(
 export async function recordProctoringEvent(
   attemptId: string,
   eventType: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<ApiResponse<ExamViolation>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -1075,4 +1128,36 @@ export async function recordProctoringEvent(
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: violation as ExamViolation, error: null, success: true };
+}
+
+/**
+ * Grant a reattempt to a student for a specific attempt.
+ * Admin sets reattempt_granted = true on the existing attempt row.
+ * The student can then start a fresh attempt.
+ */
+export async function grantReattempt(attemptId: string): Promise<ApiResponse<null>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { error } = await supabase
+    .from("exam_attempts")
+    .update({ reattempt_granted: true })
+    .eq("id", attemptId);
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: null, error: null, success: true };
+}
+
+/**
+ * Revoke a previously granted reattempt.
+ */
+export async function revokeReattempt(attemptId: string): Promise<ApiResponse<null>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { error } = await supabase
+    .from("exam_attempts")
+    .update({ reattempt_granted: false })
+    .eq("id", attemptId);
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: null, error: null, success: true };
 }

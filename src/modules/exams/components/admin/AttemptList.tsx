@@ -4,11 +4,14 @@ import { listAttempts, getViolationLog } from "../../services/exam.service";
 import { ExamStatusBadge } from "../shared/ExamStatusBadge";
 import { ViolationLog } from "./ViolationLog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Users, AlertTriangle } from "lucide-react";
+import { Users, AlertTriangle, RotateCcw } from "lucide-react";
 import type { ExamViolation } from "../../types";
+import { grantReattempt, revokeReattempt } from "../../services/exam.service";
+import { toast } from "sonner";
 
 interface AttemptListProps {
   examId: string;
@@ -20,6 +23,7 @@ export function AttemptList({ examId }: AttemptListProps) {
   const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(null);
   const [violations, setViolations] = useState<ExamViolation[]>([]);
   const [violationsLoading, setViolationsLoading] = useState(false);
+  const [reattemptLoadingId, setReattemptLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetch = async () => {
@@ -48,6 +52,31 @@ export function AttemptList({ examId }: AttemptListProps) {
     setViolationsLoading(false);
   };
 
+  const handleReattempt = async (attemptId: string, currentlyGranted: boolean) => {
+    setReattemptLoadingId(attemptId);
+    try {
+      const { success, error } = currentlyGranted
+        ? await revokeReattempt(attemptId)
+        : await grantReattempt(attemptId);
+      if (success) {
+        toast.success(
+          currentlyGranted
+            ? "Reattempt revoked"
+            : "Reattempt granted — student can now retake the test",
+        );
+        // Refresh the attempts list
+        const { data, success: ok } = await listAttempts(examId);
+        if (ok && data) setAttempts(data);
+      } else {
+        toast.error(error || "Failed to update reattempt status");
+      }
+    } catch {
+      toast.error("An error occurred");
+    } finally {
+      setReattemptLoadingId(null);
+    }
+  };
+
   const columns: DataTableColumn<any>[] = [
     {
       key: "student",
@@ -64,7 +93,9 @@ export function AttemptList({ examId }: AttemptListProps) {
       header: "Score",
       render: (attempt) => (
         <div className="font-bold">
-          {attempt.status === "not_started" ? "—" : `${attempt.score} / ${attempt.exam?.total_marks || "—"}`}
+          {attempt.status === "not_started"
+            ? "—"
+            : `${attempt.score} / ${attempt.exam?.total_marks || "—"}`}
         </div>
       ),
     },
@@ -137,6 +168,29 @@ export function AttemptList({ examId }: AttemptListProps) {
           <span className="text-muted-foreground">
             {date ? format(new Date(date), "MMM d, h:mm a") : "—"}
           </span>
+        );
+      },
+    },
+    {
+      key: "reattempt",
+      header: "Reattempt",
+      render: (attempt) => {
+        const isTerminal = ["submitted", "auto_submitted", "graded", "expired"].includes(
+          attempt.status,
+        );
+        if (!isTerminal) return <span className="text-muted-foreground">—</span>;
+        const granted = !!attempt.reattempt_granted;
+        return (
+          <Button
+            size="sm"
+            variant={granted ? "destructive" : "outline"}
+            disabled={reattemptLoadingId === attempt.id}
+            onClick={() => handleReattempt(attempt.id, granted)}
+            className="gap-1 text-xs h-7"
+          >
+            <RotateCcw className="h-3 w-3" />
+            {reattemptLoadingId === attempt.id ? "..." : granted ? "Revoke" : "Grant Reattempt"}
+          </Button>
         );
       },
     },
