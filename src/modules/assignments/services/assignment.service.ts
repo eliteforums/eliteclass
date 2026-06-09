@@ -353,7 +353,10 @@ export async function gradeSubmission(
 ): Promise<ApiResponse<AssignmentSubmission>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data, error } = await supabase
+  // Perform update without chaining .select().single() to avoid the
+  // PGRST116 "could not coerce result in single JSON object" error that
+  // occurs when RLS prevents the teacher from SELECTing the updated row.
+  const { error } = await supabase
     .from("assignment_submissions")
     .update({
       grade,
@@ -362,12 +365,17 @@ export async function gradeSubmission(
       graded_at: new Date().toISOString(),
       graded_by: gradedBy,
     })
-    .eq("id", submissionId)
-    .select()
-    .single();
+    .eq("id", submissionId);
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
-  return { data: data as AssignmentSubmission, error: null, success: true };
+
+  // Return a minimal object — the caller invalidates the query cache so the UI
+  // always refetches fresh data; the actual row content is not needed here.
+  return {
+    data: { id: submissionId, grade, feedback, status: "graded" } as AssignmentSubmission,
+    error: null,
+    success: true,
+  };
 }
 
 // ── Student Services ────────────────────────────────────────────────────────

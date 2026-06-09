@@ -1,6 +1,17 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2, X, Plus, Trash2, FileText, Calendar, Clock, Award, Upload, FileIcon } from "lucide-react";
+import {
+  Loader2,
+  X,
+  Plus,
+  Trash2,
+  FileText,
+  Calendar,
+  Clock,
+  Award,
+  Upload,
+  FileIcon,
+} from "lucide-react";
 import { useState, useRef } from "react";
 import { format } from "date-fns";
 
@@ -52,13 +63,15 @@ export function AssignmentFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [resources, setResources] = useState<AssignmentResourceSchema[]>(
-    (initialData?.resources ?? []).map(({ file_name, file_url, storage_path, file_type, file_size }) => ({
-      file_name,
-      file_url,
-      storage_path,
-      file_type: file_type ?? undefined,
-      file_size: file_size ?? undefined,
-    }))
+    (initialData?.resources ?? []).map(
+      ({ file_name, file_url, storage_path, file_type, file_size }) => ({
+        file_name,
+        file_url,
+        storage_path,
+        file_type: file_type ?? undefined,
+        file_size: file_size ?? undefined,
+      }),
+    ),
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuthStore();
@@ -70,8 +83,11 @@ export function AssignmentFormModal({
       description: initialData?.description ?? "",
       instructions: initialData?.instructions ?? "",
       total_marks: initialData?.total_marks ?? 100,
-      due_date: initialData?.due_date ? format(new Date(initialData.due_date), "yyyy-MM-dd'T'HH:mm") : "",
+      due_date: initialData?.due_date
+        ? format(new Date(initialData.due_date), "yyyy-MM-dd'T'HH:mm")
+        : "",
       allow_late: initialData?.allow_late ?? true,
+      submission_type: (initialData?.submission_type as any) ?? "any",
       status: initialData?.status ?? "draft",
     },
   });
@@ -85,8 +101,13 @@ export function AssignmentFormModal({
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const res = await uploadAssignmentFile(user.institute_id, "assignment-resources", file, "resources");
-      
+      const res = await uploadAssignmentFile(
+        user.institute_id,
+        "assignment-resources",
+        file,
+        "resources",
+      );
+
       if (res.success && res.data) {
         newResources.push({
           file_name: file.name,
@@ -127,9 +148,12 @@ export function AssignmentFormModal({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{mode === "create" ? "Create New Assignment" : "Edit Assignment"}</DialogTitle>
+          <DialogTitle>
+            {mode === "create" ? "Create New Assignment" : "Edit Assignment"}
+          </DialogTitle>
           <DialogDescription>
-            Fill in the details for the standalone assignment. This will not be linked to any course.
+            Fill in the details for the standalone assignment. This will not be linked to any
+            course.
           </DialogDescription>
         </DialogHeader>
 
@@ -171,7 +195,10 @@ export function AssignmentFormModal({
             <Label>Reference Files & Resources</Label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {resources.map((res, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg bg-muted/30">
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-muted/30"
+                >
                   <div className="flex items-center gap-2 min-w-0">
                     <FileIcon className="h-4 w-4 text-primary shrink-0" />
                     <span className="text-sm truncate font-medium">{res.file_name}</span>
@@ -225,7 +252,9 @@ export function AssignmentFormModal({
                 />
               </div>
               {form.formState.errors.total_marks && (
-                <p className="text-xs text-destructive">{form.formState.errors.total_marks.message}</p>
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.total_marks.message}
+                </p>
               )}
             </div>
 
@@ -241,6 +270,45 @@ export function AssignmentFormModal({
                 />
               </div>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="submission_type">Submission Type</Label>
+            <Select
+              value={form.watch("submission_type") ?? "any"}
+              onValueChange={(value: any) => form.setValue("submission_type", value)}
+            >
+              <SelectTrigger id="submission_type">
+                <SelectValue placeholder="How should students submit?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="any">
+                  <span className="font-medium">Any</span>
+                  <span className="text-muted-foreground ml-2 text-xs">File, text, or URL</span>
+                </SelectItem>
+                <SelectItem value="file_upload">
+                  <span className="font-medium">File Upload</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    Students must upload a file
+                  </span>
+                </SelectItem>
+                <SelectItem value="text">
+                  <span className="font-medium">Written Response</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    Students type their answer
+                  </span>
+                </SelectItem>
+                <SelectItem value="url_link">
+                  <span className="font-medium">URL / Link</span>
+                  <span className="text-muted-foreground ml-2 text-xs">
+                    Students paste a URL or link
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Controls what submission options students see when submitting this assignment.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
