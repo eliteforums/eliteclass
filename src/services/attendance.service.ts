@@ -56,16 +56,16 @@ export async function createAttendanceSession(payload: {
   }
 
   const insertRow = {
-      institute_id: payload.institute_id,
-      batch_id: payload.batch_id,
-      course_id: payload.course_id,
-      conducted_by: payload.conducted_by,
-      session_date: payload.session_date,
-      session_type: payload.session_type,
-      topic: payload.topic ?? null,
-      notes: payload.notes ?? null,
-      is_locked: false,
-    };
+    institute_id: payload.institute_id,
+    batch_id: payload.batch_id,
+    course_id: payload.course_id,
+    conducted_by: payload.conducted_by,
+    session_date: payload.session_date,
+    session_type: payload.session_type,
+    topic: payload.topic ?? null,
+    notes: payload.notes ?? null,
+    is_locked: false,
+  };
 
   debugAttendance("createAttendanceSession:payload", insertRow);
 
@@ -155,7 +155,11 @@ export async function getSessionWithRecords(
 export async function saveAttendanceRecords(
   sessionId: string,
   instituteId: string,
-  records: { student_id: string; status: "present" | "absent" | "late" | "excused"; notes?: string }[],
+  records: {
+    student_id: string;
+    status: "present" | "absent" | "late" | "excused";
+    notes?: string;
+  }[],
 ): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
@@ -217,7 +221,8 @@ export async function getBatchAttendanceStats(
     if (recordsError) return { data: null, error: getErrorMessage(recordsError), success: false };
 
     const totalRecords = records?.length ?? 0;
-    const presentRecords = records?.filter((r) => r.status === "present" || r.status === "late").length ?? 0;
+    const presentRecords =
+      records?.filter((r) => r.status === "present" || r.status === "late").length ?? 0;
 
     return {
       data: {
@@ -276,6 +281,25 @@ export async function bulkMarkAttendance(
   batchId?: string | null,
 ): Promise<ApiResponse<{ count: number; records: AttendanceRecord[] }>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // Server-side guard: refuse writes to locked sessions even if the client bypasses the UI
+  const { data: sessionRow, error: sessionCheckError } = await supabase
+    .from("attendance_sessions")
+    .select("is_locked")
+    .eq("id", sessionId)
+    .single();
+
+  if (sessionCheckError) {
+    return { data: null, error: getErrorMessage(sessionCheckError), success: false };
+  }
+
+  if (sessionRow?.is_locked) {
+    return {
+      data: null,
+      error: "This attendance session is locked and cannot be modified. Unlock it first.",
+      success: false,
+    };
+  }
 
   const rows = records.map((r) => ({
     session_id: sessionId,
@@ -336,6 +360,25 @@ export async function lockAttendanceSession(
   return { data: data as unknown as AttendanceSession, error: null, success: true };
 }
 
+/**
+ * Unlock a previously locked attendance session, allowing edits again.
+ */
+export async function unlockAttendanceSession(
+  sessionId: string,
+): Promise<ApiResponse<AttendanceSession>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("attendance_sessions")
+    .update({ is_locked: false })
+    .eq("id", sessionId)
+    .select(SESSION_SELECT)
+    .single();
+
+  if (error) return { data: null, error: error.message, success: false };
+  return { data: data as unknown as AttendanceSession, error: null, success: true };
+}
+
 // ── Reporting ─────────────────────────────────────────────────────────────────
 
 export async function getAttendanceSummary(
@@ -379,7 +422,7 @@ export async function getAttendanceSummary(
     const name = r.student?.user?.name ?? "Unknown";
     const no = r.student?.admission_no ?? "";
     const acc = map.get(r.student_id);
-    
+
     if (!acc) {
       map.set(r.student_id, {
         student_id: r.student_id,
@@ -508,7 +551,8 @@ export async function getStudentAttendanceHistory(
 ): Promise<ApiResponse<StudentAttendanceRecord[]>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const selectStr = "id, session_id, student_id, status, notes, marked_at, session:attendance_sessions(id, session_date, session_type, topic, batch:batches(id, name), conductor:users!conducted_by(id, name))";
+  const selectStr =
+    "id, session_id, student_id, status, notes, marked_at, session:attendance_sessions(id, session_date, session_type, topic, batch:batches(id, name), conductor:users!conducted_by(id, name))";
 
   if (filters?.dateFrom || filters?.dateTo) {
     let sq = supabase.from("attendance_sessions").select("id");

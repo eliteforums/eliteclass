@@ -5,10 +5,12 @@ import type { CreateAssignmentPayload, AssignmentResourceSchema } from "@/types"
 
 export const assignmentKeys = {
   all: (instituteId: string) => ["assignments", instituteId] as const,
-  list: (instituteId: string, filters: any) => [...assignmentKeys.all(instituteId), "list", filters] as const,
+  list: (instituteId: string, filters: any) =>
+    [...assignmentKeys.all(instituteId), "list", filters] as const,
   detail: (id: string) => ["assignment", id] as const,
   studentList: (studentId: string) => ["assignments", "student", studentId] as const,
-  studentDetail: (id: string, studentId: string) => ["assignment", id, "student", studentId] as const,
+  studentDetail: (id: string, studentId: string) =>
+    ["assignment", id, "student", studentId] as const,
   submissions: (assignmentId: string) => ["submissions", assignmentId] as const,
   assignees: (assignmentId: string) => ["assignees", assignmentId] as const,
 };
@@ -38,8 +40,13 @@ export function useCreateAssignment() {
   const instituteId = user?.institute_id ?? "";
 
   return useMutation({
-    mutationFn: ({ payload, resources }: { payload: CreateAssignmentPayload; resources?: AssignmentResourceSchema[] }) =>
-      assignmentService.createAssignment(instituteId, user?.id ?? "", payload, resources),
+    mutationFn: ({
+      payload,
+      resources,
+    }: {
+      payload: CreateAssignmentPayload;
+      resources?: AssignmentResourceSchema[];
+    }) => assignmentService.createAssignment(instituteId, user?.id ?? "", payload, resources),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: assignmentKeys.all(instituteId) });
     },
@@ -133,19 +140,21 @@ export function useSubmitAssignment() {
   const instituteId = user?.institute_id ?? "";
 
   return useMutation({
-    mutationFn: ({ 
-      assignmentId, 
-      content, 
-      files 
-    }: { 
-      assignmentId: string; 
-      content?: string; 
-      files?: AssignmentResourceSchema[] 
+    mutationFn: ({
+      assignmentId,
+      content,
+      files,
+    }: {
+      assignmentId: string;
+      content?: string;
+      files?: AssignmentResourceSchema[];
     }) =>
       assignmentService.submitAssignment(assignmentId, user?.id ?? "", instituteId, content, files),
     onSuccess: (_, { assignmentId }) => {
       queryClient.invalidateQueries({ queryKey: ["assignments", "student", user?.id] });
-      queryClient.invalidateQueries({ queryKey: assignmentKeys.studentDetail(assignmentId, user?.id ?? "") });
+      queryClient.invalidateQueries({
+        queryKey: assignmentKeys.studentDetail(assignmentId, user?.id ?? ""),
+      });
     },
   });
 }
@@ -155,15 +164,19 @@ export function useGradeSubmission() {
   const { user } = useAuthStore();
 
   return useMutation({
-    mutationFn: ({ submissionId, grade, feedback }: { submissionId: string; grade: number; feedback: string }) =>
-      assignmentService.gradeSubmission(submissionId, grade, feedback, user?.id ?? ""),
-    onSuccess: (res) => {
-      if (res.success && res.data) {
-        // Invalidate all submissions lists to ensure the UI updates
-        queryClient.invalidateQueries({ queryKey: ["submissions"] });
-        // Also invalidate specific student dashboard data
-        queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      }
+    mutationFn: ({
+      submissionId,
+      grade,
+      feedback,
+    }: {
+      submissionId: string;
+      grade: number;
+      feedback: string;
+    }) => assignmentService.gradeSubmission(submissionId, grade, feedback, user?.id ?? ""),
+    onSuccess: () => {
+      // Always invalidate regardless of res.data being null
+      queryClient.invalidateQueries({ queryKey: ["submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
     },
   });
 }
