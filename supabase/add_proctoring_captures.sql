@@ -60,10 +60,12 @@ VALUES (
   'exam-proctoring',
   'exam-proctoring',
   false,                    -- private bucket
-  5242880,                  -- 5 MB per file max
-  ARRAY['image/jpeg', 'image/png', 'image/webp']
+  10485760,                 -- 10 MB per file max
+  ARRAY['image/jpeg', 'image/png', 'image/jpg', 'image/webp']
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Students can upload to their own folder: {instituteId}/{examId}/{attemptId}/
 CREATE POLICY "students_upload_own_captures"

@@ -1,17 +1,15 @@
 /**
  * useProctoringCapture
  *
- * Schedules silent proctoring captures (webcam photos and screen screenshots)
- * at randomised intervals during an exam.  Uploads to Supabase Storage in the
- * background — never blocks the exam UI.
+ * Captures webcam photos at regular intervals during an exam and uploads them
+ * to Supabase Storage. Ensures the admin can see student faces.
  *
- * Webcam (2 per exam):  captured from the existing MediaStream; completely silent.
- * Screenshot (1 per exam): captured from the screen-share stream if one was granted.
+ * Strategy:
+ *   1. Take an initial capture as soon as the camera stream becomes active.
+ *   2. Take periodic captures every ~5 minutes (with jitter).
+ *   3. If a capture fails (stream not ready), retry after a short delay.
  *
- * Scheduling (for a 60-min exam):
- *   Webcam 1  — random within 20–40 % of total duration  (~12–24 min)
- *   Webcam 2  — random within 55–75 % of total duration  (~33–45 min)
- *   Screenshot — random within 38–58 % of total duration  (~23–35 min)
+ * Screenshots from screen-share are taken once if a screenStream is provided.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -49,6 +47,13 @@ async function captureFrameFromStream(
       return;
     }
 
+    // Check that the video track is live
+    const videoTrack = stream.getVideoTracks()[0];
+    if (!videoTrack || videoTrack.readyState !== 'live') {
+      resolve(null);
+      return;
+    }
+
     const video = document.createElement('video');
     video.srcObject = stream;
     video.muted = true;
@@ -61,13 +66,29 @@ async function captureFrameFromStream(
     }, 8000);
 
     const onData = () => {
+      // Wait one animation frame to ensure the frame is painted
       requestAnimationFrame(() => {
         clearTimeout(timeoutId);
-        const w = Math.min(video.videoWidth || 640, 1280);
-        const h = Math.min(video.videoHeight || 480, 960);
+
+        const w = video.videoWidth || 640;
+        const h = video.videoHeight || 480;
+
+        // Ensure we have valid dimensions
+        if (w === 0 || h === 0) {
+          video.srcObject = null;
+          resolve(null);
+          return;
+        }
+
+        // Cap resolution to reduce upload size
+        const maxW = 640;
+        const scale = w > maxW ? maxW / w : 1;
+        const canvasW = Math.round(w * scale);
+        const canvasH = Math.round(h * scale);
+
         const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = canvasW;
+        canvas.height = canvasH;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
           video.srcObject = null;
@@ -75,12 +96,12 @@ async function captureFrameFromStream(
           return;
         }
         if (mirrorHorizontal) {
-          ctx.translate(w, 0);
+          ctx.translate(canvasW, 0);
           ctx.scale(-1, 1);
         }
-        ctx.drawImage(video, 0, 0, w, h);
+        ctx.drawImage(video, 0, 0, canvasW, canvasH);
         video.srcObject = null; // release reference; do NOT stop tracks
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.80);
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.75);
       });
     };
 
@@ -99,6 +120,17 @@ async function captureFrameFromStream(
   });
 }
 
+// Interval between periodic captures (5 minutes with ±1 min jitter)
+const CAPTURE_INTERVAL_MS = 5 * 60 * 1000;
+const CAPTURE_JITTER_MS = 60 * 1000;
+
+// Maximum retries for a failed capture
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 10_000;
+
+// Delay before first capture (give camera time to warm up)
+const INITIAL_CAPTURE_DELAY_MS = 15_000;
+
 export function useProctoringCapture({
   enabled,
   attemptId,
@@ -113,32 +145,53 @@ export function useProctoringCapture({
 }: UseProctoringCaptureOptions) {
   const [capturedCount, setCapturedCount] = useState(0);
 
-  // Use refs for mutable values accessed inside setTimeout callbacks
+  // Use refs for mutable values accessed inside setTimeout/interval callbacks
   const cameraStreamRef    = useRef(cameraStream);
   const screenStreamRef    = useRef(screenStream);
   const questionIdxRef     = useRef(currentQuestionIdx);
   const timeRemainingRef   = useRef(timeRemaining);
   const captureIndexRef    = useRef(0);
-  const timeoutsRef        = useRef<ReturnType<typeof setTimeout>[]>([]);
   const mountedRef         = useRef(true);
+  const intervalRef        = useRef<ReturnType<typeof setInterval> | null>(null);
+  const initialCaptureRef  = useRef(false);
+  const initialTimeoutRef  = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { cameraStreamRef.current  = cameraStream;      }, [cameraStream]);
   useEffect(() => { screenStreamRef.current  = screenStream;      }, [screenStream]);
   useEffect(() => { questionIdxRef.current   = currentQuestionIdx; }, [currentQuestionIdx]);
   useEffect(() => { timeRemainingRef.current = timeRemaining;     }, [timeRemaining]);
 
-  const doCapture = useCallback(async (captureType: 'webcam' | 'screenshot') => {
+  const doCapture = useCallback(async (
+    captureType: 'webcam' | 'screenshot',
+    retryCount = 0,
+  ) => {
     if (!mountedRef.current) return;
 
     const stream = captureType === 'webcam'
       ? cameraStreamRef.current
       : screenStreamRef.current;
 
-    if (!stream) return; // stream not available — skip silently
+    if (!stream || !stream.active) {
+      // Retry if stream not ready yet
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => {
+          if (mountedRef.current) doCapture(captureType, retryCount + 1);
+        }, RETRY_DELAY_MS);
+      }
+      return;
+    }
 
     try {
       const blob = await captureFrameFromStream(stream, captureType === 'webcam');
-      if (!blob || !mountedRef.current) return;
+      if (!blob || !mountedRef.current) {
+        // Retry on failed capture
+        if (retryCount < MAX_RETRIES) {
+          setTimeout(() => {
+            if (mountedRef.current) doCapture(captureType, retryCount + 1);
+          }, RETRY_DELAY_MS);
+        }
+        return;
+      }
 
       const index = captureIndexRef.current++;
 
@@ -151,49 +204,105 @@ export function useProctoringCapture({
           time_remaining: timeRemainingRef.current,
         },
       )
-        .then(() => { if (mountedRef.current) setCapturedCount((p) => p + 1); })
-        .catch((err) => console.debug('[proctoring-capture] upload failed:', err));
+        .then((res) => {
+          if (mountedRef.current && res.success) {
+            setCapturedCount((p) => p + 1);
+          } else if (!res.success) {
+            console.debug('[proctoring-capture] upload failed:', res.error);
+          }
+        })
+        .catch((err) => console.debug('[proctoring-capture] upload error:', err));
     } catch (err) {
       console.debug('[proctoring-capture] capture failed:', err);
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => {
+          if (mountedRef.current) doCapture(captureType, retryCount + 1);
+        }, RETRY_DELAY_MS);
+      }
     }
   }, [attemptId, studentId, examId, instituteId]);
 
-  // Schedule captures once when the exam attempt is known
+  // Take initial capture once camera stream becomes available
+  useEffect(() => {
+    if (!enabled || !attemptId || !cameraStream || initialCaptureRef.current) return;
+
+    // Check if stream is active
+    if (!cameraStream.active || cameraStream.getVideoTracks().length === 0) return;
+
+    initialCaptureRef.current = true;
+
+    // Small delay to let the camera warm up and produce real frames
+    initialTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        doCapture('webcam');
+      }
+    }, INITIAL_CAPTURE_DELAY_MS);
+
+    return () => {
+      if (initialTimeoutRef.current) {
+        clearTimeout(initialTimeoutRef.current);
+      }
+    };
+  }, [enabled, attemptId, cameraStream, doCapture]);
+
+  // Schedule periodic captures every ~5 minutes
   useEffect(() => {
     if (!enabled || !attemptId || durationMs <= 0) return;
 
-    // Clear any previous timeouts (e.g. if hook reinitialises)
-    timeoutsRef.current.forEach(clearTimeout);
-    timeoutsRef.current = [];
+    // Start periodic captures after initial delay + first interval
+    const startDelay = INITIAL_CAPTURE_DELAY_MS + CAPTURE_INTERVAL_MS;
 
-    // ±10 % random jitter so captures feel non-mechanical
-    const jitter = () => (Math.random() - 0.5) * 0.1 * durationMs;
+    const timeout = setTimeout(() => {
+      if (!mountedRef.current) return;
 
-    const min30s = 30_000; // never fire in first 30 seconds
+      // Take one immediately at the first interval mark
+      doCapture('webcam');
 
-    // Webcam 1 — 20–40 % of duration
-    const w1 = Math.max(min30s, Math.floor(durationMs * 0.30 + jitter()));
-    // Webcam 2 — 55–75 % of duration
-    const w2 = Math.max(w1 + 30_000, Math.floor(durationMs * 0.65 + jitter()));
-    // Screenshot — 38–58 % of duration
-    const s1 = Math.max(min30s, Math.floor(durationMs * 0.48 + jitter()));
+      // Then set up the recurring interval
+      intervalRef.current = setInterval(() => {
+        if (!mountedRef.current) return;
 
-    timeoutsRef.current.push(setTimeout(() => doCapture('webcam'),     w1));
-    timeoutsRef.current.push(setTimeout(() => doCapture('webcam'),     w2));
-    timeoutsRef.current.push(setTimeout(() => doCapture('screenshot'), s1));
+        // Add jitter to make timing less predictable
+        const jitterDelay = Math.random() * CAPTURE_JITTER_MS;
+        setTimeout(() => {
+          if (mountedRef.current) doCapture('webcam');
+        }, jitterDelay);
+      }, CAPTURE_INTERVAL_MS);
+    }, startDelay);
 
     return () => {
-      timeoutsRef.current.forEach(clearTimeout);
-      timeoutsRef.current = [];
+      clearTimeout(timeout);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
   }, [enabled, attemptId, durationMs, doCapture]);
+
+  // Take one screenshot capture at ~40% of exam duration if screen stream is available
+  useEffect(() => {
+    if (!enabled || !attemptId || durationMs <= 0 || !screenStream) return;
+
+    const delay = Math.max(30_000, Math.floor(durationMs * 0.4 + (Math.random() - 0.5) * 0.1 * durationMs));
+    const timeout = setTimeout(() => {
+      if (mountedRef.current) doCapture('screenshot');
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, [enabled, attemptId, durationMs, screenStream, doCapture]);
 
   // Cleanup on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      timeoutsRef.current.forEach(clearTimeout);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      if (initialTimeoutRef.current) {
+        clearTimeout(initialTimeoutRef.current);
+      }
     };
   }, []);
 

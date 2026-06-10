@@ -1522,7 +1522,7 @@ export async function uploadProctoringCapture(
 
     if (!bucketExists) {
       await supabase.storage.createBucket(EXAM_PROCTORING_BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: 10485760,
         allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg"],
       });
