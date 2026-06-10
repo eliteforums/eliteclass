@@ -68,6 +68,7 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Students can upload to their own folder: {instituteId}/{examId}/{attemptId}/
+DROP POLICY IF EXISTS "students_upload_own_captures" ON storage.objects;
 CREATE POLICY "students_upload_own_captures"
   ON storage.objects FOR INSERT
   TO authenticated
@@ -76,6 +77,7 @@ CREATE POLICY "students_upload_own_captures"
   );
 
 -- Only institute members can read captures from the bucket
+DROP POLICY IF EXISTS "institute_read_captures" ON storage.objects;
 CREATE POLICY "institute_read_captures"
   ON storage.objects FOR SELECT
   TO authenticated
