@@ -300,6 +300,26 @@ function AssignmentDetailView({
   const isOverdue = assignment.due_date && isAfter(new Date(), new Date(assignment.due_date));
   const canSubmit = !submission || (assignment.allow_late && submission.status === "pending");
 
+  // Resolve the new granular booleans (fallback to legacy submission_type for backward-compat)
+  const allowText =
+    assignment.allow_text ??
+    (assignment.submission_type === "text" ||
+      assignment.submission_type === "any" ||
+      !assignment.submission_type);
+  const allowLink =
+    assignment.allow_link ??
+    (assignment.submission_type === "url_link" ||
+      assignment.submission_type === "any" ||
+      !assignment.submission_type);
+  const allowFileUpload =
+    assignment.allow_file_upload ??
+    (assignment.submission_type === "file_upload" ||
+      assignment.submission_type === "any" ||
+      !assignment.submission_type);
+
+  // How many input methods are enabled? (used for labelling)
+  const enabledCount = [allowText, allowLink, allowFileUpload].filter(Boolean).length;
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0 || !user?.institute_id) return;
@@ -333,17 +353,23 @@ function AssignmentDetailView({
   };
 
   const handleFinalSubmit = async () => {
-    const subType = assignment.submission_type ?? "any";
+    const hasContent = submissionContent.trim().length > 0;
+    const hasFiles = submissionFiles.length > 0;
+    const isUrl = /^https?:\/\//i.test(submissionContent.trim());
 
-    if (subType === "file_upload" && submissionFiles.length === 0) {
+    // ── Validation ───────────────────────────────────────────────────────
+    // When ONLY file upload is enabled → require at least one file
+    if (allowFileUpload && !allowText && !allowLink && !hasFiles) {
       toast.error("Please upload at least one file");
       return;
     }
-    if (subType === "text" && !submissionContent.trim()) {
+    // When ONLY text is enabled → require text content (not a URL)
+    if (allowText && !allowLink && !allowFileUpload && !hasContent) {
       toast.error("Please write your response before submitting");
       return;
     }
-    if (subType === "url_link") {
+    // When ONLY link is enabled → require a valid URL
+    if (allowLink && !allowText && !allowFileUpload) {
       if (!submissionContent.trim()) {
         toast.error("Please enter a URL before submitting");
         return;
@@ -355,9 +381,20 @@ function AssignmentDetailView({
         return;
       }
     }
-    if (subType === "any" && submissionFiles.length === 0 && !submissionContent.trim()) {
+    // When text + link are enabled but no file → require at least text or a valid URL
+    if (allowText && allowLink && !allowFileUpload && !hasContent) {
+      toast.error("Please write a response or paste a URL before submitting");
+      return;
+    }
+    // Multi-mode fallback: at least one of the enabled types must be provided
+    if (enabledCount > 1 && !hasContent && !hasFiles) {
       toast.error("Please add a file, write a response, or paste a URL before submitting");
       return;
+    }
+    // If user provided text that looks like a URL but links aren't allowed, block it
+    if (isUrl && !allowLink && allowText && submissionContent.trim() === submissionContent.trim()) {
+      // User might have pasted a URL in the text box when only text is allowed
+      // This is fine — they can submit text that happens to contain a URL.
     }
 
     try {
@@ -582,26 +619,28 @@ function AssignmentDetailView({
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg">Submit Work</CardTitle>
                 <CardDescription className="text-xs">
-                  {assignment.submission_type === "text"
-                    ? "Write your response below."
-                    : assignment.submission_type === "url_link"
-                      ? "Paste the URL or link to your work."
-                      : assignment.submission_type === "file_upload"
-                        ? "Upload your final files for grading."
-                        : "Upload a file, write a response, or share a link."}
+                  {!allowText && !allowLink && allowFileUpload
+                    ? "Upload your final files for grading."
+                    : allowText && !allowLink && !allowFileUpload
+                      ? "Write your response below."
+                      : !allowText && allowLink && !allowFileUpload
+                        ? "Paste the URL or link to your work."
+                        : allowText && allowLink && !allowFileUpload
+                          ? "Write a response or paste a URL."
+                          : allowText && !allowLink && allowFileUpload
+                            ? "Write a response and/or upload files."
+                            : !allowText && allowLink && allowFileUpload
+                              ? "Paste a URL and/or upload files."
+                              : "Upload a file, write a response, or share a link."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* ── Written text response ── */}
-                {(assignment.submission_type === "text" ||
-                  assignment.submission_type === "any" ||
-                  !assignment.submission_type) && (
+                {allowText && !allowLink && (
                   <div className="space-y-2">
-                    {assignment.submission_type === "any" && (
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                        Written Response <span className="font-normal">(optional)</span>
-                      </p>
-                    )}
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Written Response
+                    </p>
                     <textarea
                       className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none min-h-[120px]"
                       placeholder="Write your response here..."
@@ -611,9 +650,12 @@ function AssignmentDetailView({
                   </div>
                 )}
 
-                {/* ── URL / Link ── */}
-                {assignment.submission_type === "url_link" && (
+                {/* ── URL / Link (exclusive) ── */}
+                {allowLink && !allowText && (
                   <div className="space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      URL / Link
+                    </p>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <input
@@ -627,18 +669,27 @@ function AssignmentDetailView({
                   </div>
                 )}
 
-                {/* ── URL/link field in "any" mode ── */}
-                {assignment.submission_type === "any" && (
-                  <div className="space-y-2">
+                {/* ── Combined text + link section ── */}
+                {allowText && allowLink && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Written Response
+                    </p>
+                    <textarea
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none min-h-[120px]"
+                      placeholder="Write your response here..."
+                      value={submissionContent}
+                      onChange={(e) => setSubmissionContent(e.target.value)}
+                    />
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                       URL / Link{" "}
-                      <span className="font-normal">(optional — replaces text above)</span>
+                      <span className="font-normal">(optional — submitted as text above)</span>
                     </p>
                     <div className="relative">
                       <LinkIcon className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                       <input
                         type="url"
-                        placeholder="https://... (leave blank if submitting text or file)"
+                        placeholder="https://... (leave blank if only submitting text)"
                         className="w-full rounded-xl border border-border bg-background pl-9 pr-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                         value={submissionContent}
                         onChange={(e) => setSubmissionContent(e.target.value)}
@@ -648,11 +699,9 @@ function AssignmentDetailView({
                 )}
 
                 {/* ── File upload ── */}
-                {(assignment.submission_type === "file_upload" ||
-                  assignment.submission_type === "any" ||
-                  !assignment.submission_type) && (
+                {allowFileUpload && (
                   <div className="space-y-3">
-                    {assignment.submission_type === "any" && (
+                    {enabledCount > 1 && (
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         File Upload <span className="font-normal">(optional)</span>
                       </p>
