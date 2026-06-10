@@ -254,6 +254,7 @@ export async function listStudentExams(
     `,
     )
     .eq("exam_assignments.student_id", student.id)
+    .eq("attempts.student_id", student.id)
     .eq("status", "published")
     .order("start_time", { ascending: true });
 
@@ -595,6 +596,7 @@ export async function listAttempts(examId: string): Promise<ApiResponse<any[]>> 
       violation_count: attempt?.violation_count ?? 0,
       last_violation_at: attempt?.last_violation_at ?? null,
       auto_submit_reason: attempt?.auto_submit_reason ?? null,
+      reattempt_granted: attempt?.reattempt_granted ?? false,
       started_at: attempt?.started_at ?? null,
       submitted_at: attempt?.submitted_at ?? null,
       exam: { total_marks: totalMarks },

@@ -1,12 +1,13 @@
 // CSV MCQ Parser Service
 // Parses MCQ data from CSV file in the following format:
-// question_text, option_1, option_2, option_3, option_4, correct_option (1-4), marks (optional), explanation (optional)
+// question_text, option_1, option_2, option_3, option_4, correct_option (1-4), marks (optional), explanation (optional), code_snippet (optional)
 
 export interface CSVQuestion {
   question_text: string;
   options: Array<{ option_text: string; is_correct: boolean }>;
   marks: number;
   explanation: string;
+  code_snippet?: string;
 }
 
 export interface ParseResult {
@@ -81,6 +82,7 @@ export async function parseCSVMCQ(file: File): Promise<ParseResult> {
       const correct_option = fields[5]?.trim();
       const marks_str = fields[6]?.trim() || "1";
       const explanation = fields[7]?.trim() || "";
+      const code_snippet = fields[8]?.trim() || undefined;
 
       // Validate required fields
       if (!question_text) {
@@ -121,6 +123,7 @@ export async function parseCSVMCQ(file: File): Promise<ParseResult> {
         ],
         marks: isNaN(marks) || marks < 1 ? 1 : marks,
         explanation,
+        code_snippet: code_snippet || undefined,
       };
 
       result.questions.push(question);
@@ -181,13 +184,13 @@ function parseCSVLine(line: string): string[] {
  * Generate CSV template for download
  */
 export function generateCSVTemplate(): string {
-  const header = "question_text,option_1,option_2,option_3,option_4,correct_option (1-4),marks (optional),explanation (optional)";
+  const header = "question_text,option_1,option_2,option_3,option_4,correct_option (1-4),marks (optional),explanation (optional),code_snippet (optional)";
   const example1 =
-    '"What is the capital of France?","Paris","London","Berlin","Madrid",1,1,"Paris is the capital city of France"';
+    '"What is the capital of France?","Paris","London","Berlin","Madrid",1,1,"Paris is the capital city of France",';
   const example2 =
-    '"Which planet is closest to the sun?","Earth","Venus","Mercury","Mars",3,1,"Mercury is the closest planet to the sun"';
+    '"Which planet is closest to the sun?","Earth","Venus","Mercury","Mars",3,1,"Mercury is the closest planet to the sun",';
   const example3 =
-    '"What is 2 + 2?","3","4","5","6",2,1,"2 + 2 equals 4"';
+    '"What does the following code output?","Hello World","Error","Nothing","hello world",1,2,"The print statement outputs hello world","print(\'hello world\')"';
 
   return [header, example1, example2, example3].join("\n");
 }
