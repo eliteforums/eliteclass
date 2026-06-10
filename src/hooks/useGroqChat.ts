@@ -19,7 +19,7 @@ const SYSTEM_PROMPT =
   "You are an EliteClass AI study assistant. Help students with their coursework, explain concepts, and provide educational support. Be concise and helpful.";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "Llama-3.3-70B-Versatile model";
+const MODEL = "llama-3.3-70b-versatile";
 const MAX_CONTEXT_MESSAGES = 20;
 
 function generateId(): string {
@@ -55,11 +55,13 @@ export function useGroqChat() {
       }));
 
       try {
-        // Build context: system prompt + last N messages
+        // Build context: system prompt + last N messages (excluding system messages)
         const contextMessages = [
           ...state.messages.slice(-MAX_CONTEXT_MESSAGES),
           userMessage,
-        ].map((m) => ({ role: m.role, content: m.content }));
+        ]
+          .filter((m) => m.role !== "system")
+          .map((m) => ({ role: m.role, content: m.content }));
 
         const response = await fetch(GROQ_API_URL, {
           method: "POST",

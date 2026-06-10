@@ -12,7 +12,7 @@
 import { useAIKeyStore } from "@/store/aiKeyStore";
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "Llama-3.3-70B-Versatile model";
+const MODEL = "llama-3.3-70b-versatile";
 
 /**
  * Resolves the Groq API key from the user store (UI-provided) or env variable.

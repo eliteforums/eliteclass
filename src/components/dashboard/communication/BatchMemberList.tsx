@@ -22,6 +22,7 @@ interface BatchMember {
   name: string;
   avatar_url: string | null;
   batch_name: string;
+  role: string;
 }
 
 interface BatchMemberListProps {
@@ -38,7 +39,7 @@ function getInitials(name: string): string {
 }
 
 export function BatchMemberList({ onStartConversation }: BatchMemberListProps) {
-  const { user, instituteId } = useAuth();
+  const { user, instituteId, role } = useAuth();
   const [members, setMembers] = useState<BatchMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,85 +48,89 @@ export function BatchMemberList({ onStartConversation }: BatchMemberListProps) {
 
   useEffect(() => {
     async function fetchBatchMembers() {
-      if (!user?.id || !supabase) return;
+      if (!user?.id || !supabase || !instituteId) {
+        setIsLoading(false);
+        return;
+      }
 
       setIsLoading(true);
       try {
-        // Get the current user's student record
-        const { data: currentStudent } = await supabase
-          .from("students")
-          .select("id")
-          .eq("user_id", user.id)
-          .single();
+        // Fetch all users in the institute (excluding current user)
+        const { data: instituteUsers, error: usersError } = await supabase
+          .from("users")
+          .select("id, name, avatar_url, role")
+          .eq("institute_id", instituteId)
+          .neq("id", user.id)
+          .order("name", { ascending: true });
 
-        if (!currentStudent) {
+        if (usersError) {
+          console.error("Failed to fetch institute users:", usersError);
           setMembers([]);
           setIsLoading(false);
           return;
         }
 
-        // Get batches the current user is assigned to
-        const { data: myBatches } = await supabase
-          .from("student_batch_assignments")
-          .select("batch_id, batches(name)")
-          .eq("student_id", currentStudent.id)
-          .eq("is_active", true);
-
-        if (!myBatches || myBatches.length === 0) {
+        if (!instituteUsers || instituteUsers.length === 0) {
           setMembers([]);
           setIsLoading(false);
           return;
         }
 
-        const batchIds = myBatches.map((b) => b.batch_id as string);
-        const batchNameMap = new Map<string, string>();
-        for (const b of myBatches) {
-          const batch = (b as unknown as { batch_id: string; batches: { name: string } | null }).batches;
-          batchNameMap.set(b.batch_id as string, batch?.name ?? "Unknown Batch");
+        // For students, filter to only batch mates
+        let allowedUserIds = new Set<string>();
+        if (role === "student") {
+          // Get current student's batch assignments
+          const { data: currentStudent } = await supabase
+            .from("students")
+            .select("id")
+            .eq("user_id", user.id)
+            .single();
+
+          if (currentStudent) {
+            const { data: myBatches } = await supabase
+              .from("student_batch_assignments")
+              .select("batch_id")
+              .eq("student_id", currentStudent.id)
+              .eq("is_active", true);
+
+            if (myBatches && myBatches.length > 0) {
+              const batchIds = myBatches.map((b) => b.batch_id as string);
+
+              // Get all students in those batches
+              const { data: peerAssignments } = await supabase
+                .from("student_batch_assignments")
+                .select("students(user_id)")
+                .in("batch_id", batchIds)
+                .eq("is_active", true)
+                .neq("student_id", currentStudent.id);
+
+              (peerAssignments ?? []).forEach((pa: any) => {
+                if (pa.students?.user_id) {
+                  allowedUserIds.add(pa.students.user_id);
+                }
+              });
+            }
+          }
         }
 
-        // Get all students in those batches (excluding current user)
-        const { data: peerAssignments } = await supabase
-          .from("student_batch_assignments")
-          .select("batch_id, students(user_id, users(id, name, avatar_url))")
-          .in("batch_id", batchIds)
-          .eq("is_active", true)
-          .neq("student_id", currentStudent.id);
-
-        if (!peerAssignments || peerAssignments.length === 0) {
-          setMembers([]);
-          setIsLoading(false);
-          return;
-        }
-
-        // Build unique member list
-        const seen = new Set<string>();
+        // Build member list
         const memberList: BatchMember[] = [];
 
-        for (const assignment of peerAssignments) {
-          const row = assignment as unknown as {
-            batch_id: string;
-            students: {
-              user_id: string;
-              users: { id: string; name: string; avatar_url: string | null } | null;
-            } | null;
-          };
-          const student = row.students;
+        for (const u of instituteUsers as any[]) {
+          // For students, only include batch mates
+          if (role === "student" && !allowedUserIds.has(u.id)) continue;
 
-          if (!student?.users || !student.user_id) continue;
-          if (seen.has(student.user_id)) continue;
-          seen.add(student.user_id);
+          const roleLabel = u.role ? u.role.charAt(0).toUpperCase() + u.role.slice(1) : "Member";
 
           memberList.push({
-            user_id: student.user_id,
-            name: student.users.name,
-            avatar_url: student.users.avatar_url,
-            batch_name: batchNameMap.get(row.batch_id) ?? "Unknown",
+            user_id: u.id,
+            name: u.name || "Unknown",
+            avatar_url: u.avatar_url,
+            batch_name: roleLabel,
+            role: u.role || "student",
           });
         }
 
-        // Sort alphabetically by name
-        memberList.sort((a, b) => a.name.localeCompare(b.name));
         setMembers(memberList);
       } catch (err) {
         console.error("Failed to fetch batch members:", err);
@@ -136,7 +141,7 @@ export function BatchMemberList({ onStartConversation }: BatchMemberListProps) {
     }
 
     fetchBatchMembers();
-  }, [user?.id]);
+  }, [user?.id, instituteId, role]);
 
   async function handleSelectMember(member: BatchMember) {
     if (!user?.id || !instituteId || initiatingWith) return;
@@ -242,7 +247,7 @@ export function BatchMemberList({ onStartConversation }: BatchMemberListProps) {
                   <span className="font-medium truncate block">
                     {member.name}
                   </span>
-                  <span className="text-xs text-muted-foreground truncate block">
+                  <span className="text-xs text-muted-foreground truncate block capitalize">
                     {member.batch_name}
                   </span>
                 </div>

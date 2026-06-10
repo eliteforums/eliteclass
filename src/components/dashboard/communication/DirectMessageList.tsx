@@ -60,14 +60,26 @@ export function DirectMessageList({
       if (!user?.id) return;
 
       setIsLoading(true);
-      const result = await getConversations(user.id);
-      if (result.success && result.data) {
-        setConversations(result.data);
+      try {
+        const result = await getConversations(user.id);
+        if (result.success && result.data) {
+          setConversations(result.data);
+        } else {
+          console.warn("Failed to fetch conversations:", result.error);
+          setConversations([]);
+        }
+      } catch (err) {
+        console.error("Error fetching conversations:", err);
+        setConversations([]);
       }
       setIsLoading(false);
     }
 
     fetchConversations();
+
+    // Refresh conversations every 10 seconds
+    const interval = setInterval(fetchConversations, 10000);
+    return () => clearInterval(interval);
   }, [user?.id]);
 
   if (isLoading) {
