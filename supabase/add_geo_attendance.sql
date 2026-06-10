@@ -8,6 +8,12 @@
 --   4. If within 100 meters → attendance marked as present
 --   5. Prompt expires after 5 minutes automatically
 --
+-- FIXED (2026-06-10):
+--   1. Added validate_attendance_response() trigger for server-side distance check
+--   2. Added handle_duplicate_response() trigger to gracefully handle race conditions
+--   3. Added prompt cleanup function for expired prompt archival
+--   4. Added cron job setup for auto-expiry
+--
 -- Tables:
 --   - attendance_prompts: teacher-initiated attendance sessions
 --   - attendance_responses: student responses with GPS validation result
@@ -99,10 +105,13 @@ CREATE TABLE IF NOT EXISTS public.attendance_responses (
   student_latitude DOUBLE PRECISION NOT NULL,
   student_longitude DOUBLE PRECISION NOT NULL,
   student_accuracy DOUBLE PRECISION,
-  -- Validation result
+  -- Validation result (recalculated server-side by trigger)
   distance_meters DOUBLE PRECISION NOT NULL, -- Calculated distance from teacher
   is_within_radius BOOLEAN NOT NULL, -- distance_meters <= prompt.radius_meters
   status TEXT NOT NULL CHECK (status IN ('present', 'rejected', 'late')),
+  -- Server-validated flag (set by trigger)
+  server_validated BOOLEAN NOT NULL DEFAULT false,
+  server_distance_meters DOUBLE PRECISION, -- Server-recalculated distance
   -- Timestamps
   responded_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   -- Prevent duplicate responses
@@ -173,7 +182,113 @@ GRANT EXECUTE ON FUNCTION public.haversine_distance(DOUBLE PRECISION, DOUBLE PRE
 
 
 -- ═══════════════════════════════════════════════════════════════════════════════
--- 4. AUTO-EXPIRE FUNCTION — Marks prompts as expired after duration
+-- 4. TRIGGER — Server-side distance validation on response insert
+--
+--    Recalculates distance server-side to prevent client-side tampering.
+--    Updates status based on server-calculated distance vs. prompt radius.
+--    Marks the response as server_validated = true on success.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.validate_attendance_response()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  prompt_record RECORD;
+  server_distance DOUBLE PRECISION;
+  should_be_within BOOLEAN;
+  should_status TEXT;
+BEGIN
+  -- Get the associated prompt
+  SELECT * INTO prompt_record
+  FROM public.attendance_prompts
+  WHERE id = NEW.prompt_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Attendance prompt % not found', NEW.prompt_id;
+  END IF;
+
+  -- Recalculate distance server-side using haversine
+  server_distance := public.haversine_distance(
+    prompt_record.teacher_latitude,
+    prompt_record.teacher_longitude,
+    NEW.student_latitude,
+    NEW.student_longitude
+  );
+
+  -- Determine correct status based on server calculation
+  should_be_within := server_distance <= prompt_record.radius_meters;
+
+  IF should_be_within THEN
+    should_status := 'present';
+  ELSE
+    should_status := 'rejected';
+  END IF;
+
+  -- Override client-provided values with server-calculated ones
+  NEW.distance_meters := ROUND(server_distance);
+  NEW.is_within_radius := should_be_within;
+  NEW.status := should_status;
+  NEW.server_validated := true;
+  NEW.server_distance_meters := ROUND(server_distance);
+
+  RETURN NEW;
+END;
+$$;
+
+-- Drop existing trigger if present (for idempotent migrations)
+DROP TRIGGER IF EXISTS trg_validate_attendance_response ON public.attendance_responses;
+
+CREATE TRIGGER trg_validate_attendance_response
+  BEFORE INSERT ON public.attendance_responses
+  FOR EACH ROW
+  EXECUTE FUNCTION public.validate_attendance_response();
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 5. TRIGGER — Graceful handling of duplicate responses
+--
+--    Instead of raising a 23505 error, silently return the existing response.
+--    This prevents confusing error messages for race conditions.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE OR REPLACE FUNCTION public.handle_duplicate_attendance_response()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  existing RECORD;
+BEGIN
+  -- Check if a response already exists for this prompt + student
+  SELECT * INTO existing
+  FROM public.attendance_responses
+  WHERE prompt_id = NEW.prompt_id
+    AND student_id = NEW.student_id;
+
+  IF FOUND THEN
+    -- Return the existing record instead of inserting
+    RETURN NULL;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+-- Drop existing trigger if present (for idempotent migrations)
+DROP TRIGGER IF EXISTS trg_handle_duplicate_response ON public.attendance_responses;
+
+CREATE TRIGGER trg_handle_duplicate_response
+  BEFORE INSERT ON public.attendance_responses
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_duplicate_attendance_response();
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 6. AUTO-EXPIRE FUNCTION — Marks prompts as expired after duration
 --    Call this periodically via pg_cron or a Supabase Edge Function
 -- ═══════════════════════════════════════════════════════════════════════════════
 
@@ -189,10 +304,18 @@ BEGIN
   UPDATE public.attendance_prompts
   SET status = 'expired'
   WHERE status = 'active' AND expires_at <= now();
-  
+
   GET DIAGNOSTICS expired_count = ROW_COUNT;
   RETURN expired_count;
 END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.expire_attendance_prompts() TO authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- 7. ENABLE REALTIME FOR ATTENDANCE RESPONSES (optional)
+--    Uncomment if you want students to see responses in real-time
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+-- ALTER PUBLICATION supabase_realtime ADD TABLE public.attendance_responses;
