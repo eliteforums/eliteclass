@@ -9,6 +9,11 @@
 //   5. If within 100m → present, else → rejected
 //
 // Every function returns ApiResponse<T> — never throws.
+//
+// FIXED (2026-06-10):
+//   1. Added hasStudentResponded() to pre-check existing responses
+//   2. respondToAttendancePrompt now handles 23505 duplicate key gracefully
+//   3. Added server-side distance validation via DB trigger (see add_geo_attendance.sql)
 // ---------------------------------------------------------------------------
 
 import { supabase } from "@/lib/supabase";
@@ -160,6 +165,33 @@ export async function getPromptResponses(
 
   if (error) return { data: null, error: error.message, success: false };
   return { data: (data ?? []) as AttendanceResponse[], error: null, success: true };
+}
+
+// ── Student: Check if Already Responded ──────────────────────────────────────
+
+export async function hasStudentResponded(
+  promptId: string,
+  studentId: string,
+): Promise<ApiResponse<boolean>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  try {
+    const { data, error } = await supabase
+      .from("attendance_responses")
+      .select("id")
+      .eq("prompt_id", promptId)
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    if (error) {
+      return { data: null, error: error.message, success: false };
+    }
+
+    return { data: !!data, error: null, success: true };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Failed to check existing response";
+    return { data: null, error: errorMsg, success: false };
+  }
 }
 
 // ── Student: Get Active Prompts for Their Batches ────────────────────────────
