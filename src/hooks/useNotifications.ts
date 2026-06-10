@@ -110,8 +110,14 @@ export function useNotifications(): UseNotificationsReturn {
 
     loadInitial();
 
+    // Always start polling as a reliable fallback (every 30s)
+    const pollingInterval = setInterval(() => {
+      fetchNotifications();
+    }, POLLING_INTERVAL_MS);
+
     return () => {
       cancelled = true;
+      clearInterval(pollingInterval);
     };
   }, [userId, fetchNotifications]);
 
@@ -146,17 +152,21 @@ export function useNotifications(): UseNotificationsReturn {
             read_at: string | null;
           };
 
-          // Fetch sender info
+          // Fetch sender info with error handling
           let sender: Notification["sender"] | undefined;
-          if (supabase) {
-            const { data: userData } = await supabase
-              .from("users")
-              .select("id, name, role")
-              .eq("id", newRow.sender_id)
-              .single();
-            if (userData) {
-              sender = userData as { id: string; name: string; role: string };
+          try {
+            if (supabase && newRow.sender_id) {
+              const { data: userData } = await supabase
+                .from("users")
+                .select("id, name, role")
+                .eq("id", newRow.sender_id)
+                .single();
+              if (userData) {
+                sender = userData as { id: string; name: string; role: string };
+              }
             }
+          } catch {
+            // Sender fetch failed — continue without sender info
           }
 
           const newNotification: Notification = {

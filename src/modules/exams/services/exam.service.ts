@@ -1254,6 +1254,16 @@ export async function executeCode(
 }
 
 /**
+ * Normalizes output for comparison — trims whitespace and normalizes line endings.
+ */
+function normalizeOutput(output: string): string {
+  return output
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .trim();
+}
+
+/**
  * Run only the VISIBLE test cases and return results (used for the "Run" button).
  */
 export async function runVisibleTests(
@@ -1273,8 +1283,10 @@ export async function runVisibleTests(
   const results = await Promise.all(
     visible.map(async (tc) => {
       const { stdout, stderr } = await executeCode(language, code, tc.input);
+      const normalizedStdout = normalizeOutput(stdout);
+      const normalizedExpected = normalizeOutput(tc.expected_output);
       return {
-        passed: stdout === tc.expected_output.trim(),
+        passed: normalizedStdout === normalizedExpected,
         input: tc.input,
         expected_output: tc.expected_output,
         actual_output: stdout,
@@ -1306,7 +1318,9 @@ export async function submitCodingAnswer(
   const rawResults = await Promise.all(
     testCases.map(async (tc) => {
       const { stdout, stderr, exitCode } = await executeCode(language, code, tc.input);
-      const passed = exitCode === 0 && stdout === tc.expected_output.trim();
+      const normalizedStdout = normalizeOutput(stdout);
+      const normalizedExpected = normalizeOutput(tc.expected_output);
+      const passed = exitCode === 0 && normalizedStdout === normalizedExpected;
       return {
         passed,
         input: tc.is_hidden ? undefined : tc.input,
@@ -1499,29 +1513,54 @@ export async function uploadProctoringCapture(
   const timestamp = Date.now();
   const storagePath = `${instituteId}/${examId}/${attemptId}/${captureType}_${captureIndex}_${timestamp}.jpg`;
 
-  const { error: uploadError } = await supabase.storage
-    .from(EXAM_PROCTORING_BUCKET)
-    .upload(storagePath, imageBlob, {
-      contentType: "image/jpeg",
-      upsert: false,
+  try {
+    // Ensure bucket exists before upload
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = (buckets ?? []).some((b) => b.name === EXAM_PROCTORING_BUCKET);
+
+    if (!bucketExists) {
+      await supabase.storage.createBucket(EXAM_PROCTORING_BUCKET, {
+        public: true,
+        fileSizeLimit: 10485760,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/jpg"],
+      });
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from(EXAM_PROCTORING_BUCKET)
+      .upload(storagePath, imageBlob, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error("[proctoring] Upload error:", uploadError);
+      return { success: false, error: getErrorMessage(uploadError) };
+    }
+
+    const { error: insertError } = await supabase.from("exam_proctoring_captures").insert({
+      attempt_id: attemptId,
+      student_id: studentId,
+      institute_id: instituteId,
+      exam_id: examId,
+      capture_type: captureType,
+      storage_path: storagePath,
+      capture_index: captureIndex,
+      captured_at: new Date().toISOString(),
+      metadata: metadata ?? null,
     });
 
-  if (uploadError) return { success: false, error: getErrorMessage(uploadError) };
+    if (insertError) {
+      console.error("[proctoring] DB insert error:", insertError);
+      return { success: false, error: getErrorMessage(insertError) };
+    }
 
-  const { error: insertError } = await supabase.from("exam_proctoring_captures").insert({
-    attempt_id: attemptId,
-    student_id: studentId,
-    institute_id: instituteId,
-    exam_id: examId,
-    capture_type: captureType,
-    storage_path: storagePath,
-    capture_index: captureIndex,
-    captured_at: new Date().toISOString(),
-    metadata: metadata ?? null,
-  });
-
-  if (insertError) return { success: false, error: getErrorMessage(insertError) };
-  return { success: true };
+    return { success: true };
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : "Unknown upload error";
+    console.error("[proctoring] Capture upload failed:", errorMsg);
+    return { success: false, error: errorMsg };
+  }
 }
 
 /**
@@ -1541,13 +1580,27 @@ export async function getAttemptCaptures(
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
   // Generate short-lived signed URLs so images are viewable by admin only
-  const client = supabase;
   const withUrls = await Promise.all(
     (data ?? []).map(async (row: any) => {
-      const { data: urlData } = await client.storage
-        .from(EXAM_PROCTORING_BUCKET)
-        .createSignedUrl(row.storage_path, 3600);
-      return { ...row, signed_url: urlData?.signedUrl ?? null };
+      try {
+        // Try signed URL first (more secure)
+        const { data: urlData, error: signedUrlError } = await supabase.storage
+          .from(EXAM_PROCTORING_BUCKET)
+          .createSignedUrl(row.storage_path, 3600);
+
+        if (!signedUrlError && urlData?.signedUrl) {
+          return { ...row, signed_url: urlData.signedUrl };
+        }
+
+        // Fallback to public URL if signed URL fails
+        const { data: publicUrlData } = supabase.storage
+          .from(EXAM_PROCTORING_BUCKET)
+          .getPublicUrl(row.storage_path);
+
+        return { ...row, signed_url: publicUrlData?.publicUrl ?? null };
+      } catch {
+        return { ...row, signed_url: null };
+      }
     }),
   );
 
@@ -1578,15 +1631,29 @@ export async function getExamCaptures(examId: string): Promise<ApiResponse<Proct
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const client = supabase;
   const withUrls = await Promise.all(
     (data ?? []).map(async (row: any) => {
-      const { data: urlData } = await client.storage
-        .from(EXAM_PROCTORING_BUCKET)
-        .createSignedUrl(row.storage_path, 3600);
+      let signed_url: string | null = null;
+      try {
+        const { data: urlData, error: signedUrlError } = await supabase.storage
+          .from(EXAM_PROCTORING_BUCKET)
+          .createSignedUrl(row.storage_path, 3600);
+
+        if (!signedUrlError && urlData?.signedUrl) {
+          signed_url = urlData.signedUrl;
+        } else {
+          const { data: publicUrlData } = supabase.storage
+            .from(EXAM_PROCTORING_BUCKET)
+            .getPublicUrl(row.storage_path);
+          signed_url = publicUrlData?.publicUrl ?? null;
+        }
+      } catch {
+        signed_url = null;
+      }
+
       return {
         ...row,
-        signed_url: urlData?.signedUrl ?? null,
+        signed_url,
         student_name: row.attempt?.student?.user?.name ?? undefined,
         admission_no: row.attempt?.student?.admission_no ?? undefined,
       };

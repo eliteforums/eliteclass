@@ -95,17 +95,37 @@ export async function getNotifications(
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   try {
+    // Fetch notifications first
     const { data, error } = await supabase
       .from("notifications")
-      .select("id, institute_id, sender_id, recipient_id, title, body, is_read, created_at, read_at, users!notifications_sender_id_fkey(id, name, role)")
+      .select("id, institute_id, sender_id, recipient_id, title, body, is_read, created_at, read_at")
       .eq("recipient_id", userId)
       .order("created_at", { ascending: false })
       .limit(limit);
 
     if (error) return { data: null, error: error.message, success: false };
 
-    const notifications: Notification[] = (data ?? []).map((row: Record<string, unknown>) => {
-      const sender = row.users as { id: string; name: string; role: string } | null;
+    if (!data || data.length === 0) {
+      return { data: [], error: null, success: true };
+    }
+
+    // Fetch sender info separately for reliability
+    const senderIds = [...new Set((data as any[]).map((row) => row.sender_id).filter(Boolean))];
+    let senderMap = new Map<string, { id: string; name: string; role: string }>();
+
+    if (senderIds.length > 0) {
+      const { data: usersData } = await supabase
+        .from("users")
+        .select("id, name, role")
+        .in("id", senderIds);
+
+      (usersData ?? []).forEach((u: any) => {
+        senderMap.set(u.id, { id: u.id, name: u.name, role: u.role });
+      });
+    }
+
+    const notifications: Notification[] = (data as any[]).map((row: Record<string, unknown>) => {
+      const sender = senderMap.get(row.sender_id as string);
       return {
         id: row.id as string,
         institute_id: row.institute_id as string,

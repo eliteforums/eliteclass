@@ -192,7 +192,12 @@ export function CodingExamPlayer({ examId }: CodingExamPlayerProps) {
         return;
       }
 
-      setExam(examRes.data);
+      // Filter to only coding questions
+      const codingQuestions = examRes.data.questions?.filter(
+        (q: any) => q.question_type === "coding" || !q.question_type
+      ) ?? [];
+      const examWithCodingOnly = { ...examRes.data, questions: codingQuestions };
+      setExam(examWithCodingOnly);
       setAttempt(newAttempt);
 
       // Create session

@@ -91,7 +91,11 @@ async function captureFrameFromStream(
       resolve(null);
     };
 
-    video.load();
+    video.play().catch(() => {
+      clearTimeout(timeoutId);
+      video.srcObject = null;
+      resolve(null);
+    });
   });
 }
 

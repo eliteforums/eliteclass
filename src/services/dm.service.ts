@@ -299,9 +299,10 @@ export async function getMessages(
 // ── validateCommonBatch ──────────────────────────────────────────────────────
 /**
  * Checks whether two users share at least one common batch.
- * Both users must have an active student record and be assigned to a shared batch.
+ * Works for students, staff, and admin users.
  *
- * Returns true if they share at least one common batch, false otherwise.
+ * Returns true if they share at least one common batch, or if either user is staff/admin.
+ * Returns false otherwise.
  */
 export async function validateCommonBatch(
   userId: string,
@@ -310,6 +311,18 @@ export async function validateCommonBatch(
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   try {
+    // Check if either user is staff or admin — they can message anyone in their institute
+    const { data: userRoles } = await supabase
+      .from("users")
+      .select("role")
+      .in("id", [userId, otherUserId]);
+
+    const roles = (userRoles ?? []).map((u: any) => u.role);
+    // Staff and admin can message anyone
+    if (roles.some((r) => r === "admin" || r === "staff" || r === "super_admin")) {
+      return { data: true, error: null, success: true };
+    }
+
     // Get student ID for the first user
     const { data: student1 } = await supabase
       .from("students")
@@ -402,16 +415,27 @@ export async function sendDirectMessage(
         : (conversation.participant_1_id as string);
 
     // Validate that sender shares a common batch with the other participant
-    const validationResult = await validateCommonBatch(senderId, otherUserId);
-    if (!validationResult.success) {
-      return { data: null, error: validationResult.error, success: false };
-    }
-    if (validationResult.data === false) {
-      return {
-        data: null,
-        error: "Cannot send message: recipient is not reachable (no common batch).",
-        success: false,
-      };
+    // Skip validation for staff/admin users
+    const { data: senderRole } = await supabase
+      .from("users")
+      .select("role")
+      .eq("id", senderId)
+      .single();
+
+    const isStaffOrAdmin = ["admin", "staff", "super_admin"].includes((senderRole as any)?.role);
+
+    if (!isStaffOrAdmin) {
+      const validationResult = await validateCommonBatch(senderId, otherUserId);
+      if (!validationResult.success) {
+        return { data: null, error: validationResult.error, success: false };
+      }
+      if (validationResult.data === false) {
+        return {
+          data: null,
+          error: "Cannot send message: recipient is not reachable (no common batch).",
+          success: false,
+        };
+      }
     }
 
     // Insert the message
