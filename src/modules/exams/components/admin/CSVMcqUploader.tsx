@@ -122,6 +122,7 @@ export function CSVMcqUploader({ examId, onQuestionsAdded }: CSVMcqUploaderProps
         question_text: q.question_text,
         marks: q.marks,
         explanation: q.explanation || undefined,
+        code_snippet: q.code_snippet || undefined,
         position: i,
         options: q.options.map((opt, idx) => ({
           option_text: opt.option_text,
@@ -303,11 +304,13 @@ export function CSVMcqUploader({ examId, onQuestionsAdded }: CSVMcqUploaderProps
               <p className="font-medium">CSV Format:</p>
               <p>
                 question_text, option_1, option_2, option_3, option_4,
-                correct_option, marks, explanation
+                correct_option, marks, explanation, code_snippet (optional)
               </p>
               <p className="italic">
-                Example: "What is 2+2?", "3", "4", "5", "6", 2, 1, "The answer
-                is 4"
+                Example: "What is 2+2?", "3", "4", "5", "6", 2, 1, "The answer is 4", "print(2+2)"
+              </p>
+              <p className="text-xs">
+                💡 For code snippets: Place Python, JavaScript, Java, or any code inside quotes
               </p>
             </div>
           </div>
@@ -354,9 +357,15 @@ export function CSVMcqUploader({ examId, onQuestionsAdded }: CSVMcqUploaderProps
                       </p>
                     ))}
                   </div>
+                  {q.code_snippet && (
+                    <div className="mt-2 p-2 rounded bg-slate-900 text-slate-100 text-xs font-mono overflow-x-auto max-h-24">
+                      <pre className="whitespace-pre-wrap">{q.code_snippet.substring(0, 200)}{q.code_snippet.length > 200 ? "..." : ""}</pre>
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground">
                     {q.marks} marks
                     {q.explanation && ` • Has explanation`}
+                    {q.code_snippet && ` • Has code`}
                   </p>
                 </div>
               ))}
