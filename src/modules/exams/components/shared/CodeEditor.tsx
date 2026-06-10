@@ -62,7 +62,6 @@ export function CodeEditor({
           Loading editor...
         </div>
       }
-      onError={() => setHasError(true)}
       options={{
         fontSize: 14,
         minimap: { enabled: false },

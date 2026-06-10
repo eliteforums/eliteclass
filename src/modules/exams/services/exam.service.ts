@@ -1586,7 +1586,7 @@ export async function getAttemptCaptures(
     (data ?? []).map(async (row: any) => {
       try {
         // Try signed URL first (more secure)
-        const { data: urlData, error: signedUrlError } = await supabase.storage
+        const { data: urlData, error: signedUrlError } = await supabase!.storage
           .from(EXAM_PROCTORING_BUCKET)
           .createSignedUrl(row.storage_path, 3600);
 
@@ -1595,7 +1595,7 @@ export async function getAttemptCaptures(
         }
 
         // Fallback to public URL if signed URL fails
-        const { data: publicUrlData } = supabase.storage
+        const { data: publicUrlData } = supabase!.storage
           .from(EXAM_PROCTORING_BUCKET)
           .getPublicUrl(row.storage_path);
 
@@ -1637,14 +1637,14 @@ export async function getExamCaptures(examId: string): Promise<ApiResponse<Proct
     (data ?? []).map(async (row: any) => {
       let signed_url: string | null = null;
       try {
-        const { data: urlData, error: signedUrlError } = await supabase.storage
+        const { data: urlData, error: signedUrlError } = await supabase!.storage
           .from(EXAM_PROCTORING_BUCKET)
           .createSignedUrl(row.storage_path, 3600);
 
         if (!signedUrlError && urlData?.signedUrl) {
           signed_url = urlData.signedUrl;
         } else {
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = supabase!.storage
             .from(EXAM_PROCTORING_BUCKET)
             .getPublicUrl(row.storage_path);
           signed_url = publicUrlData?.publicUrl ?? null;

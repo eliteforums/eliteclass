@@ -36,6 +36,7 @@ import { useRealtimeExamTimer } from "../../hooks/useRealtimeExamTimer";
 import { useAttemptValidation } from "../../hooks/useAttemptValidation";
 import { generateBrowserFingerprint, getOrCreateDeviceId } from "../../utils/exam-security";
 import { useProctoring } from "../../hooks/useProctoring";
+import { useProctoringCapture } from "../../hooks/useProctoringCapture";
 import { ProctoringOverlay } from "./ProctoringOverlay";
 
 interface ExamPlayerProps {
@@ -77,6 +78,23 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     enableCameraMic,
     enableDeterrentUi,
     attemptId: attempt?.id || '',
+  });
+
+  // ── Proctoring Capture Hook ─────────────────────────────────────────────────
+
+  const enableScreenCapture = exam?.enable_screen_capture ?? false;
+
+  useProctoringCapture({
+    enabled: securityEnabled && (enableCameraMic || enableScreenCapture) && !!attempt?.id,
+    attemptId: attempt?.id || '',
+    studentId: attempt?.student_id || '',
+    examId,
+    instituteId: institute?.id || '',
+    cameraStream: proctoring.cameraStream,
+    screenStream: null, // Screen-share stream is not yet implemented
+    durationMs: (exam?.duration_mins || 60) * 60 * 1000,
+    currentQuestionIdx,
+    timeRemaining: timeLeft,
   });
 
   const { timeRemaining, isExpired } = useRealtimeExamTimer({
