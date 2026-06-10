@@ -250,7 +250,7 @@ export async function listStudentExams(
       `
       *,
       exam_assignments!inner(student_id),
-      attempts:exam_attempts(id, status, score, percentage, passed, submitted_at, violation_count, last_violation_at, auto_submit_reason, reattempt_granted, started_at)
+      attempts:exam_attempts(id, student_id, status, score, percentage, passed, submitted_at, violation_count, last_violation_at, auto_submit_reason, reattempt_granted, started_at)
     `,
     )
     .eq("exam_assignments.student_id", student.id)
@@ -260,8 +260,11 @@ export async function listStudentExams(
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
   const formattedData = (data as any[]).map((item) => {
-    // Sort attempts by started_at descending to get the most recent
-    const sortedAttempts = (item.attempts ?? []).sort(
+    // Filter attempts to only the current student's, then sort by started_at descending
+    const studentAttempts = (item.attempts ?? []).filter(
+      (a: any) => a.student_id === student.id,
+    );
+    const sortedAttempts = studentAttempts.sort(
       (a: { started_at?: string | null }, b: { started_at?: string | null }) =>
         new Date(b.started_at ?? 0).getTime() - new Date(a.started_at ?? 0).getTime(),
     );
