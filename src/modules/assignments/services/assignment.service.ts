@@ -204,13 +204,18 @@ export async function createAssignment(
 ): Promise<ApiResponse<Assignment>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
-  const { data: assignment, error: assignmentError } = await supabase
-    .from("assignments")
-    .insert({
+  // Strip undefined values so Supabase uses column defaults (allow_* all default TRUE)
+  const insertPayload = Object.fromEntries(
+    Object.entries({
       institute_id: instituteId,
       created_by: createdBy,
       ...payload,
-    })
+    }).filter(([, v]) => v !== undefined),
+  );
+
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("assignments")
+    .insert(insertPayload)
     .select()
     .single();
 

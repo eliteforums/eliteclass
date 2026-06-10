@@ -87,7 +87,22 @@ export function AssignmentFormModal({
         ? format(new Date(initialData.due_date), "yyyy-MM-dd'T'HH:mm")
         : "",
       allow_late: initialData?.allow_late ?? true,
-      submission_type: (initialData?.submission_type as any) ?? "any",
+      // Back-compat: derive booleans from legacy submission_type when editing old rows
+      allow_text:
+        initialData?.allow_text ??
+        (initialData?.submission_type === "text" ||
+          initialData?.submission_type === "any" ||
+          !initialData?.submission_type),
+      allow_link:
+        initialData?.allow_link ??
+        (initialData?.submission_type === "url_link" ||
+          initialData?.submission_type === "any" ||
+          !initialData?.submission_type),
+      allow_file_upload:
+        initialData?.allow_file_upload ??
+        (initialData?.submission_type === "file_upload" ||
+          initialData?.submission_type === "any" ||
+          !initialData?.submission_type),
       status: initialData?.status ?? "draft",
     },
   });
@@ -272,43 +287,83 @@ export function AssignmentFormModal({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="submission_type">Submission Type</Label>
-            <Select
-              value={form.watch("submission_type") ?? "any"}
-              onValueChange={(value: any) => form.setValue("submission_type", value)}
-            >
-              <SelectTrigger id="submission_type">
-                <SelectValue placeholder="How should students submit?" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">
-                  <span className="font-medium">Any</span>
-                  <span className="text-muted-foreground ml-2 text-xs">File, text, or URL</span>
-                </SelectItem>
-                <SelectItem value="file_upload">
-                  <span className="font-medium">File Upload</span>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    Students must upload a file
-                  </span>
-                </SelectItem>
-                <SelectItem value="text">
-                  <span className="font-medium">Written Response</span>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    Students type their answer
-                  </span>
-                </SelectItem>
-                <SelectItem value="url_link">
-                  <span className="font-medium">URL / Link</span>
-                  <span className="text-muted-foreground ml-2 text-xs">
-                    Students paste a URL or link
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Controls what submission options students see when submitting this assignment.
+          <div className="space-y-3">
+            <Label>Allowed Submission Types</Label>
+            <p className="text-xs text-muted-foreground -mt-1">
+              Choose what submission options students will see. You can enable one or more.
             </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+              {/* Text toggle */}
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${form.watch("allow_text") ? "border-primary bg-primary/5" : "border-border/50 hover:border-border bg-muted/20"}`}
+                onClick={() => form.setValue("allow_text", !form.watch("allow_text"))}
+              >
+                <Checkbox
+                  id="allow_text"
+                  checked={form.watch("allow_text")}
+                  onCheckedChange={(checked) => form.setValue("allow_text", !!checked)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1 select-none">
+                  <label htmlFor="allow_text" className="text-sm font-semibold leading-none cursor-pointer">
+                    Written Response
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Students type their answer in a text box.
+                  </p>
+                </div>
+              </div>
+
+              {/* Link toggle */}
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${form.watch("allow_link") ? "border-primary bg-primary/5" : "border-border/50 hover:border-border bg-muted/20"}`}
+                onClick={() => form.setValue("allow_link", !form.watch("allow_link"))}
+              >
+                <Checkbox
+                  id="allow_link"
+                  checked={form.watch("allow_link")}
+                  onCheckedChange={(checked) => form.setValue("allow_link", !!checked)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1 select-none">
+                  <label htmlFor="allow_link" className="text-sm font-semibold leading-none cursor-pointer">
+                    URL / Link
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Students paste a URL or external link.
+                  </p>
+                </div>
+              </div>
+
+              {/* File upload toggle */}
+              <div
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${form.watch("allow_file_upload") ? "border-primary bg-primary/5" : "border-border/50 hover:border-border bg-muted/20"}`}
+                onClick={() => form.setValue("allow_file_upload", !form.watch("allow_file_upload"))}
+              >
+                <Checkbox
+                  id="allow_file_upload"
+                  checked={form.watch("allow_file_upload")}
+                  onCheckedChange={(checked) => form.setValue("allow_file_upload", !!checked)}
+                  className="mt-0.5"
+                />
+                <div className="space-y-1 select-none">
+                  <label htmlFor="allow_file_upload" className="text-sm font-semibold leading-none cursor-pointer">
+                    File Upload
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Students upload one or more files.
+                  </p>
+                </div>
+              </div>
+            </div>
+            {/* Validation: at least one must be enabled */}
+            {!form.watch("allow_text") &&
+              !form.watch("allow_link") &&
+              !form.watch("allow_file_upload") && (
+                <p className="text-xs text-destructive font-medium">
+                  Please enable at least one submission type.
+                </p>
+              )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">

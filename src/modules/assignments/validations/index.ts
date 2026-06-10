@@ -11,7 +11,11 @@ export const assignmentSchema = z.object({
     .default(100),
   due_date: z.string().optional().nullable(),
   allow_late: z.boolean().default(true),
+  /** @deprecated Kept for backward-compat.  Use allow_text / allow_link / allow_file_upload. */
   submission_type: z.enum(["any", "file_upload", "text", "url_link"]).default("any"),
+  allow_text: z.boolean().default(true),
+  allow_link: z.boolean().default(true),
+  allow_file_upload: z.boolean().default(true),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
 });
 

@@ -1815,7 +1815,14 @@ export interface Assignment {
   due_date: string | null;
   status: AssignmentStatus;
   allow_late: boolean;
+  /** @deprecated Kept for backward-compat.  Use allow_text / allow_link / allow_file_upload instead. */
   submission_type?: SubmissionType;
+  /** When TRUE students may submit a written text response. */
+  allow_text?: boolean;
+  /** When TRUE students may submit a URL / link. */
+  allow_link?: boolean;
+  /** When TRUE students may upload one or more files. */
+  allow_file_upload?: boolean;
   created_at: string;
   updated_at: string;
 
@@ -1879,7 +1886,14 @@ export interface CreateAssignmentPayload {
   due_date?: string | null;
   status?: AssignmentStatus;
   allow_late?: boolean;
+  /** @deprecated Use allow_text / allow_link / allow_file_upload instead. */
   submission_type?: SubmissionType;
+  /** When TRUE students may submit a written text response. */
+  allow_text?: boolean;
+  /** When TRUE students may submit a URL / link. */
+  allow_link?: boolean;
+  /** When TRUE students may upload one or more files. */
+  allow_file_upload?: boolean;
 }
 
 /**
