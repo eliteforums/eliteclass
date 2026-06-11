@@ -265,4 +265,4 @@ function StatsCard({ label, value, icon: Icon, className }: any) {
       <div className="p-2 rounded-lg bg-current/10">
         <Icon className="h-5 w-5" />
       </div>
-    <
+    </div>
