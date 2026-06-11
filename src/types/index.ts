@@ -1801,7 +1801,7 @@ export interface TeacherStudentsListResponse {
 // ── Assignment Management System ──────────────────────────────────────────────
 
 export type AssignmentStatus = "draft" | "published" | "archived";
-export type SubmissionStatus = "pending" | "submitted" | "late" | "reviewed" | "graded";
+export type SubmissionStatus = "pending" | "submitted" | "late" | "reviewed" | "graded" | "resubmit_requested";
 export type SubmissionType = "any" | "file_upload" | "text" | "url_link";
 
 export interface Assignment {

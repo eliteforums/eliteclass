@@ -159,6 +159,19 @@ export function useSubmitAssignment() {
   });
 }
 
+export function useRequestResubmit() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ submissionId }: { submissionId: string }) =>
+      assignmentService.requestResubmit(submissionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["submissions"] });
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
+    },
+  });
+}
+
 export function useGradeSubmission() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();

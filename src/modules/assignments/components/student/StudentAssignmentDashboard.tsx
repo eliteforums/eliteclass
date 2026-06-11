@@ -16,6 +16,7 @@ import {
   Loader2,
   Trash2,
   Link as LinkIcon,
+  RotateCcw,
 } from "lucide-react";
 import { format, isAfter } from "date-fns";
 import {
@@ -49,7 +50,7 @@ export function StudentAssignmentDashboard() {
     if (!matchesSearch) return false;
 
     if (activeTab === "all") return true;
-    if (activeTab === "pending") return !a.submission || a.submission.status === "pending";
+    if (activeTab === "pending") return !a.submission || a.submission.status === "pending" || a.submission.status === "resubmit_requested";
     if (activeTab === "submitted")
       return (
         a.submission && (a.submission.status === "submitted" || a.submission.status === "late")
@@ -58,18 +59,23 @@ export function StudentAssignmentDashboard() {
       return (
         a.submission && (a.submission.status === "graded" || a.submission.status === "reviewed")
       );
+    if (activeTab === "resubmit")
+      return a.submission && a.submission.status === "resubmit_requested";
 
     return true;
   });
 
   const pendingAssignments = assignments.filter(
-    (a) => !a.submission || a.submission.status === "pending",
+    (a) => !a.submission || a.submission.status === "pending" || a.submission.status === "resubmit_requested",
   );
   const submittedAssignments = assignments.filter(
     (a) => a.submission && (a.submission.status === "submitted" || a.submission.status === "late"),
   );
   const gradedAssignments = assignments.filter(
     (a) => a.submission && (a.submission.status === "graded" || a.submission.status === "reviewed"),
+  );
+  const resubmitAssignments = assignments.filter(
+    (a) => a.submission && a.submission.status === "resubmit_requested",
   );
 
   if (selectedAssignmentId) {
@@ -90,7 +96,7 @@ export function StudentAssignmentDashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Pending"
           value={pendingAssignments.length}
@@ -112,6 +118,13 @@ export function StudentAssignmentDashboard() {
           color="text-green-500"
           bgColor="bg-green-500/10"
         />
+        <StatsCard
+          title="Needs Resubmit"
+          value={resubmitAssignments.length}
+          icon={RotateCcw}
+          color="text-red-500"
+          bgColor="bg-red-500/10"
+        />
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl border border-border/50 shadow-sm">
@@ -125,11 +138,12 @@ export function StudentAssignmentDashboard() {
           />
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-          <TabsList className="grid w-full grid-cols-4 sm:w-[400px]">
+          <TabsList className="grid w-full grid-cols-5 sm:w-[500px]">
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="pending">Pending</TabsTrigger>
             <TabsTrigger value="submitted">Done</TabsTrigger>
             <TabsTrigger value="graded">Graded</TabsTrigger>
+            <TabsTrigger value="resubmit">Resubmit</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -201,6 +215,12 @@ function StudentAssignmentCard({ assignment, onClick }: { assignment: any; onCli
       return (
         <Badge className="bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 border-none">
           Late Submission
+        </Badge>
+      );
+    if (submission?.status === "resubmit_requested")
+      return (
+        <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-none">
+          Resubmit Requested
         </Badge>
       );
     if (isOverdue)
@@ -298,7 +318,7 @@ function AssignmentDetailView({
 
   const submission = assignment.submission;
   const isOverdue = assignment.due_date && isAfter(new Date(), new Date(assignment.due_date));
-  const canSubmit = !submission || (assignment.allow_late && submission.status === "pending");
+  const canSubmit = !submission || (assignment.allow_late && submission.status === "pending") || submission.status === "resubmit_requested";
 
   // Resolve the new granular booleans (fallback to legacy submission_type for backward-compat)
   const allowText =
@@ -486,7 +506,22 @@ function AssignmentDetailView({
             </CardContent>
           </Card>
 
-          {submission && (
+          {submission?.status === "resubmit_requested" && (
+            <Card className="border-border/50 shadow-sm overflow-hidden border-l-4 border-l-red-500 bg-red-50/30">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg flex items-center gap-2 text-red-600">
+                  <RotateCcw className="h-5 w-5" />
+                  Resubmit Requested
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Your instructor has requested you to resubmit this assignment. 
+                  Your previous submission has been cleared. Please submit your updated work below.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )}
+
+          {submission && submission.status !== "resubmit_requested" && (
             <Card className="border-border/50 shadow-sm overflow-hidden border-l-4 border-l-green-500">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
@@ -575,8 +610,12 @@ function AssignmentDetailView({
 
               <div className="space-y-1 pt-2">
                 <p className="text-xs text-muted-foreground font-medium">Submission Status</p>
-                <div className="flex items-center gap-2">
-                  {submission ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {submission?.status === "resubmit_requested" ? (
+                    <Badge className="bg-red-500/10 text-red-600 hover:bg-red-500/20 border-none">
+                      Resubmit Requested
+                    </Badge>
+                  ) : submission ? (
                     <Badge className="bg-green-500/10 text-green-600 hover:bg-green-500/20 border-none">
                       Submitted
                     </Badge>

@@ -1,18 +1,30 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { listAttempts, getViolationLog } from "../../services/exam.service";
 import { ExamStatusBadge } from "../shared/ExamStatusBadge";
 import { ViolationLog } from "./ViolationLog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Users, AlertTriangle, RotateCcw, Camera } from "lucide-react";
+import { Users, AlertTriangle, RotateCcw, Camera, ArrowUpDown, CheckCircle2, Search, Trophy, Award } from "lucide-react";
 import { ProctoringCapturesGallery } from "./ProctoringCapturesGallery";
 import type { ExamViolation } from "../../types";
 import { grantReattempt, revokeReattempt } from "../../services/exam.service";
 import { toast } from "sonner";
+
+type SortOption = "default" | "score_desc" | "score_asc" | "percentage_desc" | "percentage_asc" | "name_asc";
+
+const sortOptions: { value: SortOption; label: string }[] = [
+  { value: "default", label: "Default Order" },
+  { value: "score_desc", label: "Score: High to Low" },
+  { value: "score_asc", label: "Score: Low to High" },
+  { value: "percentage_desc", label: "Percentage: High to Low" },
+  { value: "percentage_asc", label: "Percentage: Low to High" },
+  { value: "name_asc", label: "Name: A to Z" },
+];
 
 interface AttemptListProps {
   examId: string;
@@ -27,6 +39,8 @@ export function AttemptList({ examId }: AttemptListProps) {
   const [reattemptLoadingId, setReattemptLoadingId] = useState<string | null>(null);
   const [capturesAttemptId, setCapturesAttemptId] = useState<string | null>(null);
   const [capturesStudentName, setCapturesStudentName] = useState<string>("");
+  const [sortBy, setSortBy] = useState<SortOption>("default");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetch = async () => {
@@ -37,6 +51,55 @@ export function AttemptList({ examId }: AttemptListProps) {
     };
     fetch();
   }, [examId]);
+
+  // Compute sorted and filtered attempts with rank
+  const processedAttempts = useMemo(() => {
+    // Filter by search term
+    let filtered = attempts;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = attempts.filter(
+        (a) =>
+          a.student?.user?.name?.toLowerCase().includes(term) ||
+          a.student?.admission_no?.toLowerCase().includes(term),
+      );
+    }
+
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "score_desc":
+          return (b.score ?? 0) - (a.score ?? 0);
+        case "score_asc":
+          return (a.score ?? 0) - (b.score ?? 0);
+        case "percentage_desc":
+          return (b.percentage ?? 0) - (a.percentage ?? 0);
+        case "percentage_asc":
+          return (a.percentage ?? 0) - (b.percentage ?? 0);
+        case "name_asc":
+          return (a.student?.user?.name || "").localeCompare(b.student?.user?.name || "");
+        default:
+          // Keep original order from API
+          return 0;
+      }
+    });
+
+    // Assign rank based on score (only for submitted/graded attempts)
+    // Sort by score desc to compute rank, then restore the user's chosen sort
+    const scoreSorted = [...filtered]
+      .filter((a) => a.status !== "not_started" && a.status !== "in_progress")
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+    const rankMap = new Map<string, number>();
+    scoreSorted.forEach((attempt, index) => {
+      rankMap.set(attempt.id, index + 1);
+    });
+
+    return sorted.map((attempt) => ({
+      ...attempt,
+      rank: rankMap.get(attempt.id) ?? null,
+    }));
+  }, [attempts, sortBy, searchTerm]);
 
   const handleToggleViolations = async (attemptId: string) => {
     if (expandedAttemptId === attemptId) {
@@ -81,6 +144,26 @@ export function AttemptList({ examId }: AttemptListProps) {
   };
 
   const columns: DataTableColumn<any>[] = [
+    {
+      key: "rank",
+      header: "Rank",
+      render: (attempt: any) => {
+        if (attempt.status === "not_started" || attempt.status === "in_progress" || attempt.rank === null) {
+          return <span className="text-muted-foreground text-xs">—</span>;
+        }
+        const rankColors: Record<number, string> = {
+          1: "bg-yellow-100 text-yellow-700 border-yellow-300",
+          2: "bg-gray-100 text-gray-600 border-gray-300",
+          3: "bg-orange-100 text-orange-700 border-orange-300",
+        };
+        const colorClass = rankColors[attempt.rank] || "bg-muted text-muted-foreground border-border";
+        return (
+          <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full border text-xs font-bold ${colorClass}`}>
+            {attempt.rank === 1 ? <Trophy className="h-3.5 w-3.5" /> : attempt.rank}
+          </div>
+        );
+      },
+    },
     {
       key: "student",
       header: "Student",
@@ -229,9 +312,96 @@ export function AttemptList({ examId }: AttemptListProps) {
 
   return (
     <div className="space-y-4">
+      {/* Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-card p-4 rounded-xl border border-border/50 shadow-sm">
+        <div className="relative w-full sm:max-w-xs">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search students..."
+            className="pl-9 bg-background"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative">
+            <ArrowUpDown className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortOption)}
+              className="h-10 w-full sm:w-[220px] rounded-md border border-input bg-background pl-9 pr-8 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 cursor-pointer appearance-none"
+            >
+              {sortOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      {processedAttempts.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="bg-card p-3 rounded-lg border border-border/50 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/10">
+              <Users className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-lg font-bold">{processedAttempts.length}</p>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase">Total</p>
+            </div>
+          </div>
+          <div className="bg-card p-3 rounded-lg border border-border/50 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/10">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+            </div>
+            <div>
+              <p className="text-lg font-bold">
+                {processedAttempts.filter((a) => a.status === "submitted" || a.status === "graded" || a.status === "auto_submitted").length}
+              </p>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase">Submitted</p>
+            </div>
+          </div>
+          <div className="bg-card p-3 rounded-lg border border-border/50 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/10">
+              <Trophy className="h-4 w-4 text-yellow-600" />
+            </div>
+            <div>
+              <p className="text-lg font-bold">
+                {processedAttempts.length > 0
+                  ? Math.max(...processedAttempts.filter((a) => a.score !== undefined).map((a) => a.score ?? 0), 0)
+                  : 0}
+              </p>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase">Top Score</p>
+            </div>
+          </div>
+          <div className="bg-card p-3 rounded-lg border border-border/50 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/10">
+              <Award className="h-4 w-4 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-lg font-bold">
+                {processedAttempts.length > 0
+                  ? Math.round(
+                      processedAttempts
+                        .filter((a) => a.status !== "not_started" && a.status !== "in_progress")
+                        .reduce((sum, a) => sum + (a.percentage ?? 0), 0) /
+                        Math.max(processedAttempts.filter((a) => a.status !== "not_started" && a.status !== "in_progress").length, 1),
+                    )
+                  : 0}
+                %
+              </p>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase">Avg %</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <DataTable
         columns={columns}
-        data={attempts}
+        data={processedAttempts}
         isLoading={isLoading}
         keyExtractor={(a) => a.id}
         emptyState={

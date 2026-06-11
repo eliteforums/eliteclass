@@ -12,6 +12,7 @@ import {
   User,
   GraduationCap,
   Calendar,
+  RotateCcw,
 } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
@@ -92,7 +93,7 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatsCard
           label="Total Assigned"
           value={assignment.assignees_count ?? 0}
@@ -116,6 +117,12 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
           value={submissions.filter((s) => s.status === "graded").length}
           icon={FileText}
           className="bg-blue-500/5 text-blue-600 border-blue-500/10"
+        />
+        <StatsCard
+          label="Resubmit Requested"
+          value={submissions.filter((s) => s.status === "resubmit_requested").length}
+          icon={RotateCcw}
+          className="bg-red-500/5 text-red-600 border-red-500/10"
         />
       </div>
 
@@ -166,10 +173,16 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
                         </div>
                       </TableCell>
                       <TableCell className="text-center text-xs">
-                        {format(new Date(submission.submitted_at), "MMM d, yyyy")}
-                        <p className="text-[10px] text-muted-foreground">
-                          {format(new Date(submission.submitted_at), "h:mm a")}
-                        </p>
+                        {submission.submitted_at ? (
+                          <>
+                            {format(new Date(submission.submitted_at), "MMM d, yyyy")}
+                            <p className="text-[10px] text-muted-foreground">
+                              {format(new Date(submission.submitted_at), "h:mm a")}
+                            </p>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground italic">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge
@@ -179,13 +192,15 @@ export function SubmissionList({ assignmentId, onBack }: SubmissionListProps) {
                             ${
                               submission.status === "graded"
                                 ? "bg-green-50 text-green-600 border-green-200"
-                                : submission.is_late
-                                  ? "bg-destructive/5 text-destructive border-destructive/20"
-                                  : "bg-blue-50 text-blue-600 border-blue-200"
+                                : submission.status === "resubmit_requested"
+                                  ? "bg-red-50 text-red-600 border-red-200"
+                                  : submission.is_late
+                                    ? "bg-destructive/5 text-destructive border-destructive/20"
+                                    : "bg-blue-50 text-blue-600 border-blue-200"
                             }
                           `}
                         >
-                          {submission.status} {submission.is_late && "(LATE)"}
+                          {submission.status === "resubmit_requested" ? "RESUBMIT" : submission.status} {submission.is_late && "(LATE)"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
@@ -250,6 +265,4 @@ function StatsCard({ label, value, icon: Icon, className }: any) {
       <div className="p-2 rounded-lg bg-current/10">
         <Icon className="h-5 w-5" />
       </div>
-    </div>
-  );
-}
+    <

@@ -11,7 +11,8 @@ import {
   MessageSquare,
   User,
   Clock,
-  ExternalLink
+  ExternalLink,
+  RotateCcw
 } from "lucide-react";
 import { format } from "date-fns";
 import { 
@@ -32,7 +33,7 @@ import {
   type GradingSchema 
 } from "@/modules/assignments/validations";
 import type { Assignment, AssignmentSubmission } from "@/types";
-import { useGradeSubmission } from "@/modules/assignments/hooks/useAssignments";
+import { useGradeSubmission, useRequestResubmit } from "@/modules/assignments/hooks/useAssignments";
 import { toast } from "sonner";
 
 interface SubmissionReviewModalProps {
@@ -49,7 +50,10 @@ export function SubmissionReviewModal({
   assignment,
 }: SubmissionReviewModalProps) {
   const gradeMutation = useGradeSubmission();
+  const requestResubmitMutation = useRequestResubmit();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingResubmit, setIsRequestingResubmit] = useState(false);
+  const [showResubmitConfirm, setShowResubmitConfirm] = useState(false);
 
   const form = useForm<GradingSchema>({
     resolver: zodResolver(gradingSchema),
@@ -91,6 +95,30 @@ export function SubmissionReviewModal({
     }
   };
 
+  const handleRequestResubmit = async () => {
+    setIsRequestingResubmit(true);
+    try {
+      const res = await requestResubmitMutation.mutateAsync({
+        submissionId: submission.id,
+      });
+
+      if (res.success) {
+        toast.success("Resubmit requested — student submission data has been cleared");
+        setShowResubmitConfirm(false);
+        onClose();
+      } else {
+        toast.error(res.error || "Failed to request resubmit");
+      }
+    } catch (error) {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsRequestingResubmit(false);
+    }
+  };
+
+  // Hide resubmit button if already requested
+  const canRequestResubmit = submission.status !== "resubmit_requested";
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -102,7 +130,15 @@ export function SubmissionReviewModal({
                 {assignment.title}
               </DialogDescription>
             </div>
-            <Badge variant={submission.is_late ? "destructive" : "secondary"}>
+            <Badge 
+              variant={
+                submission.status === "resubmit_requested" 
+                  ? "destructive" 
+                  : submission.is_late 
+                    ? "destructive" 
+                    : "secondary"
+              }
+            >
               {submission.status.toUpperCase()} {submission.is_late && "(LATE)"}
             </Badge>
           </div>
@@ -121,7 +157,7 @@ export function SubmissionReviewModal({
                 </div>
                 <div className="ml-auto text-right">
                   <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Submitted On</p>
-                  <p className="text-xs font-medium">{format(new Date(submission.submitted_at), "MMM d, yyyy • h:mm a")}</p>
+                  <p className="text-xs font-medium">{submission.submitted_at ? format(new Date(submission.submitted_at), "MMM d, yyyy • h:mm a") : "—"}</p>
                 </div>
               </div>
 
@@ -173,7 +209,7 @@ export function SubmissionReviewModal({
             </div>
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 space-y-4">
             <form onSubmit={form.handleSubmit(handleGradeSubmit)} className="space-y-6 p-6 rounded-2xl border bg-muted/20 sticky top-0">
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-primary font-bold">
@@ -225,8 +261,57 @@ export function SubmissionReviewModal({
                 Release Grade
               </Button>
             </form>
+
+            {canRequestResubmit && (
+              <Button 
+                variant="outline"
+                className="w-full h-10 font-bold border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive hover:border-destructive/50"
+                onClick={() => setShowResubmitConfirm(true)}
+                disabled={isRequestingResubmit}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Request Resubmit
+              </Button>
+            )}
           </div>
         </div>
+
+        {/* Resubmit Confirmation Dialog */}
+        {showResubmitConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-background rounded-xl border shadow-lg p-6 max-w-md w-full mx-4 space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-bold text-destructive">Request Resubmit?</h3>
+                <p className="text-sm text-muted-foreground">
+                  This will clear all submitted content, files, grade, and feedback for this student. 
+                  The student will be notified to submit their assignment again.
+                </p>
+                <p className="text-sm font-medium text-destructive">
+                  This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button 
+                  variant="outline" 
+                  className="flex-1"
+                  onClick={() => setShowResubmitConfirm(false)}
+                  disabled={isRequestingResubmit}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={handleRequestResubmit}
+                  disabled={isRequestingResubmit}
+                >
+                  {isRequestingResubmit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+                  Confirm Resubmit
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

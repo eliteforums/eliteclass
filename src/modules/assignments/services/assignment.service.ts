@@ -383,6 +383,51 @@ export async function gradeSubmission(
   };
 }
 
+/**
+ * Request a student to resubmit their assignment.
+ * This clears the submission content, files, grade and feedback,
+ * and sets the status to "resubmit_requested" so the student can submit again.
+ */
+export async function requestResubmit(
+  submissionId: string,
+): Promise<ApiResponse<AssignmentSubmission>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // 1. Delete submission files from storage and database
+  const { data: files } = await supabase
+    .from("submission_files")
+    .select("storage_path")
+    .eq("submission_id", submissionId);
+
+  if (files && files.length > 0) {
+    const storagePaths = files.map((f) => f.storage_path).filter(Boolean);
+    if (storagePaths.length > 0) {
+      await supabase.storage.from("assignment-submissions").remove(storagePaths);
+    }
+    await supabase.from("submission_files").delete().eq("submission_id", submissionId);
+  }
+
+  // 2. Update the submission to clear data and request resubmit
+  const { data, error } = await supabase
+    .from("assignment_submissions")
+    .update({
+      status: "resubmit_requested",
+      content: null,
+      grade: null,
+      feedback: null,
+      graded_at: null,
+      graded_by: null,
+      submitted_at: null,
+      is_late: false,
+    })
+    .eq("id", submissionId)
+    .select()
+    .single();
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: data as AssignmentSubmission, error: null, success: true };
+}
+
 // ── Student Services ────────────────────────────────────────────────────────
 
 /**
