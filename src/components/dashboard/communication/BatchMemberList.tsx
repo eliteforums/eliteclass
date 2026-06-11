@@ -79,36 +79,64 @@ export function BatchMemberList({ onStartConversation }: BatchMemberListProps) {
         // For students, filter to only batch mates
         let allowedUserIds = new Set<string>();
         if (role === "student") {
-          // Get current student's batch assignments
-          const { data: currentStudent } = await supabase
+          // Get current student's record
+          const { data: currentStudent, error: studentError } = await supabase
             .from("students")
             .select("id")
             .eq("user_id", user.id)
             .single();
 
+          if (studentError) {
+            console.error("Failed to fetch current student:", studentError);
+          }
+
           if (currentStudent) {
-            const { data: myBatches } = await supabase
+            // Get current student's active batch assignments
+            const { data: myBatches, error: myBatchesError } = await supabase
               .from("student_batch_assignments")
               .select("batch_id")
               .eq("student_id", currentStudent.id)
               .eq("is_active", true);
 
+            if (myBatchesError) {
+              console.error("Failed to fetch my batches:", myBatchesError);
+            }
+
             if (myBatches && myBatches.length > 0) {
               const batchIds = myBatches.map((b) => b.batch_id as string);
 
-              // Get all students in those batches
-              const { data: peerAssignments } = await supabase
+              // Get all peer student IDs in those batches (excluding self)
+              const { data: peerAssignments, error: peerError } = await supabase
                 .from("student_batch_assignments")
-                .select("students(user_id)")
+                .select("student_id")
                 .in("batch_id", batchIds)
                 .eq("is_active", true)
                 .neq("student_id", currentStudent.id);
 
-              (peerAssignments ?? []).forEach((pa: any) => {
-                if (pa.students?.user_id) {
-                  allowedUserIds.add(pa.students.user_id);
+              if (peerError) {
+                console.error("Failed to fetch peer assignments:", peerError);
+              } else if (peerAssignments && peerAssignments.length > 0) {
+                // Get unique peer student IDs
+                const peerStudentIds = [...new Set(
+                  peerAssignments.map((pa) => pa.student_id as string)
+                )];
+
+                // Lookup user_ids for those students in a separate query
+                const { data: peerStudents, error: peerStudentsError } = await supabase
+                  .from("students")
+                  .select("user_id")
+                  .in("id", peerStudentIds);
+
+                if (peerStudentsError) {
+                  console.error("Failed to fetch peer student user_ids:", peerStudentsError);
+                } else {
+                  (peerStudents ?? []).forEach((ps: any) => {
+                    if (ps.user_id) {
+                      allowedUserIds.add(ps.user_id as string);
+                    }
+                  });
                 }
-              });
+              }
             }
           }
         }
