@@ -12,12 +12,18 @@ import type {
   CreateQuestionPayload,
   ProctoringCapture,
 } from "../types";
+import { examLogger } from "./examLogger";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
   error: "Supabase is not configured.",
   success: false,
 } as const;
+
+/** Helper to log DB operations consistently */
+function logDb(operation: string, details?: Record<string, unknown>) {
+  examLogger.db(operation, details);
+}
 
 // ── Admin/Staff Services ───────────────────────────────────────────────────
 
@@ -76,6 +82,9 @@ export async function listExams(
 export async function getExamDetail(examId: string): Promise<ApiResponse<Exam>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  logDb("getExamDetail:query", { examId });
+  examLogger.startTimer("getExamDetail");
+
   const { data, error } = await supabase
     .from("exams")
     .select(
@@ -91,6 +100,12 @@ export async function getExamDetail(examId: string): Promise<ApiResponse<Exam>> 
     .order("position", { foreignTable: "exam_questions", ascending: true })
     .order("position", { foreignTable: "exam_questions.exam_options", ascending: true })
     .single();
+
+  examLogger.endTimer("getExamDetail", "DB", "getExamDetail completed", {
+    examId,
+    questionCount: data?.questions?.length || 0,
+    hasError: !!error,
+  });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: data as Exam, error: null, success: true };
@@ -288,6 +303,9 @@ export async function startExamAttempt(
 ): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  logDb("startExamAttempt:begin", { examId, userId });
+  examLogger.startTimer("startExamAttempt");
+
   const { data: student } = await supabase
     .from("students")
     .select("id")
@@ -306,6 +324,9 @@ export async function startExamAttempt(
     .limit(1);
 
   if (existingError) {
+    examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt failed - existing check", {
+      error: getErrorMessage(existingError),
+    });
     return { data: null, error: getErrorMessage(existingError), success: false };
   }
 
@@ -320,6 +341,9 @@ export async function startExamAttempt(
       existingAttempt.status === "graded" ||
       existingAttempt.status === "auto_submitted"
     ) {
+      examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt - already submitted", {
+        status: existingAttempt.status,
+      });
       return {
         data: null,
         error: "Test already submitted. Multiple attempts are not allowed.",
@@ -327,6 +351,10 @@ export async function startExamAttempt(
       };
     } else {
       // Resume in-progress or expired attempt
+      examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt - resumed existing", {
+        attemptId: existingAttempt.id,
+        status: existingAttempt.status,
+      });
       return { data: existingAttempt as ExamAttempt, error: null, success: true };
     }
   }
@@ -344,12 +372,25 @@ export async function startExamAttempt(
     .select()
     .single();
 
+  examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt completed", {
+    examId,
+    studentId: student.id,
+    isNewAttempt: !existingAttempt,
+    hasError: !!error,
+  });
+
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: data as ExamAttempt, error: null, success: true };
 }
 
 /**
- * Auto-save an answer during the exam
+ * Auto-save an answer during the exam.
+ *
+ * WARNING: This hits the database on EVERY call. For high-concurrency scenarios,
+ * use the local caching system (useExamCache) instead, and only call batchSaveAnswers
+ * at exam submission time.
+ *
+ * This function is kept for backward compatibility and low-frequency updates.
  */
 export async function saveExamAnswer(
   attemptId: string,
@@ -357,6 +398,9 @@ export async function saveExamAnswer(
   selectedOptionId: string,
 ): Promise<ApiResponse<ExamAnswer>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  logDb("saveExamAnswer:upsert", { attemptId, questionId });
+  examLogger.startTimer("saveExamAnswer");
 
   const { data, error } = await supabase
     .from("exam_answers")
@@ -372,12 +416,24 @@ export async function saveExamAnswer(
     .select()
     .single();
 
+  examLogger.endTimer("saveExamAnswer", "DB", "saveExamAnswer completed", {
+    attemptId,
+    questionId,
+    hasError: !!error,
+  });
+
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: data as ExamAnswer, error: null, success: true };
 }
 
 /**
- * Batch upsert answers — used by the debounced save system to reduce DB calls
+ * Batch upsert answers — REDUCES DB CALLS significantly.
+ *
+ * This is the PREFERRED method for saving answers. Instead of calling saveExamAnswer
+ * on every answer change (N DB calls for N answers), collect all answers locally
+ * and call this ONCE at exam submission (1 DB call total).
+ *
+ * Used by: useExamCache.syncAnswersToDb() at submit time
  */
 export async function batchSaveAnswers(
   attemptId: string,
@@ -385,8 +441,13 @@ export async function batchSaveAnswers(
 ): Promise<ApiResponse<null>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  examLogger.startTimer("batchSaveAnswers");
+
   const entries = Object.entries(answers).filter(([, v]) => Boolean(v));
-  if (entries.length === 0) return { data: null, error: null, success: true };
+  if (entries.length === 0) {
+    examLogger.info("DB", "batchSaveAnswers: no answers to save");
+    return { data: null, error: null, success: true };
+  }
 
   const payload = entries.map(([questionId, optionId]) => ({
     attempt_id: attemptId,
@@ -395,9 +456,17 @@ export async function batchSaveAnswers(
     answered_at: new Date().toISOString(),
   }));
 
+  logDb("batchSaveAnswers:upsert", { attemptId, answerCount: payload.length });
+
   const { error } = await supabase
     .from("exam_answers")
     .upsert(payload, { onConflict: "attempt_id,question_id" });
+
+  examLogger.endTimer("batchSaveAnswers", "DB", "batchSaveAnswers completed", {
+    attemptId,
+    answerCount: payload.length,
+    hasError: !!error,
+  });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: null, error: null, success: true };
@@ -432,13 +501,19 @@ export async function recordViolation(
 }
 
 /**
- * Submit the exam attempt and calculate score
+ * Submit the exam attempt and calculate score.
+ *
+ * This fetches all answers from DB for scoring. When using the cache system,
+ * call batchSaveAnswers first to persist local answers, then call this.
  */
 export async function submitExamAttempt(
   attemptId: string,
   options?: { autoSubmitReason?: string | null },
 ): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  examLogger.startTimer("submitExamAttempt");
+  logDb("submitExamAttempt:begin", { attemptId, autoSubmitReason: options?.autoSubmitReason });
 
   // Fetch all questions and answers for this attempt
   const { data: attempt, error: attemptError } = await supabase
@@ -491,6 +566,8 @@ export async function submitExamAttempt(
   const percentage = (score / exam.total_marks) * 100;
   const passed = percentage >= exam.passing_marks;
 
+  logDb("submitExamAttempt:update", { attemptId, score, correctCount, wrongCount, unansweredCount, percentage, passed });
+
   const { data: updatedAttempt, error: updateError } = await supabase
     .from("exam_attempts")
     .update({
@@ -508,6 +585,14 @@ export async function submitExamAttempt(
     .eq("id", attemptId)
     .select()
     .single();
+
+  examLogger.endTimer("submitExamAttempt", "DB", "submitExamAttempt completed", {
+    attemptId,
+    score,
+    percentage: Math.round(percentage * 100) / 100,
+    passed,
+    hasError: !!updateError,
+  });
 
   if (updateError) return { data: null, error: getErrorMessage(updateError), success: false };
   return { data: updatedAttempt as ExamAttempt, error: null, success: true };
@@ -1080,17 +1165,26 @@ export async function getAttemptViolations(attemptId: string): Promise<ApiRespon
 }
 
 /**
- * Update attempt activity timestamp (for session monitoring)
+ * Update attempt activity timestamp (for session monitoring).
+ *
+ * NOTE: This is called on an interval. For high-concurrency scenarios,
+ * consider increasing the interval to 60+ seconds or disabling it entirely
+ * if the exam session system is not critical.
  */
 export async function updateAttemptActivity(attemptId: string): Promise<ApiResponse<void>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
+  // Use a lightweight RPC call if available, otherwise fall back to update
   const { error } = await supabase
     .from("exam_attempts")
     .update({ last_active_at: new Date().toISOString() })
     .eq("id", attemptId);
 
-  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  if (error) {
+    // Silently log activity update failures — they're non-critical
+    examLogger.debug("DB", "updateAttemptActivity: non-critical failure", { attemptId, error: getErrorMessage(error) });
+    return { data: null, error: getErrorMessage(error), success: false };
+  }
   return { data: undefined, error: null, success: true };
 }
 

@@ -1,22 +1,23 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
-import { 
-  Clock, 
-  ChevronLeft, 
-  ChevronRight, 
-  Send, 
+import {
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  Send,
   AlertTriangle,
   FileQuestion,
   Info,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Database,
+  HardDrive,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { 
-  getExamDetail, 
-  startExamAttempt, 
-  saveExamAnswer,
+import {
+  getExamDetail,
+  startExamAttempt,
   recordViolationWithCheck,
   submitExamAttempt,
   createExamSession,
@@ -24,7 +25,11 @@ import {
   validateExamTiming,
   updateAttemptActivity,
   lockExamAttempt,
+  batchSaveAnswers,
 } from "../../services/exam.service";
+import { examLogger } from "../../services/examLogger";
+import { examCache } from "../../services/examCache.service";
+import { useExamCache } from "../../hooks/useExamCache";
 import type { Exam, ExamAttempt } from "../../types";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
@@ -46,23 +51,42 @@ interface ExamPlayerProps {
 export function ExamPlayer({ examId }: ExamPlayerProps) {
   const { user, institute } = useAuth();
   const navigate = useNavigate();
-  
+
   const [exam, setExam] = useState<Exam | null>(null);
   const [attempt, setAttempt] = useState<ExamAttempt | null>(null);
-  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmittingExam, setIsSubmittingExam] = useState(false);
   const [securityEnabled, setSecurityEnabled] = useState(false);
-  const sessionTokenRef = useRef<string>('');
+  const [showCacheIndicator, setShowCacheIndicator] = useState(false);
+  const sessionTokenRef = useRef<string>("");
   const submissionLockRef = useRef(false);
+  const initStartedRef = useRef(false);
+
+  // ── Cache System ────────────────────────────────────────────────────────────
+
+  const {
+    answers,
+    storeAnswer,
+    currentQuestionIdx,
+    saveQuestionIndex,
+    saveTimeRemaining,
+    syncAnswersToDb,
+    initializeCache,
+    getCacheStats,
+  } = useExamCache({
+    attemptId: attempt?.id || "",
+    examId,
+    studentId: attempt?.student_id || user?.id || "",
+    instituteId: institute?.id || "",
+    exam,
+  });
 
   // ── Validation Hooks ────────────────────────────────────────────────────────
 
   const attemptValidation = useAttemptValidation({
     examId,
-    userId: user?.id || '',
+    userId: user?.id || "",
     enabled: true,
   });
 
@@ -77,7 +101,7 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     enableTabDetection,
     enableCameraMic,
     enableDeterrentUi,
-    attemptId: attempt?.id || '',
+    attemptId: attempt?.id || "",
   });
 
   // ── Proctoring Capture Hook ─────────────────────────────────────────────────
@@ -86,24 +110,30 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
   useProctoringCapture({
     enabled: securityEnabled && (enableCameraMic || enableScreenCapture) && !!attempt?.id,
-    attemptId: attempt?.id || '',
-    studentId: attempt?.student_id || '',
+    attemptId: attempt?.id || "",
+    studentId: attempt?.student_id || "",
     examId,
-    instituteId: institute?.id || '',
+    instituteId: institute?.id || "",
     cameraStream: proctoring.cameraStream,
-    screenStream: null, // Screen-share stream is not yet implemented
+    screenStream: null,
     durationMs: (exam?.duration_mins || 60) * 60 * 1000,
     currentQuestionIdx,
     timeRemaining: timeLeft,
   });
 
+  // ── Timer ───────────────────────────────────────────────────────────────────
+
   const { timeRemaining, isExpired } = useRealtimeExamTimer({
     examId,
-    attemptId: attempt?.id || '',
+    attemptId: attempt?.id || "",
     durationMs: (exam?.duration_mins || 60) * 60 * 1000,
-    enabled: !!attempt && attempt.status === 'in_progress',
+    enabled: !!attempt && attempt.status === "in_progress",
     onTimeUpdate: (seconds) => {
       setTimeLeft(seconds);
+      // Save time to cache periodically for crash recovery
+      if (attempt && seconds % 10 === 0) {
+        saveTimeRemaining(seconds);
+      }
     },
     onTimeExpired: () => {
       toast.error("Time is up! Auto-submitting your test...");
@@ -115,48 +145,59 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
   useEffect(() => {
     if (!user?.id || !institute?.id) return;
+    if (initStartedRef.current) return;
+    initStartedRef.current = true;
+
+    examLogger.startTimer("examInit");
 
     const init = async () => {
       setIsLoading(true);
-      
-      // 1. Validate exam timing (server-side)
-      const timingRes = await validateExamTiming(examId);
-      if (!timingRes.success || !timingRes.data?.isAvailable) {
-        toast.error(timingRes.data?.reason || 'Exam is not available at this time');
-        navigate({ to: "/dashboard/student/exams" });
-        setIsLoading(false);
-        return;
-      }
 
-      // 2. Validate single attempt
-      const singleAttemptRes = await validateSingleAttempt(examId, user.id);
-      if (!singleAttemptRes.success || !singleAttemptRes.data?.canAttempt) {
-        toast.error(singleAttemptRes.data?.reason || 'You cannot attempt this test');
-        navigate({ to: "/dashboard/student/exams" });
-        setIsLoading(false);
-        return;
-      }
-
-      // 3. Get exam details and create/resume attempt
-      const [examRes, attemptRes] = await Promise.all([
-        getExamDetail(examId),
-        startExamAttempt(examId, user.id, institute.id)
-      ]);
-
-      if (examRes.success && examRes.data) {
-        setExam(examRes.data);
-
-        if (!attemptRes.success || !attemptRes.data) {
-          toast.error(attemptRes.error || "Failed to start exam attempt. Please try again.");
+      try {
+        // 1. Validate exam timing (server-side)
+        const timingRes = await validateExamTiming(examId);
+        if (!timingRes.success || !timingRes.data?.isAvailable) {
+          toast.error(timingRes.data?.reason || "Exam is not available at this time");
           navigate({ to: "/dashboard/student/exams" });
           setIsLoading(false);
           return;
         }
 
-        {
+        // 2. Validate single attempt
+        const singleAttemptRes = await validateSingleAttempt(examId, user.id);
+        if (!singleAttemptRes.success || !singleAttemptRes.data?.canAttempt) {
+          toast.error(singleAttemptRes.data?.reason || "You cannot attempt this test");
+          navigate({ to: "/dashboard/student/exams" });
+          setIsLoading(false);
+          return;
+        }
+
+        // 3. Get exam details and create/resume attempt
+        const [examRes, attemptRes] = await Promise.all([
+          getExamDetail(examId),
+          startExamAttempt(examId, user.id, institute.id),
+        ]);
+
+        if (examRes.success && examRes.data) {
+          setExam(examRes.data);
+
+          // Cache exam data locally (never fetch again during exam)
+          examCache.storeExamData(examId, examRes.data);
+          examLogger.info("ExamPlayer", "Exam data loaded and cached", {
+            examId,
+            questionCount: examRes.data.questions?.length || 0,
+          });
+
+          if (!attemptRes.success || !attemptRes.data) {
+            toast.error(attemptRes.error || "Failed to start exam attempt. Please try again.");
+            navigate({ to: "/dashboard/student/exams" });
+            setIsLoading(false);
+            return;
+          }
+
           const newAttempt = attemptRes.data;
           setAttempt(newAttempt);
-          
+
           // Check if attempt is locked or already submitted
           if (newAttempt.is_locked) {
             toast.error("This test attempt is locked. You cannot make changes.");
@@ -165,7 +206,7 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             return;
           }
 
-          if (newAttempt.status !== 'in_progress') {
+          if (newAttempt.status !== "in_progress") {
             toast.info("Test already submitted");
             navigate({ to: "/dashboard/student/exams" });
             setIsLoading(false);
@@ -195,35 +236,59 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             sessionTokenRef.current = sessionRes.data.sessionToken;
           }
 
-          // 5. Load saved answers
+          // 5. Initialize cache with saved answers (for resume after refresh)
           const savedAnswers: Record<string, string> = {};
-          newAttempt.answers?.forEach(a => {
+          newAttempt.answers?.forEach((a) => {
             if (a.selected_option_id) savedAnswers[a.question_id] = a.selected_option_id;
           });
-          setAnswers(savedAnswers);
+
+          initializeCache(savedAnswers);
 
           // 6. Start timer from server time
           setTimeLeft((examRes.data.duration_mins || 60) * 60);
+
+          // Show cache indicator briefly
+          setShowCacheIndicator(true);
+          setTimeout(() => setShowCacheIndicator(false), 3000);
+
+          examLogger.endTimer("examInit", "ExamPlayer", "Exam initialized successfully", {
+            examId,
+            attemptId: newAttempt.id,
+            studentId: newAttempt.student_id,
+            cachedAnswers: Object.keys(savedAnswers).length,
+          });
+        } else {
+          toast.error(examRes.error || "Failed to load exam");
+          navigate({ to: "/dashboard/student/exams" });
         }
-      } else {
-        toast.error(examRes.error || "Failed to load exam");
+      } catch (error) {
+        examLogger.error("ExamPlayer", "Initialization error", {
+          error: String(error),
+          examId,
+          userId: user?.id,
+        });
+        toast.error("An error occurred while loading the exam.");
         navigate({ to: "/dashboard/student/exams" });
       }
-      
+
       setIsLoading(false);
     };
 
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId, user?.id, institute?.id, navigate]);
 
   // ── Track Activity for Session Monitoring ────────────────────────────────
+  // NOTE: Increased to 60s interval to reduce DB load. Activity tracking is
+  // non-critical for exam functionality. Under high concurrency, consider
+  // disabling entirely or using a heartbeat via WebSocket instead.
 
   useEffect(() => {
     if (!attempt) return;
 
     const activityInterval = setInterval(() => {
       updateAttemptActivity(attempt.id);
-    }, 30000); // Update every 30 seconds
+    }, 60000); // Update every 60 seconds (was 30s)
 
     return () => clearInterval(activityInterval);
   }, [attempt?.id]);
@@ -234,60 +299,119 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
     if (isExpired && attempt) {
       handleSubmit(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isExpired]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
-  const handleOptionSelect = async (questionId: string, optionId: string) => {
-    if (!attempt || attempt.is_locked) return;
-    
-    setAnswers(prev => ({ ...prev, [questionId]: optionId }));
-    
-    const { success } = await saveExamAnswer(attempt.id, questionId, optionId);
-    if (!success) {
-      toast.error("Failed to auto-save answer. Please check your connection.");
-    }
-  };
+  /**
+   * Handle option selection — stores answer LOCALLY only.
+   * No DB call is made. All answers are batch-saved at submit time.
+   */
+  const handleOptionSelect = useCallback(
+    (questionId: string, optionId: string) => {
+      if (!attempt || attempt.is_locked) return;
 
-  const handleSubmit = async (isAuto = false) => {
-    if (!attempt || isSubmittingExam) return;
+      // Store in local cache (no DB call!)
+      storeAnswer(questionId, optionId);
 
-    submissionLockRef.current = true;
-    setIsSubmittingExam(true);
-    try {
-      if (!isAuto) {
-        const confirmSubmit = window.confirm("Are you sure you want to submit your test?");
-        if (!confirmSubmit) {
-          submissionLockRef.current = false;
-          setIsSubmittingExam(false);
-          return;
+      examLogger.debug("ExamPlayer", "Answer selected (cached locally)", {
+        questionId,
+        totalAnswered: Object.keys(answers).length + 1, // +1 because state hasn't updated yet
+      });
+    },
+    [attempt, storeAnswer, answers]
+  );
+
+  /**
+   * Handle navigation between questions — saves index to cache.
+   */
+  const handleQuestionNavigate = useCallback(
+    (idx: number) => {
+      saveQuestionIndex(idx);
+    },
+    [saveQuestionIndex]
+  );
+
+  /**
+   * Handle exam submission — batch-save all answers then submit.
+   */
+  const handleSubmit = useCallback(
+    async (isAuto = false) => {
+      if (!attempt || isSubmittingExam) return;
+
+      submissionLockRef.current = true;
+      setIsSubmittingExam(true);
+      examLogger.startTimer("examSubmit");
+
+      try {
+        if (!isAuto) {
+          const confirmSubmit = window.confirm("Are you sure you want to submit your test?");
+          if (!confirmSubmit) {
+            submissionLockRef.current = false;
+            setIsSubmittingExam(false);
+            return;
+          }
+        } else {
+          toast.info("Submitting your test automatically...");
         }
-      } else {
-        toast.info("Submitting your test automatically...");
+
+        // Stop proctoring streams before submission
+        proctoring.stopStreams();
+
+        // ── CRITICAL: Batch-save all cached answers to DB FIRST ──────────
+        // This is the key optimization: instead of N DB calls (one per answer),
+        // we make exactly 1 DB call to save all answers.
+        examLogger.info("ExamPlayer", "Batch-syncing answers to DB before submit...", {
+          attemptId: attempt.id,
+          answerCount: Object.keys(answers).length,
+        });
+
+        const syncResult = await syncAnswersToDb();
+        if (!syncResult.success) {
+          // Still try to submit — partial answers are better than nothing
+          examLogger.warn("ExamPlayer", "Answer sync failed, attempting submit anyway", {
+            error: syncResult.error,
+          });
+        }
+
+        // ── Lock attempt before submission ───────────────────────────────
+        await lockExamAttempt(attempt.id);
+
+        // ── Submit the exam ──────────────────────────────────────────────
+        const { success, error } = await submitExamAttempt(attempt.id, {
+          autoSubmitReason: isAuto ? "Time expired" : null,
+        });
+
+        // ── Cleanup caches ───────────────────────────────────────────────
+        examCache.cleanupAllCaches(attempt.id, examId);
+
+        if (success) {
+          examLogger.endTimer("examSubmit", "ExamPlayer", "Exam submitted successfully", {
+            attemptId: attempt.id,
+            answerCount: Object.keys(answers).length,
+            isAutoSubmit: isAuto,
+          });
+          toast.success("Test submitted successfully!");
+          navigate({ to: "/dashboard/student/exams" });
+        } else {
+          examLogger.error("ExamPlayer", "Exam submission failed", { error });
+          toast.error(error || "Failed to submit test. Please try again.");
+        }
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        examLogger.error("ExamPlayer", "Exam submit error", { error: errorMsg });
+        toast.error("An error occurred while submitting. Please try again.");
+      } finally {
+        submissionLockRef.current = false;
+        setIsSubmittingExam(false);
       }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [attempt, isSubmittingExam, answers, syncAnswersToDb, examId, navigate, proctoring]
+  );
 
-      // Stop proctoring streams before submission
-      proctoring.stopStreams();
-
-      // Lock attempt before submission
-      await lockExamAttempt(attempt.id);
-
-      // Submit
-      const { success, error } = await submitExamAttempt(attempt.id);
-      
-      if (success) {
-        toast.success("Test submitted successfully!");
-        navigate({ to: "/dashboard/student/exams" });
-      } else {
-        toast.error(error || "Failed to submit test. Please try again.");
-      }
-    } catch (error) {
-      toast.error("An error occurred while submitting. Please try again.");
-    } finally {
-      submissionLockRef.current = false;
-      setIsSubmittingExam(false);
-    }
-  };
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   if (isLoading || !exam || !attempt || attemptValidation.isLoading) {
     return (
@@ -312,7 +436,7 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             )}
           </CardContent>
           <CardFooter>
-            <Button 
+            <Button
               variant="outline"
               onClick={() => navigate({ to: "/dashboard/student/exams" })}
               className="w-full"
@@ -333,8 +457,10 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
+
+  const cacheStats = getCacheStats();
 
   return (
     <SecureExamWrapper
@@ -356,7 +482,7 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
           showRecordingIndicator={enableDeterrentUi}
         />
 
-        {/* Blocking Overlay - shown when camera/mic is denied or hardware unavailable */}
+        {/* Blocking Overlay */}
         {proctoring.showBlockingOverlay && (
           <div className="fixed inset-0 z-[9999] bg-background/95 backdrop-blur-sm flex items-center justify-center p-6 text-center">
             <div className="max-w-md space-y-6">
@@ -364,9 +490,9 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                 <AlertTriangle className="size-8 text-destructive" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Camera & Microphone Required</h2>
+                <h2 className="text-2xl font-bold">Camera &amp; Microphone Required</h2>
                 <p className="text-muted-foreground">
-                  {proctoring.blockingReason || 'Camera and microphone access is required to proceed with this exam.'}
+                  {proctoring.blockingReason || "Camera and microphone access is required to proceed with this exam."}
                 </p>
               </div>
               <Button size="lg" className="w-full" onClick={() => proctoring.retryCamera()}>
@@ -387,17 +513,42 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
             <h1 className="font-bold text-lg truncate max-w-[200px] sm:max-w-md">{exam.title}</h1>
           </div>
 
-          <div className={cn(
-            "flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-lg font-bold border",
-            timeLeft < 300 ? "bg-red-50 text-red-600 border-red-200 animate-pulse" : "bg-primary/5 text-primary border-primary/20"
-          )}>
+          <div
+            className={cn(
+              "flex items-center gap-2 px-4 py-1.5 rounded-full font-mono text-lg font-bold border",
+              timeLeft < 300
+                ? "bg-red-50 text-red-600 border-red-200 animate-pulse"
+                : "bg-primary/5 text-primary border-primary/20"
+            )}
+          >
             <Clock className="h-5 w-5" />
             {formatTime(timeLeft)}
           </div>
 
-          <Button variant="default" onClick={() => handleSubmit(false)} disabled={isSubmittingExam || attempt.is_locked}>
-            {isSubmittingExam ? "Submitting..." : "Submit Test"} <Send className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-3">
+            {/* Cache mode indicator (subtle) */}
+            <div
+              className={cn(
+                "flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full transition-all duration-500",
+                showCacheIndicator
+                  ? "bg-green-50 text-green-700 border border-green-200 opacity-100"
+                  : "opacity-0"
+              )}
+              title="Answers are cached locally for better performance"
+            >
+              <HardDrive className="h-3 w-3" />
+              <span className="font-medium">Cached</span>
+            </div>
+
+            <Button
+              variant="default"
+              onClick={() => handleSubmit(false)}
+              disabled={isSubmittingExam || attempt.is_locked}
+            >
+              {isSubmittingExam ? "Submitting..." : "Submit Test"}{" "}
+              <Send className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </header>
 
         <div className="flex-1 flex overflow-hidden">
@@ -409,16 +560,18 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                 {exam.questions?.map((q, idx) => {
                   const isAnswered = !!answers[q.id];
                   const isCurrent = currentQuestionIdx === idx;
-                  
+
                   return (
                     <button
                       key={q.id}
-                      onClick={() => setCurrentQuestionIdx(idx)}
+                      onClick={() => handleQuestionNavigate(idx)}
                       className={cn(
                         "h-10 w-10 rounded-md text-xs font-bold transition-all border",
-                        isCurrent ? "border-primary bg-primary text-primary-foreground scale-110 z-10" : 
-                        isAnswered ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30" : 
-                        "border-border hover:bg-muted"
+                        isCurrent
+                          ? "border-primary bg-primary text-primary-foreground scale-110 z-10"
+                          : isAnswered
+                            ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30"
+                            : "border-border hover:bg-muted"
                       )}
                     >
                       {idx + 1}
@@ -427,30 +580,44 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                 })}
               </div>
             </div>
-            
+
             <div className="p-6 space-y-4">
-               <div className="space-y-2">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span>Overall Progress</span>
-                    <span>{Math.round(progress)}%</span>
-                  </div>
-                  <Progress value={progress} className="h-2" />
-               </div>
-               
-               <div className="space-y-2 pt-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                     <div className="h-3 w-3 rounded-full bg-green-500" />
-                     <span>Answered ({answeredCount})</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                     <div className="h-3 w-3 rounded-full border border-border" />
-                     <span>Unanswered ({totalQuestions - answeredCount})</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                     <div className="h-3 w-3 rounded-full bg-primary" />
-                     <span>Current</span>
-                  </div>
-               </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs font-medium">
+                  <span>Overall Progress</span>
+                  <span>{Math.round(progress)}%</span>
+                </div>
+                <Progress value={progress} className="h-2" />
+              </div>
+
+              <div className="space-y-2 pt-4">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
+                  <span>
+                    Answered ({answeredCount})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-3 w-3 rounded-full border border-border" />
+                  <span>Unanswered ({totalQuestions - answeredCount})</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="h-3 w-3 rounded-full bg-primary" />
+                  <span>Current</span>
+                </div>
+              </div>
+
+              {/* Cache stats (subtle, for awareness) */}
+              <div className="mt-4 pt-4 border-t border-border/50">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <HardDrive className="h-3 w-3" />
+                  <span>Local cache active</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                  <Database className="h-3 w-3" />
+                  <span>{cacheStats.totalAnswered} answers stored</span>
+                </div>
+              </div>
             </div>
           </aside>
 
@@ -474,14 +641,16 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                     {currentQuestion.code_snippet && (
                       <div className="mt-3 p-4 rounded-lg bg-slate-900 dark:bg-slate-950 text-slate-100 text-sm font-mono overflow-x-auto border border-slate-700">
                         <div className="mb-2 text-xs text-slate-400 font-sans">Code Snippet:</div>
-                        <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed">{currentQuestion.code_snippet}</pre>
+                        <pre className="whitespace-pre-wrap break-words text-xs leading-relaxed">
+                          {currentQuestion.code_snippet}
+                        </pre>
                       </div>
                     )}
                     <div className="grid grid-cols-1 gap-3">
                       {currentQuestion.options?.map((option, oIdx) => {
                         const isSelected = answers[currentQuestion.id] === option.id;
                         const label = String.fromCharCode(65 + oIdx); // A, B, C, D
-                        
+
                         return (
                           <button
                             key={option.id}
@@ -491,15 +660,19 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                               "flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all group",
                               attempt.is_locked
                                 ? "opacity-50 cursor-not-allowed"
-                                : isSelected 
-                                  ? "border-primary bg-primary/5 shadow-md" 
+                                : isSelected
+                                  ? "border-primary bg-primary/5 shadow-md"
                                   : "border-border hover:border-primary/50 hover:bg-muted/50"
                             )}
                           >
-                            <div className={cn(
-                              "h-8 w-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors",
-                              isSelected ? "bg-primary border-primary text-primary-foreground" : "border-border group-hover:border-primary/50"
-                            )}>
+                            <div
+                              className={cn(
+                                "h-8 w-8 rounded-full flex items-center justify-center font-bold border-2 transition-colors",
+                                isSelected
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-border group-hover:border-primary/50"
+                              )}
+                            >
                               {label}
                             </div>
                             <span className="flex-1 font-medium">{option.option_text}</span>
@@ -511,23 +684,23 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                   <CardFooter className="flex justify-between pt-6 border-t border-border/50">
                     <Button
                       variant="outline"
-                      onClick={() => setCurrentQuestionIdx(prev => Math.max(0, prev - 1))}
+                      onClick={() => handleQuestionNavigate(Math.max(0, currentQuestionIdx - 1))}
                       disabled={currentQuestionIdx === 0 || attempt.is_locked}
                     >
                       <ChevronLeft className="mr-2 h-4 w-4" /> Previous
                     </Button>
-                    
+
                     {currentQuestionIdx < totalQuestions - 1 ? (
                       <Button
-                        onClick={() => setCurrentQuestionIdx(prev => prev + 1)}
+                        onClick={() => handleQuestionNavigate(currentQuestionIdx + 1)}
                         disabled={attempt.is_locked}
                       >
                         Next <ChevronRight className="ml-2 h-4 w-4" />
                       </Button>
                     ) : (
-                      <Button 
-                        variant="default" 
-                        className="bg-green-600 hover:bg-green-700" 
+                      <Button
+                        variant="default"
+                        className="bg-green-600 hover:bg-green-700"
                         onClick={() => handleSubmit(false)}
                         disabled={attempt.is_locked}
                       >
@@ -538,9 +711,16 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
                 </Card>
               )}
 
-              <div className="flex items-center gap-2 p-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-sm">
-                <Info className="h-4 w-4 shrink-0" />
-                <p>Your answers are being saved automatically. Do not refresh or leave the page during the exam.</p>
+              {/* Info message about local caching */}
+              <div className="flex items-start gap-2 p-4 rounded-lg bg-blue-50 border border-blue-100 text-blue-700 text-sm">
+                <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-medium">Your answers are being saved locally for optimal performance.</p>
+                  <p className="text-blue-600/80 text-xs">
+                    All {cacheStats.totalAnswered} answers will be submitted together when you finish the test.
+                    Do not close this tab until submission is complete.
+                  </p>
+                </div>
               </div>
             </div>
           </main>

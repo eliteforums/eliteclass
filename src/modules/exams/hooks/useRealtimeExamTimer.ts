@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
+import { examLogger } from "../services/examLogger";
 
 interface UseRealtimeExamTimerProps {
   examId: string;
@@ -43,6 +44,9 @@ export function useRealtimeExamTimer({
   // Sync with server time
   const syncWithServerTime = useCallback(async () => {
     if (!supabase) return false;
+
+    examLogger.timer("Server time sync started", { attemptId });
+
     try {
       // Use database NOW() function via RPC or direct query
       const { data, error } = await supabase
@@ -52,6 +56,7 @@ export function useRealtimeExamTimer({
         .single();
 
       if (error || !data) {
+        examLogger.warn("Timer", "Failed to sync server time", { attemptId, error: String(error) });
         if (onSyncError) onSyncError("Failed to sync server time");
         return false;
       }
@@ -70,20 +75,24 @@ export function useRealtimeExamTimer({
       setTimeRemaining(Math.ceil(remaining / 1000)); // Convert to seconds
       setIsSynced(true);
 
+      examLogger.timer("Server time sync completed", { attemptId, remainingSec: Math.ceil(remaining / 1000) });
+
       return true;
     } catch (error) {
+      examLogger.error("Timer", "Time sync error", { attemptId, error: String(error) });
       if (onSyncError) onSyncError("Time sync error: " + String(error));
       return false;
     }
   }, [attemptId, durationMs, onSyncError]);
 
-  // Resync every 30 seconds to prevent drift
+  // Resync with server periodically to prevent clock drift.
+  // Increased to 180 seconds (3 min) to reduce DB load under high concurrency.
   useEffect(() => {
     if (!enabled) return;
 
     const resyncInterval = setInterval(() => {
       syncWithServerTime();
-    }, 90000); // Resync every 90 seconds to reduce DB load
+    }, 180000); // Resync every 3 minutes to reduce DB load
 
     return () => clearInterval(resyncInterval);
   }, [enabled, syncWithServerTime]);
@@ -170,19 +179,3 @@ export async function getServerTime(): Promise<number> {
 export function formatTimeDisplay(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-}
-
-/**
- * Check if time is critical (less than 5 minutes)
- */
-export function isTimeCritical(seconds: number): boolean {
-  return seconds < 300; // 5 minutes
-}
-
-/**
- * Check if time is almost expired (less than 1 minute)
- */
-export function isTimeAlmostExpired(seconds: number): boolean {
-  return seconds < 60;
-}
