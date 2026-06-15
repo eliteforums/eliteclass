@@ -6,7 +6,6 @@
 // You can pass additional config via defineConfig({ vite: { ... } }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
-import { visualizer } from "rollup-plugin-visualizer";
 import { VitePWA } from "vite-plugin-pwa";
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -22,12 +21,6 @@ export default defineConfig({
         rollupConfig: {
           external: ["@opentelemetry/api"],
         },
-      }),
-      visualizer({
-        open: false,
-        gzipSize: true,
-        brotliSize: true,
-        filename: "dist/stats.html",
       }),
       // PWA plugin disabled in SSR build (Vercel/Cloudflare) — the SW is served
       // as a static file from public/ or built separately.
@@ -53,30 +46,22 @@ export default defineConfig({
     ],
     build: {
       target: "esnext",
-      minify: "terser",
+      minify: "esbuild",
       cssMinify: true,
       cssCodeSplit: true,
       sourcemap: false,
       reportCompressedSize: false,
       rollupOptions: {
         output: {
-          manualChunks: {
-            "vendor-react": ["react", "react-dom"],
-            "vendor-ui": ["lucide-react", "framer-motion", "clsx", "tailwind-merge"],
-            "vendor-supabase": ["@supabase/supabase-js"],
-            "vendor-charts": ["recharts"],
-            "vendor-utils": ["date-fns", "zod"],
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom')) return 'vendor-react';
+            if (id.includes('node_modules/react/')) return 'vendor-react';
+            if (id.includes('node_modules/@supabase/supabase-js')) return 'vendor-supabase';
+            if (id.includes('node_modules/recharts')) return 'vendor-charts';
           },
         },
       },
       chunkSizeWarningLimit: 1000,
-      terserOptions: {
-        compress: {
-          drop_console: true,
-          drop_debugger: true,
-          pure_funcs: ["console.log", "console.info", "console.debug", "console.trace"],
-        },
-      },
     },
   },
 });
