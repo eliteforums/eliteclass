@@ -1,26 +1,16 @@
-import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
+import { attachPersister, buildQueryClient } from "./lib/queryClient";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        staleTime: 60_000,
-        gcTime: 10 * 60_000,
-        retry: (failureCount, error) => {
-          if (error instanceof Error && error.name === "AbortError") return false;
-          return failureCount < 1;
-        },
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: true,
-        refetchOnMount: false,
-      },
-      mutations: {
-        retry: 0,
-      },
-    },
-  });
+  const queryClient = buildQueryClient();
+
+  // Attach the persisted IndexedDB cache (browser only). User-id namespacing
+  // is refreshed when AuthProvider hydrates the session — see
+  // `src/components/AuthProvider.tsx` for the re-attach call.
+  if (typeof window !== "undefined") {
+    attachPersister({ queryClient, userId: null });
+  }
 
   const router = createRouter({
     routeTree,

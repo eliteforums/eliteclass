@@ -29,6 +29,7 @@ import { useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { Topbar } from "@/components/dashboard/Topbar";
 import { DashboardSkeleton } from "@/components/dashboard/DashboardSkeleton";
+import { OfflineBanner } from "@/components/offline/OfflineBanner";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/dashboard")({
@@ -64,6 +65,7 @@ function DashboardLayoutPage() {
 
       {/* Right column: topbar + page content */}
       <div className="flex min-w-0 flex-1 flex-col">
+        <OfflineBanner />
         <Topbar onToggleSidebar={handleToggleSidebar} />
 
         {/* All child routes render here */}

@@ -242,6 +242,15 @@ export async function signOut(): Promise<ApiResponse<null>> {
     navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_AUTH_CACHE' });
   }
 
+  // Purge the persisted React Query IndexedDB cache so the next user starts
+  // with an empty cache namespace (Req 9.4, 15.2).
+  try {
+    const { purgePersistedCache } = await import("@/lib/queryClient");
+    await purgePersistedCache();
+  } catch {
+    // best-effort
+  }
+
   if (error) return { data: null, error: error.message, success: false };
   return { data: null, error: null, success: true };
 }

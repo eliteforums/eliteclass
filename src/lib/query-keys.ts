@@ -120,3 +120,78 @@ export function staticQueryOptions() {
     gcTime: gcTimes.static,
   } as const;
 }
+
+// ---------------------------------------------------------------------------
+// Offline-First Query Categories (exam-reattempts-and-offline-caching spec)
+//
+// New category constants and timing maps introduced for the offline-first
+// caching rollout. The legacy `staleTimes`/`gcTimes` and *QueryOptions()
+// helpers above are preserved untouched — these are additive.
+//
+// Boundaries match Req 8:
+//   live    — staleTime ≤ 30s
+//   lists   — staleTime ≥ 5 min, gcTime ≥ 1 hour
+//   catalog — staleTime ≥ 1 hour, gcTime ≥ 24 hours
+//   default — staleTime ≥ 60s, gcTime ≥ 30 min
+// ---------------------------------------------------------------------------
+
+export const QUERY_CATEGORIES = {
+  LIVE: "live",
+  LISTS: "lists",
+  CATALOG: "catalog",
+  DEFAULT: "default",
+} as const;
+
+export type QueryCategory =
+  (typeof QUERY_CATEGORIES)[keyof typeof QUERY_CATEGORIES];
+
+export const STALE_TIMES: Record<QueryCategory, number> = {
+  live: 30_000, // 30s — Req 8.2
+  lists: 5 * 60_000, // 5 min — Req 8.3
+  catalog: 60 * 60_000, // 1 h — Req 8.4
+  default: 60_000, // 60s — Req 8.1
+};
+
+export const GC_TIMES: Record<QueryCategory, number> = {
+  live: 5 * 60_000, // 5 min
+  lists: 60 * 60_000, // 1 h — Req 8.3
+  catalog: 24 * 60 * 60_000, // 24 h — Req 8.4
+  default: 30 * 60_000, // 30 min — Req 8.1
+};
+
+export interface CategoryConfig {
+  staleTime: number;
+  gcTime: number;
+}
+
+/**
+ * Returns `{ staleTime, gcTime }` for the given category. Falls back to
+ * `default` and warns once if an unknown category name is passed (Req 8.6).
+ *
+ * Usage:
+ *
+ *   useQuery({
+ *     queryKey: queryKeys.students.list(id),
+ *     queryFn: () => listStudents(id),
+ *     ...getCategoryConfig("lists"),
+ *   });
+ */
+const _warnedCategories = new Set<string>();
+export function getCategoryConfig(
+  category: QueryCategory | string | undefined,
+): CategoryConfig {
+  if (category && (category as QueryCategory) in STALE_TIMES) {
+    const cat = category as QueryCategory;
+    return { staleTime: STALE_TIMES[cat], gcTime: GC_TIMES[cat] };
+  }
+  if (category && !_warnedCategories.has(category)) {
+    _warnedCategories.add(category);
+    if (typeof console !== "undefined") {
+      // Single warning per unknown category.
+      console.warn(
+        `[queryClient] unknown query category "${category}", falling back to "default"`,
+      );
+    }
+  }
+  return { staleTime: STALE_TIMES.default, gcTime: GC_TIMES.default };
+}
