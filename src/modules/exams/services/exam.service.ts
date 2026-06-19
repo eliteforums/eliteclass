@@ -359,28 +359,209 @@ export async function startExamAttempt(
     }
   }
 
-  // Create new attempt
+  // Create new attempt via the SECURITY DEFINER RPC. The RPC atomically:
+  //   - counts existing attempts
+  //   - inserts the new exam_attempts row (the BEFORE INSERT trigger
+  //     `enforce_exam_attempt_limit` rejects insert if the cap is breached)
+  //   - consumes the oldest active override when the base count would otherwise block
+  // It returns the UUID of the inserted attempt row.
+  // We pass `instituteId` only to silence unused-var warnings — RLS / triggers
+  // pull institute scoping from `exams.institute_id` server-side.
+  void instituteId;
+  const { data: newAttemptId, error: rpcError } = await supabase.rpc("start_exam_attempt", {
+    p_exam_id: examId,
+  });
+
+  if (rpcError) {
+    examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt failed - RPC error", {
+      error: getErrorMessage(rpcError),
+      code: (rpcError as { code?: string }).code,
+    });
+
+    const code = (rpcError as { code?: string }).code;
+    const rawMessage = `${rpcError.message ?? ""} ${
+      (rpcError as { details?: string }).details ?? ""
+    }`.toLowerCase();
+
+    // Trigger raises `attempt limit reached: % of % (overrides: %)` with errcode `check_violation`
+    if (code === "23514" || rawMessage.includes("attempt limit reached")) {
+      // Try to lift the human-readable form out of the trigger message;
+      // it already has the count + max + overrides baked in.
+      const match = /attempt limit reached:\s*(\d+)\s*of\s*(\d+)/i.exec(rpcError.message ?? "");
+      const friendly = match
+        ? `You've reached the maximum attempts (${match[1]} of ${match[2]}).`
+        : "You've reached the maximum attempts for this exam.";
+      return { data: null, error: friendly, success: false };
+    }
+
+    // RPC GRANT only allows authenticated users; if the auth context is somehow
+    // missing or the role check inside the RPC fires, surface a clearer message.
+    if (
+      code === "42501" ||
+      rawMessage.includes("not a student") ||
+      rawMessage.includes("insufficient_privilege")
+    ) {
+      return {
+        data: null,
+        error: "You must be enrolled as a student to attempt this exam.",
+        success: false,
+      };
+    }
+
+    return { data: null, error: getErrorMessage(rpcError), success: false };
+  }
+
+  if (!newAttemptId) {
+    examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt failed - no id returned");
+    return { data: null, error: "Failed to start exam attempt.", success: false };
+  }
+
+  // Re-read the inserted row to return the full ExamAttempt shape (existing return contract).
   const { data, error } = await supabase
     .from("exam_attempts")
-    .insert({
-      exam_id: examId,
-      student_id: student.id,
-      institute_id: instituteId,
-      status: "in_progress",
-      started_at: new Date().toISOString(),
-    })
-    .select()
+    .select("*")
+    .eq("id", newAttemptId as string)
     .single();
 
   examLogger.endTimer("startExamAttempt", "DB", "startExamAttempt completed", {
     examId,
     studentId: student.id,
+    attemptId: newAttemptId,
     isNewAttempt: !existingAttempt,
     hasError: !!error,
   });
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
   return { data: data as ExamAttempt, error: null, success: true };
+}
+
+/**
+ * Compute remaining attempts for a student given the configured max, taken count,
+ * and active override count.
+ *
+ * - `max_attempts === 0` is the sentinel for unlimited (Req 1.1, 2.2).
+ * - Effective limit = `max + activeOverrides`; remaining is bounded at zero.
+ */
+export function getRemainingAttempts(
+  maxAttempts: number,
+  taken: number,
+  activeOverrides: number,
+): { remaining: number | "Unlimited"; isUnlimited: boolean } {
+  if (maxAttempts === 0) {
+    return { remaining: "Unlimited", isUnlimited: true };
+  }
+  return {
+    remaining: Math.max(0, maxAttempts + activeOverrides - taken),
+    isUnlimited: false,
+  };
+}
+
+export interface StudentAttemptHistory {
+  attempts: ExamAttempt[];
+  maxAttempts: number;
+  totalMarks: number;
+  activeOverrides: number;
+  bestScore: number | null;
+  latestScore: number | null;
+}
+
+/**
+ * Fetch a student's complete attempt history for an exam, including the configured
+ * max_attempts, total_marks, active override count, and best/latest score summaries.
+ *
+ * Used by the student-side AttemptHistoryCard (Req 4.1, 4.2, 4.3).
+ */
+export async function listStudentAttemptHistory(
+  examId: string,
+  userId: string,
+): Promise<ApiResponse<StudentAttemptHistory>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  logDb("listStudentAttemptHistory:begin", { examId, userId });
+  examLogger.startTimer("listStudentAttemptHistory");
+
+  const { data: student, error: studentError } = await supabase
+    .from("students")
+    .select("id")
+    .eq("user_id", userId)
+    .single();
+
+  if (studentError || !student) {
+    examLogger.endTimer("listStudentAttemptHistory", "DB", "no student profile", {
+      error: studentError ? getErrorMessage(studentError) : "missing",
+    });
+    return { data: null, error: "Student profile not found", success: false };
+  }
+
+  const [examRes, attemptsRes, overridesRes] = await Promise.all([
+    supabase.from("exams").select("max_attempts, total_marks").eq("id", examId).single(),
+    supabase
+      .from("exam_attempts")
+      .select("*")
+      .eq("exam_id", examId)
+      .eq("student_id", student.id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("exam_attempt_overrides")
+      .select("id", { count: "exact", head: true })
+      .eq("exam_id", examId)
+      .eq("student_id", student.id)
+      .is("consumed_at", null),
+  ]);
+
+  if (examRes.error) {
+    examLogger.endTimer("listStudentAttemptHistory", "DB", "exam fetch failed", {
+      error: getErrorMessage(examRes.error),
+    });
+    return { data: null, error: getErrorMessage(examRes.error), success: false };
+  }
+  if (attemptsRes.error) {
+    examLogger.endTimer("listStudentAttemptHistory", "DB", "attempts fetch failed", {
+      error: getErrorMessage(attemptsRes.error),
+    });
+    return { data: null, error: getErrorMessage(attemptsRes.error), success: false };
+  }
+
+  // exam_attempt_overrides may not exist yet in older databases; treat read errors
+  // as "0 active overrides" rather than failing the whole call.
+  const activeOverrides = overridesRes.error ? 0 : (overridesRes.count ?? 0);
+
+  const attempts = (attemptsRes.data ?? []) as ExamAttempt[];
+
+  const submitted = attempts.filter((a) => a.submitted_at !== null);
+  const bestScore =
+    submitted.length === 0
+      ? null
+      : submitted.reduce((max, a) => (a.score > max ? a.score : max), -Infinity);
+  const latestScore =
+    submitted.length === 0
+      ? null
+      : submitted
+          .slice()
+          .sort(
+            (a, b) =>
+              new Date(b.submitted_at ?? 0).getTime() - new Date(a.submitted_at ?? 0).getTime(),
+          )[0]?.score ?? null;
+
+  examLogger.endTimer("listStudentAttemptHistory", "DB", "listStudentAttemptHistory completed", {
+    examId,
+    studentId: student.id,
+    attemptCount: attempts.length,
+    activeOverrides,
+  });
+
+  return {
+    data: {
+      attempts,
+      maxAttempts: (examRes.data?.max_attempts as number | undefined) ?? 1,
+      totalMarks: (examRes.data?.total_marks as number | undefined) ?? 0,
+      activeOverrides,
+      bestScore: Number.isFinite(bestScore as number) ? (bestScore as number) : null,
+      latestScore: latestScore ?? null,
+    },
+    error: null,
+    success: true,
+  };
 }
 
 /**
@@ -1757,4 +1938,373 @@ export async function getExamCaptures(examId: string): Promise<ApiResponse<Proct
   );
 
   return { data: withUrls as ProctoringCapture[], error: null, success: true };
+}
+
+// ── Attempt Override Services (Reattempts admin panel) ─────────────────────
+
+/**
+ * Row in `exam_attempt_overrides`.
+ *
+ * `consumed_at IS NULL` means the override is still active and grants the
+ * targeted student exactly +1 attempt above `exams.max_attempts`.
+ *
+ * Inserts go through RLS — staff/admin/super_admin in the same institute as
+ * the exam may grant overrides (Req 3.3).
+ */
+export interface AttemptOverride {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  granted_by: string;
+  granted_at: string;
+  consumed_at: string | null;
+  reason: string;
+}
+
+/**
+ * Per-row stat shown in the admin "Reattempts" tab — one entry per assigned
+ * student for this exam.
+ */
+export interface ExamReattemptStatRow {
+  student_id: string;
+  student_name: string;
+  admission_no: string;
+  attempts_taken: number;
+  max_attempts: number;
+  active_overrides: number;
+}
+
+/**
+ * List every override row for an exam, newest first.
+ *
+ * The student's display name and admission number are joined in via
+ * `students -> users.name` so the panel can render rows without a second
+ * round trip per row.
+ */
+export async function listExamOverrides(
+  examId: string,
+): Promise<
+  ApiResponse<
+    Array<
+      AttemptOverride & {
+        student_name?: string;
+        admission_no?: string;
+      }
+    >
+  >
+> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_attempt_overrides")
+    .select(
+      `
+      id,
+      exam_id,
+      student_id,
+      granted_by,
+      granted_at,
+      consumed_at,
+      reason,
+      student:students(
+        admission_no,
+        user:users(name)
+      )
+    `,
+    )
+    .eq("exam_id", examId)
+    .order("granted_at", { ascending: false });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+
+  const formatted = (data as any[]).map((row) => ({
+    id: row.id,
+    exam_id: row.exam_id,
+    student_id: row.student_id,
+    granted_by: row.granted_by,
+    granted_at: row.granted_at,
+    consumed_at: row.consumed_at,
+    reason: row.reason,
+    student_name: row.student?.user?.name ?? undefined,
+    admission_no: row.student?.admission_no ?? undefined,
+  }));
+
+  return { data: formatted, error: null, success: true };
+}
+
+/**
+ * Grant a +1 attempt override for a single student on this exam.
+ *
+ * Validates `reason` to 1–500 chars (matches the DB CHECK constraint), looks
+ * up the calling user via `auth.getUser()` for `granted_by`, and inserts a
+ * fresh override row with `consumed_at = NULL` so the trigger
+ * `enforce_exam_attempt_limit` sees it as active.
+ */
+export async function grantAttemptOverride(
+  examId: string,
+  studentId: string,
+  reason: string,
+): Promise<ApiResponse<AttemptOverride>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const trimmed = reason.trim();
+  if (trimmed.length < 1 || trimmed.length > 500) {
+    return {
+      data: null,
+      error: "Reason must be between 1 and 500 characters.",
+      success: false,
+    };
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      data: null,
+      error: "You must be signed in to grant an override.",
+      success: false,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("exam_attempt_overrides")
+    .insert({
+      exam_id: examId,
+      student_id: studentId,
+      granted_by: user.id,
+      reason: trimmed,
+      consumed_at: null,
+    })
+    .select("id, exam_id, student_id, granted_by, granted_at, consumed_at, reason")
+    .single();
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: data as AttemptOverride, error: null, success: true };
+}
+
+/**
+ * Build the per-student stat table for the admin "Reattempts" tab.
+ *
+ * Three round trips, merged client-side:
+ *   1. assigned students (with name + admission_no joined)
+ *   2. all attempts for this exam (counted per student)
+ *   3. all active overrides for this exam (counted per student)
+ *
+ * `max_attempts` is read once from the parent exam row and applied to every
+ * stat row so the UI can render "Unlimited" when it equals 0.
+ */
+export async function listExamReattemptStats(
+  examId: string,
+): Promise<ApiResponse<ExamReattemptStatRow[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const [examRes, assignmentsRes, attemptsRes, overridesRes] = await Promise.all([
+    supabase.from("exams").select("max_attempts").eq("id", examId).single(),
+    supabase
+      .from("exam_assignments")
+      .select(
+        `
+        student_id,
+        student:students(
+          admission_no,
+          user:users(name)
+        )
+      `,
+      )
+      .eq("exam_id", examId),
+    supabase
+      .from("exam_attempts")
+      .select("student_id")
+      .eq("exam_id", examId),
+    supabase
+      .from("exam_attempt_overrides")
+      .select("student_id")
+      .eq("exam_id", examId)
+      .is("consumed_at", null),
+  ]);
+
+  if (examRes.error) {
+    return { data: null, error: getErrorMessage(examRes.error), success: false };
+  }
+  if (assignmentsRes.error) {
+    return { data: null, error: getErrorMessage(assignmentsRes.error), success: false };
+  }
+  if (attemptsRes.error) {
+    return { data: null, error: getErrorMessage(attemptsRes.error), success: false };
+  }
+  if (overridesRes.error) {
+    return { data: null, error: getErrorMessage(overridesRes.error), success: false };
+  }
+
+  const maxAttempts = (examRes.data?.max_attempts as number | undefined) ?? 1;
+
+  // Group attempts by student_id
+  const attemptCounts = new Map<string, number>();
+  for (const row of (attemptsRes.data ?? []) as Array<{ student_id: string }>) {
+    attemptCounts.set(row.student_id, (attemptCounts.get(row.student_id) ?? 0) + 1);
+  }
+
+  // Group active overrides by student_id
+  const overrideCounts = new Map<string, number>();
+  for (const row of (overridesRes.data ?? []) as Array<{ student_id: string }>) {
+    overrideCounts.set(row.student_id, (overrideCounts.get(row.student_id) ?? 0) + 1);
+  }
+
+  const rows: ExamReattemptStatRow[] = ((assignmentsRes.data ?? []) as any[]).map((asgn) => ({
+    student_id: asgn.student_id,
+    student_name: asgn.student?.user?.name ?? "Unknown",
+    admission_no: asgn.student?.admission_no ?? "",
+    attempts_taken: attemptCounts.get(asgn.student_id) ?? 0,
+    max_attempts: maxAttempts,
+    active_overrides: overrideCounts.get(asgn.student_id) ?? 0,
+  }));
+
+  // Sort by name for stable, predictable rendering.
+  rows.sort((a, b) => a.student_name.localeCompare(b.student_name));
+
+  return { data: rows, error: null, success: true };
+}
+
+// ── Manual score edit + audit log (Req 5, 6) ───────────────────────────────
+
+/**
+ * Row in `exam_score_audits` enriched with the editor's display name.
+ *
+ * Schema notes (see supabase/setup.sql):
+ *   * `attempt_id` references `exam_attempts(id)` — this codebase has no
+ *     `exam_results` table; score lives on `exam_attempts.score`.
+ *   * The table is append-only via RLS for everyone except `super_admin`.
+ *   * `editor_user_id` references `auth.users(id)`. There is no FK to
+ *     `public.users`, so PostgREST cannot auto-embed the name. We fetch
+ *     editor names in a second query and merge.
+ */
+export interface ExamScoreAudit {
+  id: string;
+  attempt_id: string;
+  exam_id: string;
+  student_id: string;
+  editor_user_id: string;
+  edited_at: string;
+  old_score: number;
+  new_score: number;
+  reason: string;
+  // joined
+  editor_name?: string;
+}
+
+/**
+ * Edit a student's exam score and record an audit row.
+ *
+ * Routes through the SECURITY DEFINER RPC `update_exam_score` which
+ * validates inputs, updates `exam_attempts.score`, inserts into
+ * `exam_score_audits`, and writes to `activity_logs` — all in a single
+ * transaction. Client-side we additionally validate the reason length so
+ * we can short-circuit the round trip with a clear message.
+ *
+ * Error mapping mirrors the RPC's RAISE EXCEPTION codes:
+ *   * `check_violation` (errcode 23514) — invalid score range or short
+ *     reason. The DB message includes the valid range, so we surface it
+ *     verbatim.
+ *   * `insufficient_privilege` (errcode 42501) — caller is not staff /
+ *     admin / super_admin in the exam's institute.
+ *   * `foreign_key_violation` (errcode 23503) — attempt id not found.
+ */
+export async function updateAttemptScore(
+  attemptId: string,
+  newScore: number,
+  reason: string,
+): Promise<ApiResponse<null>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const trimmed = reason.trim();
+  if (trimmed.length < 3 || trimmed.length > 500) {
+    return {
+      data: null,
+      error: "Reason must be between 3 and 500 characters.",
+      success: false,
+    };
+  }
+
+  const { error } = await supabase.rpc("update_exam_score", {
+    p_attempt_id: attemptId,
+    p_new_score: newScore,
+    p_reason: trimmed,
+  });
+
+  if (!error) return { data: null, error: null, success: true };
+
+  const code = (error as { code?: string }).code;
+  const message = (error as { message?: string }).message ?? "";
+
+  if (code === "23514" || /invalid input/i.test(message)) {
+    // Surface the DB message verbatim — it includes the allowed range.
+    return { data: null, error: message || "Invalid input.", success: false };
+  }
+  if (code === "42501" || /permission denied/i.test(message)) {
+    return {
+      data: null,
+      error: "You don't have permission to update this score.",
+      success: false,
+    };
+  }
+  if (code === "23503" || code === "foreign_key_violation") {
+    return { data: null, error: "Attempt not found.", success: false };
+  }
+
+  return { data: null, error: getErrorMessage(error), success: false };
+}
+
+/**
+ * List every manual score edit recorded for a single attempt, newest first.
+ *
+ * Two round trips since `editor_user_id` lacks a public-side FK we can use
+ * for PostgREST embedding:
+ *   1. SELECT all audit rows for the attempt.
+ *   2. SELECT names from `users` for the distinct editor ids.
+ *
+ * Editor name falls back to `undefined` if the editor row is missing (e.g.
+ * deleted user); the panel renders "Unknown editor" in that case.
+ */
+export async function listAttemptScoreAudits(
+  attemptId: string,
+): Promise<ApiResponse<ExamScoreAudit[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const { data, error } = await supabase
+    .from("exam_score_audits")
+    .select(
+      "id, attempt_id, exam_id, student_id, editor_user_id, edited_at, old_score, new_score, reason",
+    )
+    .eq("attempt_id", attemptId)
+    .order("edited_at", { ascending: false });
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+
+  const rows = (data ?? []) as ExamScoreAudit[];
+  if (rows.length === 0) return { data: rows, error: null, success: true };
+
+  const editorIds = Array.from(new Set(rows.map((r) => r.editor_user_id)));
+  const { data: editorRows, error: editorError } = await supabase
+    .from("users")
+    .select("id, name")
+    .in("id", editorIds);
+
+  // Editor name lookup is non-critical — render audits without names rather
+  // than fail the whole panel.
+  const nameById = new Map<string, string>();
+  if (!editorError) {
+    for (const row of (editorRows ?? []) as Array<{ id: string; name: string | null }>) {
+      if (row.name) nameById.set(row.id, row.name);
+    }
+  }
+
+  const enriched = rows.map((row) => ({
+    ...row,
+    editor_name: nameById.get(row.editor_user_id),
+  }));
+
+  return { data: enriched, error: null, success: true };
 }

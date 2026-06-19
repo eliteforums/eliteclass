@@ -9,11 +9,31 @@ import { Input } from "@/components/ui/input";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Users, AlertTriangle, RotateCcw, Camera, ArrowUpDown, CheckCircle2, Search, Trophy, Award } from "lucide-react";
+import {
+  Users,
+  AlertTriangle,
+  RotateCcw,
+  Camera,
+  ArrowUpDown,
+  CheckCircle2,
+  Search,
+  Trophy,
+  Award,
+  Pencil,
+  History,
+} from "lucide-react";
 import { ProctoringCapturesGallery } from "./ProctoringCapturesGallery";
 import type { ExamViolation } from "../../types";
 import { grantReattempt, revokeReattempt } from "../../services/exam.service";
 import { toast } from "sonner";
+import { EditScoreDialog, type EditScoreDialogAttempt } from "./EditScoreDialog";
+import { ScoreAuditPanel } from "./ScoreAuditPanel";
+
+/**
+ * Statuses where the score is considered final and a manual edit is
+ * meaningful. Mirrors the `isTerminal` set used elsewhere in this file.
+ */
+const FINAL_SCORE_STATUSES = new Set(["submitted", "auto_submitted", "graded"]);
 
 type SortOption = "default" | "score_desc" | "score_asc" | "percentage_desc" | "percentage_asc" | "name_asc";
 
@@ -41,15 +61,27 @@ export function AttemptList({ examId }: AttemptListProps) {
   const [capturesStudentName, setCapturesStudentName] = useState<string>("");
   const [sortBy, setSortBy] = useState<SortOption>("default");
   const [searchTerm, setSearchTerm] = useState("");
+  // Manual score edit dialog state. `editTarget === null` means the dialog
+  // is closed; we keep the last target for one render cycle so the
+  // close-animation doesn't see an empty body.
+  const [editTarget, setEditTarget] = useState<EditScoreDialogAttempt | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  // Per-attempt audit-history expansion. Toggles independently of the
+  // violations panel above.
+  const [auditExpandedId, setAuditExpandedId] = useState<string | null>(null);
+  // Bumped after every successful edit to force ScoreAuditPanel to refetch.
+  const [auditRefreshKey, setAuditRefreshKey] = useState(0);
+
+  const fetchAttempts = async () => {
+    setIsLoading(true);
+    const { data, success } = await listAttempts(examId);
+    if (success && data) setAttempts(data);
+    setIsLoading(false);
+  };
 
   useEffect(() => {
-    const fetch = async () => {
-      setIsLoading(true);
-      const { data, success } = await listAttempts(examId);
-      if (success && data) setAttempts(data);
-      setIsLoading(false);
-    };
-    fetch();
+    fetchAttempts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [examId]);
 
   // Compute sorted and filtered attempts with rank
@@ -118,6 +150,29 @@ export function AttemptList({ examId }: AttemptListProps) {
     setViolationsLoading(false);
   };
 
+  const handleOpenEditScore = (attempt: any) => {
+    const totalMarks = Number(attempt.exam?.total_marks ?? 0);
+    setEditTarget({
+      id: attempt.id,
+      student_name: attempt.student?.user?.name ?? "Unknown",
+      current_score: Number(attempt.score ?? 0),
+      max_score: Number.isFinite(totalMarks) ? totalMarks : 0,
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = async () => {
+    // Refetch the attempts list so the new score appears in the table.
+    await fetchAttempts();
+    // Bump the audit refresh key so the audit panel (if expanded for any
+    // attempt) re-queries — most importantly for the just-edited attempt.
+    setAuditRefreshKey((n) => n + 1);
+  };
+
+  const handleToggleAuditPanel = (attemptId: string) => {
+    setAuditExpandedId((current) => (current === attemptId ? null : attemptId));
+  };
+
   const handleReattempt = async (attemptId: string, currentlyGranted: boolean) => {
     setReattemptLoadingId(attemptId);
     try {
@@ -131,8 +186,7 @@ export function AttemptList({ examId }: AttemptListProps) {
             : "Reattempt granted — student can now retake the test",
         );
         // Refresh the attempts list
-        const { data, success: ok } = await listAttempts(examId);
-        if (ok && data) setAttempts(data);
+        await fetchAttempts();
       } else {
         toast.error(error || "Failed to update reattempt status");
       }
@@ -277,6 +331,38 @@ export function AttemptList({ examId }: AttemptListProps) {
             <RotateCcw className="h-3 w-3" />
             {reattemptLoadingId === attempt.id ? "..." : granted ? "Revoke" : "Grant Reattempt"}
           </Button>
+        );
+      },
+    },
+    {
+      key: "edit_score",
+      header: "Edit Score",
+      render: (attempt: any) => {
+        const isFinal = FINAL_SCORE_STATUSES.has(attempt.status);
+        if (!isFinal) return <span className="text-muted-foreground text-xs">—</span>;
+        const isAuditOpen = auditExpandedId === attempt.id;
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 gap-1 text-xs"
+              onClick={() => handleOpenEditScore(attempt)}
+            >
+              <Pencil className="h-3 w-3" />
+              Edit
+            </Button>
+            <Button
+              size="sm"
+              variant={isAuditOpen ? "default" : "ghost"}
+              className="h-7 gap-1 text-xs"
+              onClick={() => handleToggleAuditPanel(attempt.id)}
+              title="View edit history"
+            >
+              <History className="h-3 w-3" />
+              {isAuditOpen ? "Hide" : "History"}
+            </Button>
+          </div>
         );
       },
     },
@@ -459,6 +545,46 @@ export function AttemptList({ examId }: AttemptListProps) {
           )}
         </div>
       )}
+
+      {auditExpandedId && (
+        <div className="rounded-lg border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <History className="h-4 w-4 text-muted-foreground" />
+              Score edit history
+              {(() => {
+                const target = attempts.find((a) => a.id === auditExpandedId);
+                const name = target?.student?.user?.name;
+                return name ? (
+                  <span className="text-muted-foreground font-normal">— {name}</span>
+                ) : null;
+              })()}
+            </h4>
+            <button
+              type="button"
+              onClick={() => setAuditExpandedId(null)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Close
+            </button>
+          </div>
+          <ScoreAuditPanel attemptId={auditExpandedId} refreshKey={auditRefreshKey} />
+        </div>
+      )}
+
+      <EditScoreDialog
+        attempt={editTarget}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) {
+            // Defer clearing the target so the closing animation has data
+            // to render. Not strictly required but keeps the dialog tidy.
+            setTimeout(() => setEditTarget(null), 200);
+          }
+        }}
+        onSuccess={handleEditSuccess}
+      />
     </div>
   );
 }

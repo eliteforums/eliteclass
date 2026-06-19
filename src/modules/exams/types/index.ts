@@ -71,6 +71,7 @@ export interface Exam {
   end_time: string | null;
   total_marks: number;
   passing_marks: number;
+  max_attempts: number;
   status: ExamStatus;
   auto_submit: boolean;
   negative_marking: boolean;
@@ -180,6 +181,7 @@ export interface CreateExamPayload {
   end_time?: string;
   total_marks: number;
   passing_marks: number;
+  max_attempts?: number;
   status?: ExamStatus;
   auto_submit?: boolean;
   negative_marking?: boolean;

@@ -60,6 +60,7 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
       time_per_question_seconds: null,
       total_marks: 100,
       passing_marks: 35,
+      max_attempts: 1,
       status: "draft",
       auto_submit: true,
       negative_marking: false,
@@ -347,6 +348,23 @@ export function ExamForm({ initialData, onSubmit, isLoading }: ExamFormProps) {
                     )}
                   />
                 </div>
+
+                <FormField
+                  control={form.control}
+                  name="max_attempts"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Max Attempts</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={0} max={9999} step={1} {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Maximum number of attempts a student can make. 0 = unlimited.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 <div className="space-y-4 pt-4">
                   <FormField

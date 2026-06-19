@@ -7,10 +7,12 @@ import {
   CheckCircle2,
   AlertCircle,
   RotateCcw,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useAuth } from "@/hooks/useAuth";
 import { listStudentExams } from "../../services/exam.service";
 import type { Exam, ExamAttempt } from "../../types";
@@ -18,12 +20,14 @@ import { useNavigate } from "@tanstack/react-router";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { format } from "date-fns";
 import { ExamStatusBadge } from "../shared/ExamStatusBadge";
+import { AttemptHistoryCard } from "./AttemptHistoryCard";
 import { cn } from "@/lib/utils";
 
 export function StudentExamDashboard() {
   const { user } = useAuth();
   const [exams, setExams] = useState<(Exam & { attempt?: ExamAttempt | null })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [openHistory, setOpenHistory] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -155,6 +159,40 @@ export function StudentExamDashboard() {
                       </span>
                     </div>
                   </div>
+                )}
+
+                {user?.id && (
+                  <Collapsible
+                    open={!!openHistory[item.id]}
+                    onOpenChange={(next) =>
+                      setOpenHistory((prev) => ({ ...prev, [item.id]: next }))
+                    }
+                  >
+                    <CollapsibleTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-between text-xs"
+                      >
+                        <span>Attempt history</span>
+                        <ChevronDown
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform",
+                            openHistory[item.id] && "rotate-180",
+                          )}
+                        />
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pt-2">
+                      {openHistory[item.id] && (
+                        <AttemptHistoryCard
+                          examId={item.id}
+                          userId={user.id}
+                          totalMarksFallback={item.total_marks}
+                        />
+                      )}
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
               </CardContent>
               <CardFooter className="bg-muted/10 border-t border-border/50">

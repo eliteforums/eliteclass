@@ -9,6 +9,7 @@ import { ExamForm } from "@/modules/exams/components/admin/ExamForm";
 import { QuestionManager } from "@/modules/exams/components/admin/QuestionManager";
 import { ExamAssigneeSelector } from "@/modules/exams/components/admin/ExamAssigneeSelector";
 import { AttemptList } from "@/modules/exams/components/admin/AttemptList";
+import { AttemptOverridePanel } from "@/modules/exams/components/admin/AttemptOverridePanel";
 import { LiveExamMonitoring } from "@/modules/exams/components/admin/LiveExamMonitoring";
 import { ProctoringStatusBadges } from "@/modules/exams/components/admin/ProctoringStatusBadges";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -25,6 +26,7 @@ import {
   ChevronLeft,
   Activity,
   Camera,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
@@ -146,6 +148,9 @@ function ManageExamPage() {
           <TabsTrigger value="results" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" /> Results & Analytics
           </TabsTrigger>
+          <TabsTrigger value="reattempts" className="flex items-center gap-2">
+            <RotateCcw className="h-4 w-4" /> Reattempts
+          </TabsTrigger>
           <TabsTrigger value="monitoring" className="flex items-center gap-2">
             <Activity className="h-4 w-4" /> Live Monitoring
           </TabsTrigger>
@@ -184,6 +189,10 @@ function ManageExamPage() {
 
         <TabsContent value="results">
           <AttemptList examId={examId} />
+        </TabsContent>
+
+        <TabsContent value="reattempts">
+          <AttemptOverridePanel examId={examId} />
         </TabsContent>
 
         <TabsContent value="monitoring">

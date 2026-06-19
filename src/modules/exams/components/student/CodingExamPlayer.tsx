@@ -177,7 +177,7 @@ export function CodingExamPlayer({ examId }: CodingExamPlayerProps) {
       ]);
 
       if (!examRes.success || !examRes.data || !attemptRes.success || !attemptRes.data) {
-        toast.error("Failed to load exam. Please try again.");
+        toast.error(attemptRes.error || examRes.error || "Failed to load exam. Please try again.");
         navigate({ to: "/dashboard/student/exams" });
         setIsLoading(false);
         return;

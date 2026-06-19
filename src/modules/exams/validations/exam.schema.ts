@@ -8,6 +8,7 @@ export const examSchema = z.object({
   time_per_question_seconds: z.coerce.number().min(0).nullable().default(null),
   total_marks: z.coerce.number().min(0),
   passing_marks: z.coerce.number().min(0),
+  max_attempts: z.coerce.number().int().min(0).max(9999).default(1),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
   start_time: z.string().optional().nullable(),
   end_time: z.string().optional().nullable(),

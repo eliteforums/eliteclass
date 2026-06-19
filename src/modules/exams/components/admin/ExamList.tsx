@@ -81,6 +81,13 @@ export function ExamList() {
       render: (exam) => <span>{exam.duration_mins} mins</span>,
     },
     {
+      key: "max_attempts",
+      header: "Attempts",
+      render: (exam) => (
+        <span>{exam.max_attempts === 0 ? "Unlimited" : exam.max_attempts}</span>
+      ),
+    },
+    {
       key: "marks",
       header: "Total Marks",
       render: (exam) => <span>{exam.total_marks}</span>,
