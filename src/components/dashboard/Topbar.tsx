@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { NotificationBell } from "@/components/dashboard/notifications/NotificationBell";
+import { SyncIndicator } from "@/components/offline/SyncIndicator";
+import { OutboxPanel } from "@/components/offline/OutboxPanel";
 import { useAuthStore } from "@/store/authStore";
 import { signOut } from "@/services/auth.service";
 import { ROLE_LABELS } from "@/utils/rbac";
@@ -17,6 +19,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showNewMenu, setShowNewMenu] = useState(false);
+  const [outboxOpen, setOutboxOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const newMenuRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +130,8 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
 
           <NotificationBell />
 
+          <SyncIndicator onClick={() => setOutboxOpen(true)} />
+
           <LanguageSwitcher />
 
           <ThemeToggle />
@@ -178,6 +183,7 @@ export function Topbar({ onToggleSidebar }: { onToggleSidebar: () => void }) {
           </div>
         </div>
       </div>
+      <OutboxPanel open={outboxOpen} onOpenChange={setOutboxOpen} />
     </header>
   );
 }
