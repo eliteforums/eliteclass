@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 //
 // Builds the shared TanStack Query client and wires `persistQueryClient` to
-// IndexedDB via `idb` so cached reads survive reloads and full browser
-// restarts. This is part of the offline-first rollout
+// IndexedDB via the shared offline DB so cached reads survive reloads and
+// full browser restarts. This is part of the offline-first rollout
 // (`exam-reattempts-and-offline-caching` spec, Phase B).
 //
 // Cache isolation rules (Req 9.3, 9.6, 15.1, 15.4):
@@ -14,6 +14,11 @@
 //     next sign-in starts clean.
 //   * The persister only runs in the browser; SSR boots without persistence.
 //
+// Single-source-of-truth for IndexedDB: the persister uses the same database
+// handle as the offline subsystem (`src/services/offline/db.ts`). Opening the
+// same DB at the same version from two upgrade scripts caused the second
+// caller to see missing stores; consolidating here fixes that.
+//
 // PWA-disabled fallback (Req 18.3): the persister is independent of the
 // service worker. Reads continue to hydrate from IndexedDB even when no SW
 // is registered.
@@ -22,13 +27,11 @@
 import { QueryClient } from "@tanstack/react-query";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
-import { openDB, type IDBPDatabase } from "idb";
+
+import { offlineDb, STORES } from "@/services/offline/db";
 
 import { GC_TIMES, STALE_TIMES } from "./query-keys";
 
-const DB_NAME = "eliteclass-offline";
-const DB_VERSION = 1;
-const STORE_NAME = "tq-persister";
 const PERSIST_KEY = "react-query-cache";
 
 // Per-app cache schema version. Bumping this discards the entire persisted
@@ -36,28 +39,7 @@ const PERSIST_KEY = "react-query-cache";
 // changes that would invalidate cached payload shapes.
 const PERSISTED_SCHEMA_VERSION = "v1";
 
-// Max persisted-cache entry size before we discard. The persist-client lib
-// already compresses with structuredClone; this is a safety bound only.
 const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-// ---------------------------------------------------------------------------
-// IndexedDB helpers
-// ---------------------------------------------------------------------------
-
-let _db: Promise<IDBPDatabase> | null = null;
-
-function getDb(): Promise<IDBPDatabase> {
-  if (!_db) {
-    _db = openDB(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        if (!db.objectStoreNames.contains(STORE_NAME)) {
-          db.createObjectStore(STORE_NAME);
-        }
-      },
-    });
-  }
-  return _db;
-}
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof indexedDB !== "undefined";
@@ -93,23 +75,10 @@ export function buildQueryClient(): QueryClient {
 // ---------------------------------------------------------------------------
 
 interface AttachPersisterArgs {
-  /** The QueryClient to attach to. */
   queryClient: QueryClient;
-  /**
-   * Authenticated user id. Used as part of the buster so cached entries
-   * for one user are never returned to another. Pass `null` for an
-   * unauthenticated session — the cache is namespaced under "anon".
-   */
   userId: string | null;
 }
 
-/**
- * Attach the IndexedDB persister to a `QueryClient`. Safe to call repeatedly;
- * each call replaces the prior persister and triggers a fresh hydrate.
- *
- * Returns a teardown function (kept for symmetry; the persist-client lib
- * already manages its own subscription, so this is informational only).
- */
 export function attachPersister({ queryClient, userId }: AttachPersisterArgs): () => void {
   if (!isBrowser()) return () => {};
 
@@ -119,8 +88,8 @@ export function attachPersister({ queryClient, userId }: AttachPersisterArgs): (
     storage: {
       getItem: async (key) => {
         try {
-          const db = await getDb();
-          const value = await db.get(STORE_NAME, key);
+          const db = await offlineDb();
+          const value = await db.get(STORES.TQ_PERSISTER, key);
           return (value as string | undefined) ?? null;
         } catch {
           return null;
@@ -128,16 +97,16 @@ export function attachPersister({ queryClient, userId }: AttachPersisterArgs): (
       },
       setItem: async (key, value) => {
         try {
-          const db = await getDb();
-          await db.put(STORE_NAME, value, key);
+          const db = await offlineDb();
+          await db.put(STORES.TQ_PERSISTER, value, key);
         } catch {
           // Quota or transient IDB failure — drop silently; reads still work.
         }
       },
       removeItem: async (key) => {
         try {
-          const db = await getDb();
-          await db.delete(STORE_NAME, key);
+          const db = await offlineDb();
+          await db.delete(STORES.TQ_PERSISTER, key);
         } catch {
           // ignore
         }
@@ -163,8 +132,8 @@ export function attachPersister({ queryClient, userId }: AttachPersisterArgs): (
 export async function purgePersistedCache(): Promise<void> {
   if (!isBrowser()) return;
   try {
-    const db = await getDb();
-    await db.clear(STORE_NAME);
+    const db = await offlineDb();
+    await db.clear(STORES.TQ_PERSISTER);
   } catch {
     // ignore — best-effort cleanup
   }
