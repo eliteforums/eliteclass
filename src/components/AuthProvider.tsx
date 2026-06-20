@@ -16,10 +16,12 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUser } from "@/services/auth.service";
 import { getErrorMessage } from "@/utils/helpers";
+import { bootstrapOfflineRuntime } from "@/services/offline";
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -43,11 +45,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useAuthStore((s) => s.logout);
   const setLoading = useAuthStore((s) => s.setLoading);
   const mountedRef = useRef(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  // Bootstrap the offline outbox replay loop. Drains pending mutations on
+  // every `online` event and on a 30s interval. Idempotent — safe to mount
+  // alongside the SW Background Sync handler in Phase G.
+  useEffect(() => {
+    const teardown = bootstrapOfflineRuntime({
+      queryClient,
+      getOwnerUserId: () => useAuthStore.getState().user?.id ?? null,
+    });
+    return teardown;
+  }, [queryClient]);
 
   useEffect(() => {
     if (!supabase) {

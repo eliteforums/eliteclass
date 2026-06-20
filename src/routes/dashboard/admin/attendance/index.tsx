@@ -46,7 +46,6 @@ import { getStaffBatchAssignments, getStaffByUserId } from "@/services/staff.ser
 import {
   getAttendanceSessions,
   getSessionWithRecords,
-  bulkMarkAttendance,
   lockAttendanceSession,
   unlockAttendanceSession,
   getAttendanceSummary,
@@ -56,6 +55,8 @@ import { AttendanceMarkingTable } from "@/modules/attendance/components/Attendan
 import { AttendanceSummaryCard } from "@/modules/attendance/components/AttendanceSummaryCard";
 import { GeoAttendancePrompt } from "@/components/attendance/GeoAttendancePrompt";
 import { resolveSessionBatchId } from "@/modules/attendance/utils/sessionHelpers";
+import { useMarkAttendanceOffline } from "@/modules/attendance/hooks/useMarkAttendanceOffline";
+import { useNetwork } from "@/hooks/useNetwork";
 import type {
   AttendanceSession,
   AttendanceRecord,
@@ -240,6 +241,8 @@ function AttendancePage() {
   const { user } = useAuthStore();
   const instituteId = user?.institute_id ?? "";
   const isStaffUser = user?.role === "staff";
+  const { isOnline } = useNetwork();
+  const markAttendanceOffline = useMarkAttendanceOffline();
 
   // ── Shared state ─────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>("sessions");
@@ -593,42 +596,64 @@ function AttendancePage() {
     });
 
     const session = sessions.find((s) => s.id === expandedSessionId);
-    const result = await bulkMarkAttendance(
-      expandedSessionId,
-      instituteId,
-      user.id,
-      records,
-      session?.batch_id,
-    );
+    const sessionBatchId = session?.batch_id ?? null;
 
-    if (!result.success) {
-      setSaveError(result.error ?? "Failed to save attendance.");
-      toast.error(result.error ?? "Failed to save attendance.");
+    // Route every per-row mark through the offline mutation hook. When
+    // online the outbox drains immediately; when offline each row is
+    // optimistically applied and queued until reconnect (Req 13).
+    try {
+      await Promise.all(
+        records.map((record) =>
+          markAttendanceOffline.mutateAsync({
+            sessionId: expandedSessionId,
+            studentId: record.student_id,
+            status: record.status,
+            instituteId,
+            batchId: sessionBatchId,
+            notes: record.notes ?? null,
+            markedBy: user.id,
+          }),
+        ),
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to queue attendance changes.";
+      setSaveError(message);
+      toast.error(message);
       setIsSaving(false);
       return false;
-    } else {
-      console.debug("[attendance.save] updated rows", result.data?.records ?? []);
-      const refreshed = await getSessionWithRecords(expandedSessionId);
-      if (refreshed.success && refreshed.data) {
-        setExpandedRecords(refreshed.data.records);
-        console.debug(
-          "[attendance.save] refetched rows",
-          refreshed.data.records.map((row) => ({
-            student_id: row.student_id,
-            attendance_date: refreshed.data?.session_date ?? null,
-            selected_status: row.status,
-          })),
-        );
-        toast.success("Attendance saved successfully.");
-      } else {
-        const refreshError = refreshed.error ?? "Saved, but failed to refresh attendance.";
-        setSaveError(refreshError);
-        toast.error(refreshError);
-        setIsSaving(false);
-        return false;
-      }
-      await fetchSessions();
     }
+
+    if (!isOnline) {
+      // Offline: rows already updated optimistically; drain will replay
+      // when the device reconnects.
+      toast.success("Attendance queued. It will sync when you're back online.");
+      setIsSaving(false);
+      return true;
+    }
+
+    // Online: outbox drains in the background. Refetch once to pull the
+    // server-confirmed rows (and surface any RLS rejections).
+    const refreshed = await getSessionWithRecords(expandedSessionId);
+    if (refreshed.success && refreshed.data) {
+      setExpandedRecords(refreshed.data.records);
+      console.debug(
+        "[attendance.save] refetched rows",
+        refreshed.data.records.map((row) => ({
+          student_id: row.student_id,
+          attendance_date: refreshed.data?.session_date ?? null,
+          selected_status: row.status,
+        })),
+      );
+      toast.success("Attendance saved successfully.");
+    } else {
+      const refreshError = refreshed.error ?? "Saved, but failed to refresh attendance.";
+      setSaveError(refreshError);
+      toast.error(refreshError);
+      setIsSaving(false);
+      return false;
+    }
+    await fetchSessions();
 
     setIsSaving(false);
     return true;

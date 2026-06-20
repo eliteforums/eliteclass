@@ -24,6 +24,8 @@ import {
   useStudentAssignmentDetail,
   useSubmitAssignment,
 } from "@/modules/assignments/hooks/useAssignments";
+import { useSubmitAssignmentOffline } from "@/modules/assignments/hooks/useSubmitAssignmentOffline";
+import { useNetwork } from "@/hooks/useNetwork";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -301,6 +303,8 @@ function AssignmentDetailView({
 }) {
   const { data, isLoading } = useStudentAssignmentDetail(assignmentId);
   const submitMutation = useSubmitAssignment();
+  const submitOfflineMutation = useSubmitAssignmentOffline();
+  const { isOnline } = useNetwork();
   const { user } = useAuthStore();
   const [submissionFiles, setSubmissionFiles] = useState<AssignmentResourceSchema[]>([]);
   const [submissionContent, setSubmissionContent] = useState("");
@@ -418,6 +422,42 @@ function AssignmentDetailView({
     }
 
     try {
+      // ── Route the submission row through the offline-aware hook when
+      // there are no files (text / link only). The Sync Outbox queues the
+      // INSERT/UPSERT and replays it as soon as the network returns. When
+      // there ARE files we fall back to the existing online path because:
+      //   1. Supabase Storage uploads cannot be queued offline.
+      //   2. `submission_files.submission_id` only exists once the parent
+      //      row hits the server, so they need a live round-trip.
+      if (submissionFiles.length === 0) {
+        const studentId = data?.data?.student_id;
+        const instituteId = user?.institute_id;
+        const userId = user?.id;
+
+        if (!studentId || !instituteId || !userId) {
+          toast.error("Your profile is still loading — please retry in a moment.");
+          return;
+        }
+
+        await submitOfflineMutation.mutateAsync({
+          assignmentId,
+          studentId,
+          userId,
+          instituteId,
+          content: submissionContent.trim() || undefined,
+          isLate: !!isOverdue,
+        });
+
+        toast.success(
+          isOnline
+            ? "Assignment submitted successfully!"
+            : "You're offline — your submission is queued and will sync when you reconnect.",
+        );
+        setSubmissionContent("");
+        setSubmissionFiles([]);
+        return;
+      }
+
       const res = await submitMutation.mutateAsync({
         assignmentId,
         content: submissionContent.trim() || undefined,
@@ -788,11 +828,17 @@ function AssignmentDetailView({
 
                 <Button
                   className="w-full font-bold shadow-md shadow-primary/20 py-6"
-                  disabled={submitMutation.isPending || uploading}
+                  disabled={
+                    submitMutation.isPending ||
+                    submitOfflineMutation.isPending ||
+                    uploading
+                  }
                   onClick={handleFinalSubmit}
                 >
-                  {submitMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Submit Assignment
+                  {(submitMutation.isPending || submitOfflineMutation.isPending) && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {!isOnline ? "Submit Assignment (Queued)" : "Submit Assignment"}
                 </Button>
                 {isOverdue && (
                   <p className="text-[10px] text-center text-orange-600 font-medium">

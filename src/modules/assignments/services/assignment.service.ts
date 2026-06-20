@@ -471,12 +471,20 @@ export async function getStudentAssignments(userId: string): Promise<ApiResponse
 }
 
 /**
- * Get student assignment details with submission
+ * Get student assignment details with submission.
+ *
+ * Returns `student_id` (the `students.id` PK) alongside the assignment so
+ * downstream offline-aware mutations can target the row without an extra
+ * round-trip while online (Phase C — `useSubmitAssignmentOffline`).
  */
 export async function getStudentAssignmentDetail(
   assignmentId: string,
   userId: string,
-): Promise<ApiResponse<Assignment & { submission: AssignmentSubmission | null }>> {
+): Promise<
+  ApiResponse<
+    Assignment & { submission: AssignmentSubmission | null; student_id: string }
+  >
+> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   // First, get the student record for this user
@@ -523,6 +531,7 @@ export async function getStudentAssignmentDetail(
       ...(assignment as Assignment),
       resources,
       submission: (submission as AssignmentSubmission) || null,
+      student_id: student.id,
     },
     error: null,
     success: true,
