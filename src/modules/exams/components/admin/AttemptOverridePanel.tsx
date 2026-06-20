@@ -26,6 +26,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import {
   grantAttemptOverride,
+  grantAttemptOverrideToMany,
   listExamOverrides,
   listExamReattemptStats,
   type AttemptOverride,
@@ -64,6 +65,9 @@ export function AttemptOverridePanel({ examId }: AttemptOverridePanelProps) {
   const [target, setTarget] = useState<ExamReattemptStatRow | null>(null);
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkReason, setBulkReason] = useState("");
+  const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
   const refresh = async () => {
     setIsLoading(true);
@@ -84,10 +88,20 @@ export function AttemptOverridePanel({ examId }: AttemptOverridePanelProps) {
   const reasonLength = reason.trim().length;
   const reasonValid = reasonLength >= REASON_MIN && reasonLength <= REASON_MAX;
 
+  const bulkReasonLength = bulkReason.trim().length;
+  const bulkReasonValid =
+    bulkReasonLength >= REASON_MIN && bulkReasonLength <= REASON_MAX;
+
   const closeDialog = () => {
     if (isSubmitting) return;
     setTarget(null);
     setReason("");
+  };
+
+  const closeBulkDialog = () => {
+    if (isBulkSubmitting) return;
+    setBulkOpen(false);
+    setBulkReason("");
   };
 
   const handleSubmit = async () => {
@@ -106,6 +120,37 @@ export function AttemptOverridePanel({ examId }: AttemptOverridePanelProps) {
       refresh();
     } else {
       toast.error(error ?? "Failed to grant override");
+    }
+  };
+
+  const handleBulkSubmit = async () => {
+    if (!bulkReasonValid) {
+      toast.error(`Reason must be between ${REASON_MIN} and ${REASON_MAX} characters.`);
+      return;
+    }
+    if (stats.length === 0) {
+      toast.error("No students to grant attempts to.");
+      return;
+    }
+    setIsBulkSubmitting(true);
+    const studentIds = stats.map((row) => row.student_id);
+    const { success, error, data } = await grantAttemptOverrideToMany(
+      examId,
+      studentIds,
+      bulkReason,
+    );
+    setIsBulkSubmitting(false);
+    if (success) {
+      toast.success(
+        `Granted +1 attempt to ${data?.length ?? studentIds.length} student${
+          (data?.length ?? studentIds.length) === 1 ? "" : "s"
+        }`,
+      );
+      setBulkOpen(false);
+      setBulkReason("");
+      refresh();
+    } else {
+      toast.error(error ?? "Failed to grant overrides");
     }
   };
 
@@ -131,12 +176,27 @@ export function AttemptOverridePanel({ examId }: AttemptOverridePanelProps) {
               Per-student attempts consumed and active overrides.
             </p>
           </div>
-          {totalActiveOverrides > 0 && (
-            <Badge variant="outline" className="gap-1">
-              <RotateCcw className="h-3 w-3" />
-              {totalActiveOverrides} active override{totalActiveOverrides === 1 ? "" : "s"}
-            </Badge>
-          )}
+          <div className="flex flex-col items-end gap-2">
+            <Button
+              size="sm"
+              variant="default"
+              className="gap-1"
+              onClick={() => {
+                setBulkReason("");
+                setBulkOpen(true);
+              }}
+              disabled={isLoading || stats.length === 0}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Grant +1 to all
+            </Button>
+            {totalActiveOverrides > 0 && (
+              <Badge variant="outline" className="gap-1">
+                <RotateCcw className="h-3 w-3" />
+                {totalActiveOverrides} active override{totalActiveOverrides === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -333,6 +393,82 @@ export function AttemptOverridePanel({ examId }: AttemptOverridePanelProps) {
                 </>
               ) : (
                 "Grant +1 Attempt"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk grant dialog */}
+      <Dialog open={bulkOpen} onOpenChange={(open) => !open && closeBulkDialog()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Grant +1 attempt to everyone</DialogTitle>
+            <DialogDescription>
+              This adds one extra attempt above the configured maximum for every assigned
+              student. Each override is consumed independently the next time the student
+              starts a new attempt.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="rounded-md border bg-muted/30 px-3 py-2">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                Affected students
+              </p>
+              <p className="font-medium">
+                {stats.length} student{stats.length === 1 ? "" : "s"}
+              </p>
+            </div>
+
+            <div className="space-y-1">
+              <label htmlFor="bulk-override-reason" className="text-sm font-medium">
+                Reason <span className="text-destructive">*</span>
+              </label>
+              <Textarea
+                id="bulk-override-reason"
+                placeholder="e.g. Network outage during the exam window"
+                value={bulkReason}
+                maxLength={REASON_MAX}
+                rows={4}
+                onChange={(e) => setBulkReason(e.target.value)}
+                disabled={isBulkSubmitting}
+              />
+              <div className="flex items-center justify-between text-xs">
+                <span
+                  className={
+                    bulkReasonLength > 0 && !bulkReasonValid
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {bulkReasonLength === 0
+                    ? "Required — applies to every student"
+                    : !bulkReasonValid
+                      ? `Must be ${REASON_MIN}–${REASON_MAX} characters`
+                      : "Looks good"}
+                </span>
+                <span className="text-muted-foreground">
+                  {bulkReasonLength}/{REASON_MAX}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeBulkDialog} disabled={isBulkSubmitting}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleBulkSubmit}
+              disabled={!bulkReasonValid || isBulkSubmitting || stats.length === 0}
+            >
+              {isBulkSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Granting…
+                </>
+              ) : (
+                `Grant +1 to all (${stats.length})`
               )}
             </Button>
           </DialogFooter>

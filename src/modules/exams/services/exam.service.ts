@@ -2086,6 +2086,64 @@ export async function grantAttemptOverride(
 }
 
 /**
+ * Grant a +1 attempt override to every student in the provided list, in a
+ * single round trip. Used by the "Grant +1 to all" button in the admin
+ * Reattempts panel.
+ *
+ * Validates the reason once for the whole batch. Returns the inserted rows
+ * so the caller can refresh local state without a second fetch.
+ */
+export async function grantAttemptOverrideToMany(
+  examId: string,
+  studentIds: string[],
+  reason: string,
+): Promise<ApiResponse<AttemptOverride[]>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  if (studentIds.length === 0) {
+    return { data: [], error: null, success: true };
+  }
+
+  const trimmed = reason.trim();
+  if (trimmed.length < 1 || trimmed.length > 500) {
+    return {
+      data: null,
+      error: "Reason must be between 1 and 500 characters.",
+      success: false,
+    };
+  }
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return {
+      data: null,
+      error: "You must be signed in to grant an override.",
+      success: false,
+    };
+  }
+
+  const rows = studentIds.map((studentId) => ({
+    exam_id: examId,
+    student_id: studentId,
+    granted_by: user.id,
+    reason: trimmed,
+    consumed_at: null,
+  }));
+
+  const { data, error } = await supabase
+    .from("exam_attempt_overrides")
+    .insert(rows)
+    .select("id, exam_id, student_id, granted_by, granted_at, consumed_at, reason");
+
+  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  return { data: (data ?? []) as AttemptOverride[], error: null, success: true };
+}
+
+/**
  * Build the per-student stat table for the admin "Reattempts" tab.
  *
  * Three round trips, merged client-side:
