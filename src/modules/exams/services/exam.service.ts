@@ -332,9 +332,23 @@ export async function startExamAttempt(
 
   const existingAttempt = existingAttempts?.[0];
 
+  // Active overrides table (new in spec). Each row with `consumed_at IS NULL`
+  // grants this student exactly +1 attempt above the configured maximum.
+  // Read errors fall back to 0 (older databases without the table).
+  const { count: activeOverrideCount } = await supabase
+    .from("exam_attempt_overrides")
+    .select("id", { count: "exact", head: true })
+    .eq("exam_id", examId)
+    .eq("student_id", student.id)
+    .is("consumed_at", null);
+
+  const hasActiveOverride = (activeOverrideCount ?? 0) > 0;
+
   if (existingAttempt) {
-    // If reattempt was granted, fall through to create a new attempt row
-    if ((existingAttempt as ExamAttempt).reattempt_granted) {
+    // Either the legacy per-attempt flag OR the new override grants a fresh
+    // attempt — in both cases we fall through to the RPC which will consume
+    // the override (if one applies).
+    if ((existingAttempt as ExamAttempt).reattempt_granted || hasActiveOverride) {
       // Fall through to create new attempt below
     } else if (
       existingAttempt.status === "submitted" ||
@@ -1008,9 +1022,22 @@ export async function validateSingleAttempt(
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  // If all submitted attempts have reattempt_granted=true, the student can attempt again
+  // An active override (consumed_at IS NULL) in the new exam_attempt_overrides
+  // table also grants the student a fresh attempt — treat it the same as a
+  // legacy reattempt_granted flag.
+  const { count: activeOverrideCount } = await supabase
+    .from("exam_attempt_overrides")
+    .select("id", { count: "exact", head: true })
+    .eq("exam_id", examId)
+    .eq("student_id", student.id)
+    .is("consumed_at", null);
+
+  const hasActiveOverride = (activeOverrideCount ?? 0) > 0;
+
+  // If all submitted attempts have reattempt_granted=true OR the student has
+  // an active override, the student can attempt again.
   const blockedSubmissions = submissions?.filter((s) => !s.reattempt_granted) ?? [];
-  if (blockedSubmissions.length > 0) {
+  if (blockedSubmissions.length > 0 && !hasActiveOverride) {
     return {
       data: {
         canAttempt: false,
