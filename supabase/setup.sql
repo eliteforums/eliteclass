@@ -13867,3 +13867,40 @@ GRANT EXECUTE ON FUNCTION
 -- =============================================================================
 -- end exam-reattempts-and-offline-caching (spec)
 -- =============================================================================
+
+-- =============================================================================
+-- fix: request_assignment_resubmit SECURITY DEFINER RPC
+-- Lets staff/admin bypass student-only RLS on assignment_submissions UPDATE.
+-- =============================================================================
+CREATE OR REPLACE FUNCTION public.request_assignment_resubmit(p_submission_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+DECLARE
+  v_role user_role;
+BEGIN
+  v_role := public.get_my_role();
+  IF v_role IS NULL OR v_role NOT IN ('staff', 'admin', 'super_admin') THEN
+    RAISE EXCEPTION 'permission denied' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  -- Remove attached files
+  DELETE FROM public.submission_files WHERE submission_id = p_submission_id;
+
+  -- Clear data and set status
+  UPDATE public.assignment_submissions
+     SET status       = 'resubmit_requested',
+         content      = NULL,
+         grade        = NULL,
+         feedback     = NULL,
+         graded_at    = NULL,
+         graded_by    = NULL,
+         submitted_at = NULL,
+         is_late      = FALSE
+   WHERE id = p_submission_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.request_assignment_resubmit(UUID) TO authenticated;
+-- =============================================================================

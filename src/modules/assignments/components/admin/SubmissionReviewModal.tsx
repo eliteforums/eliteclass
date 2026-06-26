@@ -163,10 +163,26 @@ export function SubmissionReviewModal({
 
               {submission.content && (
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Text Submission</Label>
-                  <div className="p-4 rounded-xl border bg-background text-sm leading-relaxed whitespace-pre-wrap">
-                    {submission.content}
-                  </div>
+                  <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    {/^https?:\/\//i.test(submission.content.trim()) ? "URL Submission" : "Text Submission"}
+                  </Label>
+                  {/^https?:\/\//i.test(submission.content.trim()) ? (
+                    <div className="p-4 rounded-xl border bg-background flex items-start gap-2">
+                      <ExternalLink className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+                      <a
+                        href={submission.content.trim()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary underline break-all hover:opacity-70"
+                      >
+                        {submission.content.trim()}
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="p-4 rounded-xl border bg-background text-sm leading-relaxed whitespace-pre-wrap">
+                      {submission.content}
+                    </div>
+                  )}
                 </div>
               )}
 

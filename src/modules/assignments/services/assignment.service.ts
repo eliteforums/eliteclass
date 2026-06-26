@@ -387,11 +387,39 @@ export async function gradeSubmission(
  * Request a student to resubmit their assignment.
  * This clears the submission content, files, grade and feedback,
  * and sets the status to "resubmit_requested" so the student can submit again.
+ *
+ * Uses the `request_assignment_resubmit` RPC (SECURITY DEFINER) so that
+ * staff/admin bypass the student-only RLS on assignment_submissions UPDATE.
+ * Falls back to a direct update if the RPC doesn't exist yet (older DBs).
  */
 export async function requestResubmit(
   submissionId: string,
 ): Promise<ApiResponse<AssignmentSubmission>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  // Try the RPC first (bypasses RLS, safe for staff/admin)
+  const { data: rpcData, error: rpcError } = await supabase
+    .rpc("request_assignment_resubmit", { p_submission_id: submissionId });
+
+  if (!rpcError) {
+    // RPC succeeded — re-fetch the updated row for the caller
+    const { data: updated } = await supabase
+      .from("assignment_submissions")
+      .select("*")
+      .eq("id", submissionId)
+      .single();
+    return {
+      data: (updated ?? rpcData) as AssignmentSubmission,
+      error: null,
+      success: true,
+    };
+  }
+
+  // RPC not found (schema not yet applied) — fall back to direct update.
+  // If this also fails it's an RLS problem; surface the real error.
+  if (!rpcError.message?.includes("request_assignment_resubmit")) {
+    return { data: null, error: getErrorMessage(rpcError), success: false };
+  }
 
   // 1. Delete submission files from storage and database
   const { data: files } = await supabase

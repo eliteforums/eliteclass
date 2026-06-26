@@ -379,8 +379,11 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
         await lockExamAttempt(attempt.id);
 
         // ── Submit the exam ──────────────────────────────────────────────
+        // Pass the in-memory answers so scoring doesn't depend on the DB
+        // read beating the upsert commit (was causing 0-marks results).
         const { success, error } = await submitExamAttempt(attempt.id, {
           autoSubmitReason: isAuto ? "Time expired" : null,
+          answersOverride: { ...answers },
         });
 
         // ── Cleanup caches ───────────────────────────────────────────────

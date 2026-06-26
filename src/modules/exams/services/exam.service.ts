@@ -698,19 +698,25 @@ export async function recordViolation(
 /**
  * Submit the exam attempt and calculate score.
  *
- * This fetches all answers from DB for scoring. When using the cache system,
- * call batchSaveAnswers first to persist local answers, then call this.
+ * `answersOverride` — when provided, these answers are used for scoring
+ * instead of re-fetching from the database. This eliminates the race
+ * condition where the scoring query runs before the batchSaveAnswers upsert
+ * has fully committed, which caused 0-marks results.
  */
 export async function submitExamAttempt(
   attemptId: string,
-  options?: { autoSubmitReason?: string | null },
+  options?: {
+    autoSubmitReason?: string | null;
+    /** In-memory answers map: { [questionId]: optionId } */
+    answersOverride?: Record<string, string>;
+  },
 ): Promise<ApiResponse<ExamAttempt>> {
   if (!supabase) return SUPABASE_NOT_CONFIGURED;
 
   examLogger.startTimer("submitExamAttempt");
   logDb("submitExamAttempt:begin", { attemptId, autoSubmitReason: options?.autoSubmitReason });
 
-  // Fetch all questions and answers for this attempt
+  // Fetch questions (and answers if no override supplied)
   const { data: attempt, error: attemptError } = await supabase
     .from("exam_attempts")
     .select(
@@ -722,8 +728,7 @@ export async function submitExamAttempt(
           *,
           options:exam_options(*)
         )
-      ),
-      answers:exam_answers(*)
+      )${options?.answersOverride ? "" : ",\n      answers:exam_answers(*)"}
     `,
     )
     .eq("id", attemptId)
@@ -733,7 +738,17 @@ export async function submitExamAttempt(
 
   const exam = (attempt as any).exam;
   const questions = exam.questions;
-  const answers = (attempt as any).answers;
+
+  // Use the caller-supplied in-memory answers when available (avoids the
+  // race condition where the DB read happens before the upsert commits).
+  // Fall back to the DB answers if no override was passed.
+  const answersFromDb: Array<{ question_id: string; selected_option_id: string | null }> =
+    options?.answersOverride
+      ? Object.entries(options.answersOverride).map(([question_id, selected_option_id]) => ({
+          question_id,
+          selected_option_id,
+        }))
+      : ((attempt as any).answers ?? []);
 
   let score = 0;
   let correctCount = 0;
@@ -741,7 +756,7 @@ export async function submitExamAttempt(
   let unansweredCount = 0;
 
   questions.forEach((q: any) => {
-    const answer = answers.find((a: any) => a.question_id === q.id);
+    const answer = answersFromDb.find((a: any) => a.question_id === q.id);
     if (!answer || !answer.selected_option_id) {
       unansweredCount++;
     } else {
