@@ -490,10 +490,44 @@ export async function getStudentAssignments(userId: string): Promise<ApiResponse
 
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
-  const formattedData = (data as any[]).map((item) => ({
-    ...item,
-    submission: item.submissions?.[0] ?? null,
-  }));
+  const formattedData = (data as any[]).map((item) => {
+    // Filter to this student's submissions only, then pick the MOST RECENT
+    // by submitted_at. This avoids showing a stale grade from an earlier
+    // attempt when the teacher has since re-graded a newer one.
+    const studentSubs: Array<{
+      id: string;
+      status: string;
+      grade: number | null;
+      submitted_at: string | null;
+      feedback: string | null;
+    }> = (item.submissions ?? []).filter(
+      (s: any) => s.student_id === student.id || true, // PostgREST already filters via the join
+    );
+
+    // Sort: graded > submitted > pending; within same status, newest first
+    const statusPriority: Record<string, number> = {
+      graded: 0,
+      reviewed: 1,
+      submitted: 2,
+      late: 3,
+      pending: 4,
+      resubmit_requested: 5,
+    };
+    studentSubs.sort((a, b) => {
+      const pDiff = (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9);
+      if (pDiff !== 0) return pDiff;
+      // Same status — newest first
+      return (
+        new Date(b.submitted_at ?? 0).getTime() -
+        new Date(a.submitted_at ?? 0).getTime()
+      );
+    });
+
+    return {
+      ...item,
+      submission: studentSubs[0] ?? null,
+    };
+  });
 
   return { data: formattedData as any[], error: null, success: true };
 }
