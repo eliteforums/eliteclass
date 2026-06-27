@@ -80,13 +80,9 @@ function TextContent({
 }) {
   const body = content?.trim() || description?.trim() || "";
 
-  useEffect(() => {
-    // Auto-mark text lessons complete after 5 seconds of viewing
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 5000);
-    return () => clearTimeout(timer);
-  }, [onComplete]);
+  // Auto-mark is intentionally removed — users should click "Mark as Complete"
+  // explicitly. Auto-marking after 5s caused the button click to be a no-op
+  // since the lesson was already complete by the time the user clicked.
 
   if (!body) {
     return (
@@ -193,14 +189,9 @@ function PdfViewer({ lesson, onComplete }: { lesson: LmsLesson; onComplete: () =
     };
   }, [lesson.id, lesson.video_url, lesson.video_storage_path, lesson.materials]);
 
-  // Auto-mark complete after 10 seconds of viewing PDF
-  useEffect(() => {
-    if (!pdfUrl) return;
-    const timer = setTimeout(() => {
-      onComplete();
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [pdfUrl, onComplete]);
+  // Auto-mark removed — user clicks "Mark as Complete" explicitly. Auto-mark
+  // after 10s caused the click to be a no-op since the lesson was already
+  // complete by the time the button was pressed.
 
   if (loading) {
     return (
@@ -429,8 +420,17 @@ export function CoursePlayer({
     if (!wasComplete) {
       onProgressUpdate(currentLesson.id, { is_completed: true });
       toast.success("Lesson completed!", { duration: 2500 });
+    } else {
+      // Already complete — confirm to the user and advance if there's a next lesson
+      toast.success("Lesson already complete", { duration: 1500 });
     }
-  }, [currentLesson, progressMap, onProgressUpdate]);
+    // Auto-advance to the next lesson on explicit completion
+    if (nextLesson) {
+      setTimeout(() => {
+        handleLessonSelect(nextLesson);
+      }, 600);
+    }
+  }, [currentLesson, progressMap, onProgressUpdate, nextLesson, handleLessonSelect]);
 
   // ── Quiz complete ─────────────────────────────────────────────────────────
 
