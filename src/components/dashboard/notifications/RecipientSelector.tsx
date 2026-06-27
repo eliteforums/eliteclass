@@ -140,7 +140,11 @@ export function RecipientSelector({ value, onChange, disabled }: RecipientSelect
   }
 
   function toggleStudent(studentId: string) {
-    setSelectedStudents((prev) => ({ ...prev, [studentId]: !prev[studentId] }));
+    // studentId here is students.id; we need to store user_id for the notification
+    // recipient_id since notifications.recipient_id = auth.uid() = users.id
+    const student = students.find(s => s.id === studentId);
+    const userId = student?.user_id ?? student?.user?.id ?? studentId;
+    setSelectedStudents((prev) => ({ ...prev, [userId]: !prev[userId] }));
   }
 
   // Determine available target types based on role
@@ -237,26 +241,29 @@ export function RecipientSelector({ value, onChange, disabled }: RecipientSelect
               </div>
             ) : (
               <div className="divide-y divide-border/50">
-                {students.slice(0, 50).map((student) => (
-                  <label
-                    key={student.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer transition-colors"
-                  >
-                    <Checkbox
-                      checked={!!selectedStudents[student.id]}
-                      onCheckedChange={() => toggleStudent(student.id)}
-                      disabled={disabled}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {student.user?.name ?? "Unknown"}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {student.user?.email ?? ""}
-                      </p>
-                    </div>
-                  </label>
-                ))}
+                {students.slice(0, 50).map((student) => {
+                  const userId = student.user_id ?? student.user?.id ?? student.id;
+                  return (
+                    <label
+                      key={student.id}
+                      className="flex items-center gap-3 px-3 py-2 hover:bg-muted/30 cursor-pointer transition-colors"
+                    >
+                      <Checkbox
+                        checked={!!selectedStudents[userId]}
+                        onCheckedChange={() => toggleStudent(student.id)}
+                        disabled={disabled}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {student.user?.name ?? "Unknown"}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {student.user?.email ?? ""}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             )}
           </div>

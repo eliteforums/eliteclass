@@ -3,9 +3,11 @@ import { registerSW, onSWUpdateAvailable, skipWaitingAndReload } from "@/lib/sw-
 import { useNetworkStore } from "@/store/networkStore";
 import { useInstallStore } from "@/store/installStore";
 import { useLocationTracking } from "@/hooks/useLocationTracking";
+import { useAuthStore } from "@/store/authStore";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { InstallBanner } from "./InstallBanner";
 import { UpdatePrompt } from "./UpdatePrompt";
+import { SplashScreen } from "./SplashScreen";
 import { StudentAttendancePopup } from "@/components/attendance/StudentAttendancePopup";
 
 interface PWAProviderProps {
@@ -15,6 +17,7 @@ interface PWAProviderProps {
 export function PWAProvider({ children }: PWAProviderProps) {
   const [showUpdate, setShowUpdate] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const isAuthLoading = useAuthStore((s) => s.isLoading);
 
   // Start GPS tracking for authenticated users
   useLocationTracking();
@@ -37,8 +40,12 @@ export function PWAProvider({ children }: PWAProviderProps) {
     };
   }, []);
 
+  // App is ready when auth has resolved (not loading) and component is mounted
+  const isReady = mounted && !isAuthLoading;
+
   return (
     <>
+      <SplashScreen isReady={isReady} />
       {children}
       {mounted && (
         <>
