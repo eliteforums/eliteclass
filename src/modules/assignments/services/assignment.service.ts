@@ -435,7 +435,9 @@ export async function requestResubmit(
     await supabase.from("submission_files").delete().eq("submission_id", submissionId);
   }
 
-  // 2. Update the submission to clear data and request resubmit
+  // 2. Update the submission — do NOT null out submitted_at (NOT NULL column).
+  // Keep the original timestamp; the status change to resubmit_requested is
+  // enough to let the student resubmit.
   const { data, error } = await supabase
     .from("assignment_submissions")
     .update({
@@ -445,7 +447,6 @@ export async function requestResubmit(
       feedback: null,
       graded_at: null,
       graded_by: null,
-      submitted_at: null,
       is_late: false,
     })
     .eq("id", submissionId)

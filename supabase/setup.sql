@@ -13894,7 +13894,9 @@ BEGIN
   -- Remove attached files
   DELETE FROM public.submission_files WHERE submission_id = p_submission_id;
 
-  -- Clear data and set status
+  -- Clear data and request resubmit but KEEP submitted_at (NOT NULL constraint).
+  -- Setting it to NULL violates the constraint; keep the original timestamp so
+  -- the row records when the student first submitted.
   UPDATE public.assignment_submissions
      SET status       = 'resubmit_requested',
          content      = NULL,
@@ -13902,7 +13904,6 @@ BEGIN
          feedback     = NULL,
          graded_at    = NULL,
          graded_by    = NULL,
-         submitted_at = NULL,
          is_late      = FALSE
    WHERE id = p_submission_id;
 END;
