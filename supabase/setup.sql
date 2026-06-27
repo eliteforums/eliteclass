@@ -9892,8 +9892,13 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE submission_status AS ENUM ('pending', 'submitted', 'late', 'reviewed', 'graded');
+    CREATE TYPE submission_status AS ENUM ('pending', 'submitted', 'late', 'reviewed', 'graded', 'resubmit_requested');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Add resubmit_requested to enum if it doesn't exist yet (safe to run multiple times)
+DO $$ BEGIN
+    ALTER TYPE submission_status ADD VALUE IF NOT EXISTS 'resubmit_requested';
+EXCEPTION WHEN others THEN NULL; END $$;
 
 -- ── 2. Tables ───────────────────────────────────────────────────────────────
 
