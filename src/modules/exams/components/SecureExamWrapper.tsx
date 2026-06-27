@@ -39,6 +39,17 @@ interface SecureExamWrapperProps {
   enabled?: boolean;
   enableTabDetection?: boolean;
   onAutoSubmit?: () => void;
+  /**
+   * Called when violations trigger auto-submit. If provided, the wrapper
+   * delegates the actual submit to the parent (which should flush answers
+   * first). If not provided, the wrapper falls back to its own submit which
+   * bypasses answer-flushing — causing 0-marks results.
+   */
+  onAutoSubmitRequested?: (reason: string) => Promise<void> | void;
+  /**
+   * Number of violations before auto-submit triggers. Defaults to 5.
+   */
+  violationThreshold?: number;
 }
 
 export function SecureExamWrapper({
@@ -49,6 +60,8 @@ export function SecureExamWrapper({
   enabled = true,
   enableTabDetection = true,
   onAutoSubmit,
+  onAutoSubmitRequested,
+  violationThreshold = 5,
 }: SecureExamWrapperProps) {
   const [showViolationModal, setShowViolationModal] = useState(false);
   const [violationMessage, setViolationMessage] = useState('');
@@ -68,8 +81,18 @@ export function SecureExamWrapper({
     isAutoSubmittingRef.current = true;
     setIsAutoSubmitting(true);
     if (submissionLockRef) submissionLockRef.current = true;
-    
+
     try {
+      // If parent supplied an auto-submit handler, delegate to it so answers
+      // get flushed before scoring. This is the correct path — bypassing it
+      // (the fallback below) causes 0-marks results because in-memory answers
+      // are lost.
+      if (onAutoSubmitRequested) {
+        await onAutoSubmitRequested(autoSubmitReason);
+        return;
+      }
+
+      // Fallback path — only hit when the parent doesn't wire the callback
       const result = await submitExamAttempt(attemptId, { autoSubmitReason });
       if (result.success) {
         toast.error('Exam auto-submitted due to security violations');
@@ -84,7 +107,7 @@ export function SecureExamWrapper({
     } finally {
       setIsAutoSubmitting(false);
     }
-  }, [attemptId, onAutoSubmit, submissionLockRef]);
+  }, [attemptId, onAutoSubmit, onAutoSubmitRequested, submissionLockRef]);
 
   const shouldIgnoreViolation = useCallback(() => {
     return Boolean(
@@ -115,7 +138,7 @@ export function SecureExamWrapper({
 
       setViolationCount(result.data.totalViolations);
 
-      if (result.data.totalViolations >= 3 || result.data.shouldAutoSubmit) {
+      if (result.data.totalViolations >= violationThreshold || result.data.shouldAutoSubmit) {
         setShouldAutoSubmit(true);
         setViolationMessage('Maximum violations reached. Your exam is being auto-submitted.');
         setShowViolationModal(true);
@@ -133,7 +156,7 @@ export function SecureExamWrapper({
         );
         setShowViolationModal(true);
       } else {
-        setViolationMessage(`Violation ${result.data.totalViolations}/3 recorded (${violationType}). One more will result in auto-submission.`);
+        setViolationMessage(`Violation ${result.data.totalViolations}/${violationThreshold} recorded (${violationType}). ${violationThreshold - result.data.totalViolations} more will result in auto-submission.`);
         setShowViolationModal(true);
       }
     } finally {
@@ -215,8 +238,8 @@ export function SecureExamWrapper({
             <p className="font-medium text-foreground">{violationMessage}</p>
             
             <div className="text-sm text-muted-foreground">
-              Violations recorded: <span className={cn("font-bold", violationCount >= 2 ? "text-destructive" : "text-foreground")}>
-                  {violationCount}/3
+              Violations recorded: <span className={cn("font-bold", violationCount >= violationThreshold - 1 ? "text-destructive" : "text-foreground")}>
+                  {violationCount}/{violationThreshold}
               </span>
             </div>
 

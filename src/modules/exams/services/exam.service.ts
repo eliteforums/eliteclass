@@ -1247,6 +1247,9 @@ async function recordViolationWithCheckFallback(
             submitted_at: new Date().toISOString(),
             is_locked: true,
             auto_submit_reason: "Exceeded maximum proctoring violations",
+            // Auto-grant a reattempt on violation-based auto-submit so the
+            // student isn't permanently blocked. Admin can still revoke.
+            reattempt_granted: true,
           }
         : { auto_submit_reason: null }),
     })

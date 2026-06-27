@@ -123,11 +123,19 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
 
   // ── Timer ───────────────────────────────────────────────────────────────────
 
+  // The timer is paused while the proctoring blocking overlay is shown
+  // (camera/mic permission denied or hardware missing). This prevents the
+  // student from losing exam time while resolving permission issues.
+  const timerEnabled =
+    !!attempt &&
+    attempt.status === "in_progress" &&
+    !proctoring.showBlockingOverlay;
+
   const { timeRemaining, isExpired } = useRealtimeExamTimer({
     examId,
     attemptId: attempt?.id || "",
     durationMs: (exam?.duration_mins || 60) * 60 * 1000,
-    enabled: !!attempt && attempt.status === "in_progress",
+    enabled: timerEnabled,
     onTimeUpdate: (seconds) => {
       setTimeLeft(seconds);
       // Save time to cache periodically for crash recovery
@@ -472,6 +480,14 @@ export function ExamPlayer({ examId }: ExamPlayerProps) {
       submissionLockRef={submissionLockRef}
       enabled={securityEnabled}
       enableTabDetection={enableTabDetection}
+      violationThreshold={5}
+      onAutoSubmitRequested={async (_reason) => {
+        // Funnel through the regular submit handler so answers get flushed
+        // first. Without this, the wrapper would call submitExamAttempt
+        // directly and score before batchSaveAnswers commits — that was the
+        // 0-marks bug for auto-submitted attempts.
+        await handleSubmit(true);
+      }}
       onAutoSubmit={() => {
         proctoring.stopStreams();
         navigate({ to: "/dashboard/student/exams" });

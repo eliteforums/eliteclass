@@ -120,16 +120,18 @@ async function captureFrameFromStream(
   });
 }
 
-// Interval between periodic captures (5 minutes with ±1 min jitter)
-const CAPTURE_INTERVAL_MS = 5 * 60 * 1000;
-const CAPTURE_JITTER_MS = 60 * 1000;
+// Interval between periodic captures (2 minutes with ±20s jitter).
+// Tightened from the original 5min ±1min so short exams still get captures.
+const CAPTURE_INTERVAL_MS = 2 * 60 * 1000;
+const CAPTURE_JITTER_MS = 20 * 1000;
 
 // Maximum retries for a failed capture
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 10_000;
 
-// Delay before first capture (give camera time to warm up)
-const INITIAL_CAPTURE_DELAY_MS = 15_000;
+// Delay before first capture (give camera time to warm up).
+// Tightened from 15s to 5s so the first capture lands during short exams.
+const INITIAL_CAPTURE_DELAY_MS = 5_000;
 
 export function useProctoringCapture({
   enabled,
