@@ -49,14 +49,13 @@ import {
   lockAttendanceSession,
   unlockAttendanceSession,
   getAttendanceSummary,
+  bulkMarkAttendance,
 } from "@/services/attendance.service";
 import { CreateSessionModal } from "@/modules/attendance/components/CreateSessionModal";
 import { AttendanceMarkingTable } from "@/modules/attendance/components/AttendanceMarkingTable";
 import { AttendanceSummaryCard } from "@/modules/attendance/components/AttendanceSummaryCard";
 import { GeoAttendancePrompt } from "@/components/attendance/GeoAttendancePrompt";
 import { resolveSessionBatchId } from "@/modules/attendance/utils/sessionHelpers";
-import { useMarkAttendanceOffline } from "@/modules/attendance/hooks/useMarkAttendanceOffline";
-import { useNetwork } from "@/hooks/useNetwork";
 import type {
   AttendanceSession,
   AttendanceRecord,
@@ -241,9 +240,6 @@ function AttendancePage() {
   const { user } = useAuthStore();
   const instituteId = user?.institute_id ?? "";
   const isStaffUser = user?.role === "staff";
-  const { isOnline } = useNetwork();
-  const markAttendanceOffline = useMarkAttendanceOffline();
-
   // ── Shared state ─────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<Tab>("sessions");
   const [batches, setBatches] = useState<AttendanceBatchOption[]>([]);
@@ -598,60 +594,42 @@ function AttendancePage() {
     const session = sessions.find((s) => s.id === expandedSessionId);
     const sessionBatchId = session?.batch_id ?? null;
 
-    // Route every per-row mark through the offline mutation hook. When
-    // online the outbox drains immediately; when offline each row is
-    // optimistically applied and queued until reconnect (Req 13).
-    try {
-      await Promise.all(
-        records.map((record) =>
-          markAttendanceOffline.mutateAsync({
-            sessionId: expandedSessionId,
-            studentId: record.student_id,
-            status: record.status,
-            instituteId,
-            batchId: sessionBatchId,
-            notes: record.notes ?? null,
-            markedBy: user.id,
-          }),
-        ),
-      );
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to queue attendance changes.";
+    // Direct DB write via supabase client. The offline-outbox route was
+    // unreliable in Vercel builds where the service worker is disabled —
+    // marks would optimistically appear saved but the row never reached
+    // the DB. Going back to a single supabase upsert that we know works.
+    const result = await bulkMarkAttendance(
+      expandedSessionId,
+      instituteId,
+      user.id,
+      records,
+      sessionBatchId,
+    );
+
+    if (!result.success) {
+      const message = result.error ?? "Failed to save attendance.";
       setSaveError(message);
       toast.error(message);
       setIsSaving(false);
       return false;
     }
 
-    if (!isOnline) {
-      // Offline: rows already updated optimistically; drain will replay
-      // when the device reconnects.
-      toast.success("Attendance queued. It will sync when you're back online.");
-      setIsSaving(false);
-      return true;
-    }
-
-    // Online: outbox drains in the background. Refetch once to pull the
-    // server-confirmed rows (and surface any RLS rejections).
+    // Refetch to confirm server-side state and surface any RLS rejections
     const refreshed = await getSessionWithRecords(expandedSessionId);
     if (refreshed.success && refreshed.data) {
       setExpandedRecords(refreshed.data.records);
       console.debug(
-        "[attendance.save] refetched rows",
-        refreshed.data.records.map((row) => ({
-          student_id: row.student_id,
-          attendance_date: refreshed.data?.session_date ?? null,
-          selected_status: row.status,
-        })),
+        "[attendance.save] saved",
+        result.data?.count ?? 0,
+        "rows; refetched",
+        refreshed.data.records.length,
+        "rows from server",
       );
-      toast.success("Attendance saved successfully.");
+      toast.success(`Attendance saved (${result.data?.count ?? 0} students)`);
     } else {
-      const refreshError = refreshed.error ?? "Saved, but failed to refresh attendance.";
-      setSaveError(refreshError);
-      toast.error(refreshError);
-      setIsSaving(false);
-      return false;
+      // Save succeeded but refetch failed — still treat as success since the
+      // upsert returned representation already in result.data.records
+      toast.success("Attendance saved.");
     }
     await fetchSessions();
 
