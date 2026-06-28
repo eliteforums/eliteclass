@@ -212,8 +212,12 @@ export function StudentExamDashboard() {
                     <RotateCcw className="mr-2 h-4 w-4" /> Reattempt Test
                   </Button>
                 ) : status === "completed" ? (
-                  <Button variant="outline" className="w-full" disabled>
-                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> Completed
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => navigate({ to: `/dashboard/student/exams/${item.id}/attempt` })}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" /> View Result
                   </Button>
                 ) : (
                   <Button variant="ghost" className="w-full" disabled>
