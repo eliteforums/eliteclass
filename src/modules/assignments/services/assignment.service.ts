@@ -482,7 +482,7 @@ export async function getStudentAssignments(userId: string): Promise<ApiResponse
       `
       *,
       assignment_assignees!inner(student_id),
-      submissions:assignment_submissions(id, status, grade, submitted_at, feedback)
+      submissions:assignment_submissions(id, status, grade, submitted_at, feedback, student_id)
     `,
     )
     .eq("assignment_assignees.student_id", student.id)
@@ -492,17 +492,19 @@ export async function getStudentAssignments(userId: string): Promise<ApiResponse
   if (error) return { data: null, error: getErrorMessage(error), success: false };
 
   const formattedData = (data as any[]).map((item) => {
-    // Filter to this student's submissions only, then pick the MOST RECENT
-    // by submitted_at. This avoids showing a stale grade from an earlier
-    // attempt when the teacher has since re-graded a newer one.
+    // CRITICAL: the submissions join doesn't filter by student_id (PostgREST
+    // can't apply that filter inside a nested relation when the parent is
+    // assignments). So `item.submissions` may contain submissions from
+    // OTHER students. Filter to this student before picking one.
     const studentSubs: Array<{
       id: string;
       status: string;
       grade: number | null;
       submitted_at: string | null;
       feedback: string | null;
+      student_id?: string;
     }> = (item.submissions ?? []).filter(
-      (s: any) => s.student_id === student.id || true, // PostgREST already filters via the join
+      (s: any) => s.student_id === student.id,
     );
 
     // Sort: graded > submitted > pending; within same status, newest first
@@ -577,7 +579,10 @@ export async function getStudentAssignmentDetail(
 
   const resources = await resolveStudentResourceDownloadUrls((assignment as Assignment).resources);
 
-  const { data: submission } = await supabase
+  // Fetch ALL submissions for this student on this assignment, then pick
+  // the most relevant one. maybeSingle() would crash when a student has
+  // multiple submissions (e.g. after a resubmit_requested cycle).
+  const { data: subs } = await supabase
     .from("assignment_submissions")
     .select(
       `
@@ -586,14 +591,35 @@ export async function getStudentAssignmentDetail(
     `,
     )
     .eq("assignment_id", assignmentId)
-    .eq("student_id", student.id)
-    .maybeSingle();
+    .eq("student_id", student.id);
+
+  let chosenSubmission: AssignmentSubmission | null = null;
+  if (subs && subs.length > 0) {
+    const statusPriority: Record<string, number> = {
+      graded: 0,
+      reviewed: 1,
+      submitted: 2,
+      late: 3,
+      pending: 4,
+      resubmit_requested: 5,
+    };
+    const sorted = [...(subs as AssignmentSubmission[])].sort((a, b) => {
+      const pDiff =
+        (statusPriority[a.status] ?? 9) - (statusPriority[b.status] ?? 9);
+      if (pDiff !== 0) return pDiff;
+      return (
+        new Date(b.submitted_at ?? 0).getTime() -
+        new Date(a.submitted_at ?? 0).getTime()
+      );
+    });
+    chosenSubmission = sorted[0] ?? null;
+  }
 
   return {
     data: {
       ...(assignment as Assignment),
       resources,
-      submission: (submission as AssignmentSubmission) || null,
+      submission: chosenSubmission,
       student_id: student.id,
     },
     error: null,
