@@ -16,6 +16,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, CheckCircle2, User, BookOpen, Shield, Phone, Users } from "lucide-react";
+import { toast } from "sonner";
 
 import { admissionSchema, type AdmissionSchema } from "@/modules/students/validations";
 import { admitStudent } from "@/services";
@@ -234,7 +235,31 @@ export function AdmissionForm({ instituteId, onSuccess, onCancel }: AdmissionFor
   // ── Form ────────────────────────────────────────────────────────────────────
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
+    <form
+      onSubmit={handleSubmit(onSubmit, (formErrors) => {
+        // Surface validation failures visibly — otherwise the inline errors
+        // on individual fields may be off-screen and the user thinks the
+        // submit button did nothing.
+        const firstError = Object.values(formErrors)[0];
+        const firstMessage =
+          (firstError && "message" in firstError && typeof firstError.message === "string"
+            ? firstError.message
+            : null) ?? "Please check the form for errors and try again.";
+        toast.error(firstMessage);
+
+        // Scroll to the first error field
+        const firstName = Object.keys(formErrors)[0];
+        if (firstName) {
+          const el = document.getElementById(firstName);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            (el as HTMLInputElement).focus?.();
+          }
+        }
+      })}
+      className="space-y-6"
+      noValidate
+    >
       {/* Server error banner */}
       {serverError && (
         <div

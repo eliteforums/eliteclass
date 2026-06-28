@@ -304,7 +304,28 @@ export function StaffAdmissionForm({ instituteId, mode = "create", staff = null,
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+    <form
+      onSubmit={handleSubmit(onSubmit, (formErrors) => {
+        // Visible validation failure feedback — otherwise inline errors may
+        // be off-screen and the user thinks the submit button did nothing.
+        const firstError = Object.values(formErrors)[0];
+        const firstMessage =
+          (firstError && "message" in firstError && typeof firstError.message === "string"
+            ? firstError.message
+            : null) ?? "Please check the form for errors and try again.";
+        toast.error(firstMessage);
+
+        const firstName = Object.keys(formErrors)[0];
+        if (firstName) {
+          const el = document.getElementById(firstName);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+            (el as HTMLInputElement).focus?.();
+          }
+        }
+      })}
+      className="space-y-8"
+    >
       {serverError && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {serverError}
