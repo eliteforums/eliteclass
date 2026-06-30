@@ -13,6 +13,11 @@ import type {
   ProctoringCapture,
 } from "../types";
 import { examLogger } from "./examLogger";
+import {
+  cacheList,
+  isOffline,
+  readCachedDetail,
+} from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -61,6 +66,10 @@ export async function listExams(
     attempts_count: item.exam_attempts?.[0]?.count ?? 0,
   }));
 
+  // Seed the OCS snapshot cache so the exams list survives offline reloads
+  // and detail-view fallbacks have something to read (Req 12.4, 12.5).
+  cacheList("exam", formattedData as Exam[]);
+
   return {
     data: {
       items: formattedData as Exam[],
@@ -107,7 +116,22 @@ export async function getExamDetail(examId: string): Promise<ApiResponse<Exam>> 
     hasError: !!error,
   });
 
-  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  if (error) {
+    // Offline fallback: serve whatever the OCS snapshot cache last seeded
+    // from `listExams`. Detail-view rows are partial (no questions) but
+    // still let the UI render an offline-friendly read-only view.
+    if (isOffline()) {
+      const cached = await readCachedDetail<Exam>("exam", examId);
+      if (cached) {
+        return { data: cached, error: null, success: true };
+      }
+    }
+    return { data: null, error: getErrorMessage(error), success: false };
+  }
+
+  // Refresh the cached detail snapshot for future offline reads.
+  cacheList("exam", [data as Exam]);
+
   return { data: data as Exam, error: null, success: true };
 }
 
@@ -289,6 +313,13 @@ export async function listStudentExams(
       attempt: sortedAttempts[0] ?? null,
     };
   });
+
+  // Seed the snapshot cache so the student exams list survives offline
+  // reloads (Req 12.4, 12.5).
+  cacheList(
+    "exam",
+    formattedData as Array<Exam & { attempt?: ExamAttempt | null }>,
+  );
 
   return { data: formattedData, error: null, success: true };
 }

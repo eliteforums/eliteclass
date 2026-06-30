@@ -17,6 +17,7 @@ import type {
   StudentAttendanceRecord,
   StudentAttendanceStats,
 } from "@/types";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -114,6 +115,10 @@ export async function getAttendanceSessions(
       }
       return session;
     });
+
+    // Seed the OCS snapshot cache so attendance sessions survive offline
+    // reloads (Req 12.4, 12.5).
+    cacheList("attendance_session", sessions);
 
     return { data: sessions, error: null, success: true };
   } catch (err) {

@@ -23,6 +23,7 @@ import {
 import { getStudentBatch } from "@/services/batch.service";
 import { getStudentAttendanceHistory } from "@/services/attendance.service";
 import { isAbortError, getErrorMessage } from "@/utils/helpers";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 import type {
   Student,
   StudentParent,
@@ -233,7 +234,13 @@ export async function getStudentsByInstitute(
       .order("created_at", { ascending: false });
 
     if (error) return { data: null, error: getErrorMessage(error), success: false };
-    return { data: data as unknown as Student[], error: null, success: true };
+    const students = data as unknown as Student[];
+
+    // Seed the OCS snapshot cache so the students list survives offline
+    // reloads (Req 12.4, 12.5).
+    cacheList("student", students);
+
+    return { data: students, error: null, success: true };
   } catch (err) {
     const msg = getErrorMessage(err, "Failed to load students.");
     console.error("[getStudentsByInstitute] exception:", err);

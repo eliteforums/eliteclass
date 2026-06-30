@@ -20,6 +20,7 @@ import type {
   Student,
   StudentBatchInfo,
 } from "@/types";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -225,6 +226,10 @@ export async function getBatchesByInstitute(
       batch.student_count = counter.get(batch.id) ?? 0;
     }
   }
+
+  // Seed the OCS snapshot cache so the batches list survives offline
+  // reloads (Req 12.4, 12.5).
+  cacheList("batch", batches);
 
   const total = count ?? 0;
 

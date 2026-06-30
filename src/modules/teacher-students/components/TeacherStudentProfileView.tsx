@@ -44,13 +44,14 @@ import type {
   StudentParent,
 } from "@/types";
 
-type TabId = "overview" | "attendance" | "performance" | "submissions" | "remarks" | "parents";
+type TabId = "overview" | "attendance" | "performance" | "submissions" | "reports" | "remarks" | "parents";
 
 const TABS: { id: TabId; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: "overview", label: "Overview", icon: Users },
   { id: "attendance", label: "Attendance", icon: Calendar },
   { id: "performance", label: "Performance", icon: TrendingUp },
   { id: "submissions", label: "Submissions", icon: FileText },
+  { id: "reports", label: "Reports", icon: FileText },
   { id: "remarks", label: "Remarks", icon: MessageSquarePlus },
   { id: "parents", label: "Parents", icon: Users },
 ];

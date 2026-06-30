@@ -47,6 +47,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAuthStore } from "@/store/authStore";
 import { useStudentDetail } from "@/modules/students/hooks/useStudentDetail";
+import { StudentReportPanel } from "@/modules/reports/components/StudentReportPanel";
 import { LifecycleActionModal } from "@/modules/students/components/LifecycleActionModal";
 import { StudentTimeline } from "@/modules/students/components/StudentTimeline";
 import { StudentIDCard } from "@/modules/students/components/StudentIDCard";
@@ -63,7 +64,7 @@ export const Route = createFileRoute("/dashboard/admin/students/$studentId")({
 
 // ── Tab configuration ─────────────────────────────────────────────────────────
 
-type TabId = "overview" | "attendance" | "fees" | "documents" | "history";
+type TabId = "overview" | "attendance" | "fees" | "documents" | "reports" | "history";
 
 interface TabConfig {
   id: TabId;
@@ -76,6 +77,7 @@ const TABS: TabConfig[] = [
   { id: "attendance", label: "Attendance", icon: Calendar },
   { id: "fees", label: "Fees", icon: CreditCard },
   { id: "documents", label: "Documents", icon: FileText },
+  { id: "reports", label: "Reports", icon: Zap },
   { id: "history", label: "History", icon: History },
 ];
 
@@ -438,6 +440,23 @@ function StudentDetailPage() {
           className="mt-5"
         >
           <DocumentsPanel documents={documents} isLoading={isLoadingDocuments} />
+        </div>
+
+        {/* Reports — manual report cards */}
+        <div
+          id="tab-panel-reports"
+          role="tabpanel"
+          hidden={activeTab !== "reports"}
+          className="mt-5"
+        >
+          {student && instituteId && (
+            <StudentReportPanel
+              studentId={student.id}
+              instituteId={instituteId}
+              canEdit={true}
+              studentName={student.user?.name ?? "Student"}
+            />
+          )}
         </div>
 
         {/* History */}

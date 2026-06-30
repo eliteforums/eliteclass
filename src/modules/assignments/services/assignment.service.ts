@@ -13,6 +13,11 @@ import type {
   PaginatedResponse,
   SubmissionFile,
 } from "@/types";
+import {
+  cacheList,
+  isOffline,
+  readCachedDetail,
+} from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -151,6 +156,10 @@ export async function listAssignments(
     submissions_count: item.assignment_submissions?.[0]?.count ?? 0,
   }));
 
+  // Seed the OCS snapshot cache so the assignments list survives offline
+  // reloads (Req 12.4, 12.5).
+  cacheList("assignment", formattedData as Assignment[]);
+
   return {
     data: {
       items: formattedData as Assignment[],
@@ -183,7 +192,22 @@ export async function getAssignmentDetail(assignmentId: string): Promise<ApiResp
     .eq("id", assignmentId)
     .single();
 
-  if (error) return { data: null, error: getErrorMessage(error), success: false };
+  if (error) {
+    // Offline fallback: serve whatever the list query last cached. The
+    // snapshot will not include the joined `resources` array, but the UI
+    // can still render the assignment shell in read-only mode (Req 12.5).
+    if (isOffline()) {
+      const cached = await readCachedDetail<Assignment>("assignment", assignmentId);
+      if (cached) {
+        return { data: cached, error: null, success: true };
+      }
+    }
+    return { data: null, error: getErrorMessage(error), success: false };
+  }
+
+  // Refresh the cached detail snapshot for future offline reads.
+  cacheList("assignment", [data as Assignment]);
+
   return { data: data as Assignment, error: null, success: true };
 }
 
@@ -531,6 +555,10 @@ export async function getStudentAssignments(userId: string): Promise<ApiResponse
       submission: studentSubs[0] ?? null,
     };
   });
+
+  // Seed the OCS snapshot cache so the student assignments list survives
+  // offline reloads (Req 12.4, 12.5).
+  cacheList("assignment", formattedData as Assignment[]);
 
   return { data: formattedData as any[], error: null, success: true };
 }

@@ -4,6 +4,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type { Course, ApiResponse } from "@/types";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -37,6 +38,10 @@ export async function getCoursesByInstitute(
     ...r,
     name: r.title,
   }));
+
+  // Seed the OCS snapshot cache so the courses list survives offline
+  // reloads (Req 12.4, 12.5).
+  cacheList("course", mapped);
 
   return { data: mapped, error: null, success: true };
 }

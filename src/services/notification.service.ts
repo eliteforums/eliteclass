@@ -11,6 +11,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type { ApiResponse } from "@/types";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 
 const SUPABASE_NOT_CONFIGURED = {
   data: null,
@@ -139,6 +140,10 @@ export async function getNotifications(
         sender: sender ?? undefined,
       };
     });
+
+    // Seed the OCS snapshot cache so the notifications dropdown survives
+    // offline reloads (Req 12.4, 12.5).
+    cacheList("notification", notifications);
 
     return { data: notifications, error: null, success: true };
   } catch (err) {

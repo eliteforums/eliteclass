@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { cachedQuery, invalidateQueryCache } from "@/lib/query-cache";
 import { runService } from "@/lib/service-runner";
 import { getErrorMessage } from "@/utils/helpers";
+import { cacheList } from "@/services/offline/snapshotHelpers";
 import type {
   ApiResponse,
   CreateRoomPayload,
@@ -112,6 +113,10 @@ export async function getSchedules(
         return haystack.includes(q);
       });
     }
+
+    // Seed the OCS snapshot cache so the schedule view survives offline
+    // reloads (Req 12.4, 12.5).
+    cacheList("schedule_event", filtered);
 
     return { data: filtered, error: null, success: true };
   });
