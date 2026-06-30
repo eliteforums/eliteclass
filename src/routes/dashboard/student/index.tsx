@@ -16,6 +16,7 @@ import { useStudentDashboardStore } from "@/store/studentDashboardStore";
 import type { AttendanceStatus, StudentAttendanceRecord } from "@/types";
 import { AlertCircle, RefreshCw, Sparkles } from "lucide-react";
 import { StudentLearningSection } from "@/modules/courses/components/student/StudentLearningSection";
+import { GamesHub } from "@/modules/games/components/GamesHub";
 
 const STUDENT_DASHBOARD_TIMEOUT_MS = 15_000;
 
@@ -250,6 +251,8 @@ function StudentDashboard() {
         </section>
 
         {user?.id ? <StudentLearningSection studentId={user.id} /> : null}
+
+        <GamesHub />
 
         {!activeDashboard && isLoading ? (
           <div className="grid gap-6 xl:grid-cols-2">

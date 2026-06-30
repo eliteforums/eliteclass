@@ -161,7 +161,7 @@ export function GamesHub() {
 
   return (
     <TooltipProvider delayDuration={250}>
-      <section className="space-y-4">
+      <section id="brain-games" className="space-y-4 scroll-mt-24">
         <div className="flex items-center gap-2 flex-wrap">
           <Gamepad2 className="size-5 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Brain Games</h2>

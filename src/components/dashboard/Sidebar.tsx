@@ -21,6 +21,7 @@ import {
   Search,
   Brain,
   Bell,
+  Gamepad2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -150,6 +151,7 @@ function getNavGroups(role: UserRole, t: (key: string) => string): NavGroup[] {
         items: [
           { title: t("nav.dashboard") || "Dashboard", url: "/dashboard/student", icon: LayoutDashboard },
           { title: t("nav.myLearning") || "My Learning", url: "/dashboard/student/my-learning", icon: BookOpen },
+          { title: t("nav.brainGames") || "Brain Games", url: "/dashboard/student/my-learning#brain-games", icon: Gamepad2 },
           { title: t("nav.exams") || "MCQ Tests", url: "/dashboard/student/exams", icon: FileText },
           { title: t("nav.assignments") || "Assignments", url: "/dashboard/student/assignments", icon: FileText },
           { title: t("nav.certificates") || "Certificates", url: "/dashboard/student/certificates", icon: GraduationCap },
