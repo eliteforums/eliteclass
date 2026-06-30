@@ -31,7 +31,6 @@ import { useStudentEnrollments } from "@/modules/courses/hooks/useEnrollment";
 import { DifficultyBadge } from "@/modules/courses/components/shared/DifficultyBadge";
 import { ProgressRing } from "@/modules/courses/components/shared/ProgressRing";
 import { EmptyCoursesState } from "@/modules/courses/components/shared/EmptyCoursesState";
-import { GamesHub } from "@/modules/games/components/GamesHub";
 import type { LmsEnrollmentWithProgress } from "@/types";
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -306,9 +305,6 @@ function MyLearningPage() {
             )}
           </section>
         )}
-
-        {/* ── AI Brain Games ──────────────────────────────────────────── */}
-        {!isLoading && <GamesHub />}
 
         {/* ── Learning Stats mini-cards ────────────────────────────────── */}
         {!isLoading && enrollments.length > 0 && (
