@@ -1,5 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { registerSW, onSWUpdateAvailable, skipWaitingAndReload } from "@/lib/sw-register";
+import { registerSW } from "@/lib/sw-register";
+import { useAppUpdate } from "@/hooks/useAppUpdate";
 import { useNetworkStore } from "@/store/networkStore";
 import { useInstallStore } from "@/store/installStore";
 import { useLocationTracking } from "@/hooks/useLocationTracking";
@@ -15,9 +16,11 @@ interface PWAProviderProps {
 }
 
 export function PWAProvider({ children }: PWAProviderProps) {
-  const [showUpdate, setShowUpdate] = useState(false);
   const [mounted, setMounted] = useState(false);
   const isAuthLoading = useAuthStore((s) => s.isLoading);
+
+  // Unified update detection: SW waiting (PWA) OR version manifest drift (web)
+  const { updateAvailable, applyUpdate } = useAppUpdate();
 
   // Start GPS tracking for authenticated users
   useLocationTracking();
@@ -30,8 +33,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
     useInstallStore.getState().initialize();
     setMounted(true);
 
-    // Register service worker and listen for updates
-    onSWUpdateAvailable(() => setShowUpdate(true));
+    // Register service worker (no-op in dev / on Vercel where PWA is disabled).
     registerSW();
 
     return () => {
@@ -51,7 +53,7 @@ export function PWAProvider({ children }: PWAProviderProps) {
         <>
           <OfflineIndicator />
           <InstallBanner />
-          <UpdatePrompt showUpdate={showUpdate} onUpdate={skipWaitingAndReload} />
+          <UpdatePrompt showUpdate={updateAvailable} onUpdate={applyUpdate} />
           <StudentAttendancePopup />
         </>
       )}

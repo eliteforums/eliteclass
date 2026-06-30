@@ -7,6 +7,33 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { nitro } from "nitro/vite";
 import { VitePWA } from "vite-plugin-pwa";
+import { writeFileSync, mkdirSync } from "node:fs";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// ── Build-time version stamp ────────────────────────────────────────────────
+// We derive a short build id from Vercel / GitHub Actions metadata, falling
+// back to a timestamp for local dev. The same value is:
+//   - injected into the client bundle as `import.meta.env.VITE_APP_VERSION`
+//   - written to `public/version.json` so it ships as a static asset the
+//     running app can poll. When the polled value drifts from the baked-in
+//     value, an "Update available" prompt appears.
+const __dir = dirname(fileURLToPath(import.meta.url));
+const BUILD_ID =
+  (process.env.VERCEL_GIT_COMMIT_SHA && process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12)) ||
+  (process.env.GITHUB_SHA && process.env.GITHUB_SHA.slice(0, 12)) ||
+  `dev-${Date.now()}`;
+
+try {
+  mkdirSync(resolve(__dir, "public"), { recursive: true });
+  writeFileSync(
+    resolve(__dir, "public", "version.json"),
+    JSON.stringify({ version: BUILD_ID, builtAt: new Date().toISOString() }) + "\n",
+  );
+} catch {
+  // If public/ isn't writable for some reason, the build still succeeds; the
+  // update prompt will simply never trigger on web until the next deploy.
+}
 
 // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
 // @cloudflare/vite-plugin builds from this — wrangler.jsonc main alone is insufficient.
@@ -44,6 +71,9 @@ export default defineConfig({
             }),
           ]),
     ],
+    define: {
+      "import.meta.env.VITE_APP_VERSION": JSON.stringify(BUILD_ID),
+    },
     build: {
       target: "esnext",
       minify: "esbuild",

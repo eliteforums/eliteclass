@@ -42,3 +42,7 @@ dist-ssr
 
 # Development specs
 .kiro/specs/
+
+
+# Build-time generated version manifest (see vite.config.ts)
+public/version.json
