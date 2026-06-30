@@ -9,6 +9,7 @@ import {
   Brain,
   Calendar,
   CheckCircle2,
+  Crown,
   Flame,
   Gamepad2,
   Lightbulb,
@@ -43,6 +44,7 @@ import { HangmanGame } from "./HangmanGame";
 import { WordScrambleGame } from "./WordScrambleGame";
 import { FillBlanksGame } from "./FillBlanksGame";
 import { TrueFalseSpeedrunGame } from "./TrueFalseSpeedrunGame";
+import { LeaderboardView } from "./LeaderboardView";
 
 interface GameMeta {
   id: GameId;
@@ -121,6 +123,7 @@ export function GamesHub() {
   const [active, setActive] = useState<GameId | null>(null);
   const [dailyMode, setDailyMode] = useState(false);
   const [achievementsOpen, setAchievementsOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
   const {
     progress,
     highScores,
@@ -128,6 +131,9 @@ export function GamesHub() {
     getScore,
     wasDailyChallengeCompletedToday,
   } = useGameScores();
+
+  // Per-result leaderboard writes happen inside useGameScores.recordResult.
+  // No separate sync needed — game_scores is the source of truth.
 
   const daily = getDailyChallenge();
   const dailyDone = wasDailyChallengeCompletedToday();
@@ -216,6 +222,15 @@ export function GamesHub() {
                   <span className="tabular-nums">
                     {unlockedAchievements}/{totalAchievements}
                   </span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLeaderboardOpen(true)}
+                  className="gap-1.5"
+                >
+                  <Crown className="size-3.5 text-amber-500" />
+                  Leaderboard
                 </Button>
               </div>
             </div>
@@ -393,6 +408,14 @@ export function GamesHub() {
               <Stat label="Perfect runs" value={progress.totalPerfects} />
               <Stat label="Topics tried" value={progress.uniqueTopics.length} />
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* ── Leaderboard ─────────────────────────────────────────────── */}
+        <Dialog open={leaderboardOpen} onOpenChange={setLeaderboardOpen}>
+          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle className="sr-only">Leaderboard</DialogTitle>
+            <LeaderboardView />
           </DialogContent>
         </Dialog>
 

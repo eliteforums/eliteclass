@@ -26,6 +26,7 @@ import {
   xpProgressWithinLevel,
 } from "../lib/achievements";
 import { dayDiff, localDateISO } from "../lib/dailyChallenge";
+import { recordGameScoreRemote } from "../services/gameLeaderboard.service";
 
 const STORAGE_KEY = "eliteclass-game-state-v2";
 
@@ -348,7 +349,7 @@ export function useGameScores() {
       writeStore(store);
       setState({ ...userState });
 
-      return {
+      const rewards: AwardedRewards = {
         xpGain,
         previousLevel,
         newLevel,
@@ -359,6 +360,14 @@ export function useGameScores() {
         dailyStreak: userState.progress.dailyStreak,
         streakIncreased: streakInfo.increased,
       };
+
+      // Fire-and-forget upload to server leaderboard. Failure is silent —
+      // local progress (XP, streaks, achievements) is the source of truth
+      // for the player's own dashboard; leaderboards are a social-proof
+      // layer that gracefully degrades when offline.
+      void recordGameScoreRemote(result, rewards);
+
+      return rewards;
     },
     [userId],
   );

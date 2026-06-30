@@ -13994,3 +13994,340 @@ BEGIN
     EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications';
   END IF;
 END $$;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- AI GAMES LEADERBOARD (added later)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Mirror of docs/games-leaderboard-schema.sql. Idempotent so setup.sql can be
+-- re-run safely. Powers the per-institute leaderboard inside the games hub.
+
+CREATE TABLE IF NOT EXISTS public.game_player_stats (
+  user_id            UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  institute_id       UUID NOT NULL REFERENCES public.institutes(id) ON DELETE CASCADE,
+  xp                 INTEGER NOT NULL DEFAULT 0 CHECK (xp >= 0),
+  level              INTEGER NOT NULL DEFAULT 1 CHECK (level >= 1),
+  daily_streak       INTEGER NOT NULL DEFAULT 0 CHECK (daily_streak >= 0),
+  longest_streak     INTEGER NOT NULL DEFAULT 0 CHECK (longest_streak >= 0),
+  total_plays        INTEGER NOT NULL DEFAULT 0 CHECK (total_plays >= 0),
+  total_perfects     INTEGER NOT NULL DEFAULT 0 CHECK (total_perfects >= 0),
+  achievements_count INTEGER NOT NULL DEFAULT 0 CHECK (achievements_count >= 0),
+  daily_challenges   INTEGER NOT NULL DEFAULT 0 CHECK (daily_challenges >= 0),
+  last_played_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_player_stats_inst_xp
+  ON public.game_player_stats (institute_id, xp DESC, last_played_at DESC);
+CREATE INDEX IF NOT EXISTS idx_game_player_stats_inst_streak
+  ON public.game_player_stats (institute_id, daily_streak DESC);
+CREATE INDEX IF NOT EXISTS idx_game_player_stats_inst_perfects
+  ON public.game_player_stats (institute_id, total_perfects DESC);
+
+ALTER TABLE public.game_player_stats ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "leaderboard_select_same_institute" ON public.game_player_stats;
+DROP POLICY IF EXISTS "leaderboard_self_upsert" ON public.game_player_stats;
+DROP POLICY IF EXISTS "leaderboard_self_update" ON public.game_player_stats;
+DROP POLICY IF EXISTS "leaderboard_super_admin" ON public.game_player_stats;
+
+CREATE POLICY "leaderboard_select_same_institute" ON public.game_player_stats
+  FOR SELECT
+  USING (
+    institute_id = public.get_my_institute_id()
+    OR public.is_super_admin()
+  );
+
+CREATE POLICY "leaderboard_self_upsert" ON public.game_player_stats
+  FOR INSERT
+  WITH CHECK (
+    user_id = auth.uid()
+    AND institute_id = public.get_my_institute_id()
+  );
+
+CREATE POLICY "leaderboard_self_update" ON public.game_player_stats
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (
+    user_id = auth.uid()
+    AND institute_id = public.get_my_institute_id()
+  );
+
+CREATE POLICY "leaderboard_super_admin" ON public.game_player_stats
+  FOR ALL
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+CREATE OR REPLACE FUNCTION public.upsert_game_player_stats(
+  p_xp                 INTEGER,
+  p_level              INTEGER,
+  p_daily_streak       INTEGER,
+  p_longest_streak     INTEGER,
+  p_total_plays        INTEGER,
+  p_total_perfects     INTEGER,
+  p_achievements_count INTEGER,
+  p_daily_challenges   INTEGER,
+  p_last_played_at     TIMESTAMPTZ
+)
+RETURNS public.game_player_stats
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id      UUID := auth.uid();
+  v_institute_id UUID;
+  v_row          public.game_player_stats;
+BEGIN
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT u.institute_id INTO v_institute_id
+    FROM public.users u
+   WHERE u.id = v_user_id;
+
+  IF v_institute_id IS NULL THEN
+    RAISE EXCEPTION 'institute_missing' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.game_player_stats AS s (
+    user_id, institute_id, xp, level, daily_streak, longest_streak,
+    total_plays, total_perfects, achievements_count, daily_challenges,
+    last_played_at, updated_at
+  )
+  VALUES (
+    v_user_id, v_institute_id,
+    GREATEST(0, COALESCE(p_xp, 0)),
+    GREATEST(1, COALESCE(p_level, 1)),
+    GREATEST(0, COALESCE(p_daily_streak, 0)),
+    GREATEST(0, COALESCE(p_longest_streak, 0)),
+    GREATEST(0, COALESCE(p_total_plays, 0)),
+    GREATEST(0, COALESCE(p_total_perfects, 0)),
+    GREATEST(0, COALESCE(p_achievements_count, 0)),
+    GREATEST(0, COALESCE(p_daily_challenges, 0)),
+    COALESCE(p_last_played_at, now()),
+    now()
+  )
+  ON CONFLICT (user_id) DO UPDATE
+     SET institute_id       = EXCLUDED.institute_id,
+         xp                 = EXCLUDED.xp,
+         level              = EXCLUDED.level,
+         daily_streak       = EXCLUDED.daily_streak,
+         longest_streak     = GREATEST(s.longest_streak, EXCLUDED.longest_streak),
+         total_plays        = EXCLUDED.total_plays,
+         total_perfects     = EXCLUDED.total_perfects,
+         achievements_count = EXCLUDED.achievements_count,
+         daily_challenges   = EXCLUDED.daily_challenges,
+         last_played_at     = EXCLUDED.last_played_at,
+         updated_at         = now()
+  RETURNING * INTO v_row;
+
+  RETURN v_row;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.upsert_game_player_stats(
+  INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, INTEGER, TIMESTAMPTZ
+) TO authenticated;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- GAMES LEADERBOARD (added later)
+-- Mirror of docs/games-leaderboard-schema.sql. Idempotent so re-running
+-- setup.sql is safe.
+-- ═══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.game_scores (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id              UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  institute_id         UUID NOT NULL REFERENCES public.institutes(id) ON DELETE CASCADE,
+  game_id              TEXT NOT NULL CHECK (length(game_id) BETWEEN 1 AND 40),
+  topic                TEXT NOT NULL CHECK (length(topic) BETWEEN 1 AND 120),
+  difficulty           TEXT NOT NULL CHECK (difficulty IN ('easy','medium','hard')),
+  score                INTEGER NOT NULL CHECK (score >= 0),
+  max_score            INTEGER NOT NULL CHECK (max_score >= 0),
+  percent              NUMERIC(5,2) NOT NULL CHECK (percent >= 0 AND percent <= 100),
+  duration_ms          INTEGER NOT NULL CHECK (duration_ms >= 0),
+  is_perfect           BOOLEAN NOT NULL DEFAULT FALSE,
+  is_daily_challenge   BOOLEAN NOT NULL DEFAULT FALSE,
+  xp_earned            INTEGER NOT NULL DEFAULT 0 CHECK (xp_earned >= 0),
+  created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_scores_inst_created
+  ON public.game_scores (institute_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_game_scores_user_created
+  ON public.game_scores (user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_game_scores_inst_game_score
+  ON public.game_scores (institute_id, game_id, score DESC);
+CREATE INDEX IF NOT EXISTS idx_game_scores_inst_xp_recent
+  ON public.game_scores (institute_id, created_at DESC, xp_earned);
+
+ALTER TABLE public.game_scores ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "game_scores_insert_own"      ON public.game_scores;
+DROP POLICY IF EXISTS "game_scores_read_institute"  ON public.game_scores;
+DROP POLICY IF EXISTS "game_scores_super_admin_all" ON public.game_scores;
+
+CREATE POLICY "game_scores_insert_own" ON public.game_scores
+  FOR INSERT WITH CHECK (
+    user_id = auth.uid()
+    AND institute_id = public.get_my_institute_id()
+  );
+
+CREATE POLICY "game_scores_read_institute" ON public.game_scores
+  FOR SELECT USING (
+    institute_id = public.get_my_institute_id()
+    OR public.is_super_admin()
+  );
+
+CREATE POLICY "game_scores_super_admin_all" ON public.game_scores
+  FOR ALL
+  USING (public.is_super_admin())
+  WITH CHECK (public.is_super_admin());
+
+CREATE OR REPLACE FUNCTION public.get_game_leaderboard(
+  p_period   TEXT DEFAULT 'all',
+  p_game_id  TEXT DEFAULT NULL,
+  p_limit    INTEGER DEFAULT 20
+)
+RETURNS TABLE (
+  user_id          UUID,
+  name             TEXT,
+  avatar_url       TEXT,
+  total_xp         BIGINT,
+  total_plays      BIGINT,
+  total_perfects   BIGINT,
+  best_score       INTEGER,
+  best_percent     NUMERIC,
+  is_me            BOOLEAN,
+  rank             BIGINT
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_caller_id     UUID := auth.uid();
+  v_institute_id  UUID := public.get_my_institute_id();
+  v_since         TIMESTAMPTZ;
+  v_limit         INTEGER := LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100);
+BEGIN
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
+  END IF;
+  IF v_institute_id IS NULL THEN RETURN; END IF;
+
+  v_since := CASE lower(coalesce(p_period, 'all'))
+    WHEN 'today' THEN date_trunc('day', now())
+    WHEN 'week'  THEN now() - INTERVAL '7 days'
+    WHEN 'month' THEN now() - INTERVAL '30 days'
+    ELSE TIMESTAMPTZ '1970-01-01'
+  END;
+
+  RETURN QUERY
+  WITH scoped AS (
+    SELECT gs.* FROM public.game_scores gs
+     WHERE gs.institute_id = v_institute_id
+       AND gs.created_at >= v_since
+       AND (p_game_id IS NULL OR gs.game_id = p_game_id)
+  ),
+  agg AS (
+    SELECT
+      s.user_id,
+      SUM(s.xp_earned)::BIGINT      AS total_xp,
+      COUNT(*)::BIGINT              AS total_plays,
+      SUM(CASE WHEN s.is_perfect THEN 1 ELSE 0 END)::BIGINT AS total_perfects,
+      MAX(s.score)::INTEGER         AS best_score,
+      MAX(s.percent)::NUMERIC       AS best_percent
+    FROM scoped s
+    GROUP BY s.user_id
+  )
+  SELECT
+    a.user_id,
+    COALESCE(u.name, 'Anonymous')              AS name,
+    u.avatar_url                                AS avatar_url,
+    a.total_xp,
+    a.total_plays,
+    a.total_perfects,
+    a.best_score,
+    a.best_percent,
+    (a.user_id = v_caller_id)                  AS is_me,
+    DENSE_RANK() OVER (ORDER BY a.total_xp DESC, a.total_plays DESC) AS rank
+  FROM agg a
+  JOIN public.users u ON u.id = a.user_id
+  ORDER BY rank ASC, a.total_xp DESC
+  LIMIT v_limit;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_game_leaderboard(TEXT, TEXT, INTEGER) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.get_streak_leaderboard(
+  p_limit INTEGER DEFAULT 20
+)
+RETURNS TABLE (
+  user_id        UUID,
+  name           TEXT,
+  avatar_url     TEXT,
+  current_streak INTEGER,
+  is_me          BOOLEAN,
+  rank           BIGINT
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_caller_id     UUID := auth.uid();
+  v_institute_id  UUID := public.get_my_institute_id();
+  v_limit         INTEGER := LEAST(GREATEST(COALESCE(p_limit, 20), 1), 100);
+BEGIN
+  IF v_caller_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
+  END IF;
+  IF v_institute_id IS NULL THEN RETURN; END IF;
+
+  RETURN QUERY
+  WITH play_days AS (
+    SELECT DISTINCT
+      gs.user_id,
+      (gs.created_at AT TIME ZONE 'UTC')::DATE AS play_date
+      FROM public.game_scores gs
+     WHERE gs.institute_id = v_institute_id
+  ),
+  numbered AS (
+    SELECT
+      pd.user_id,
+      pd.play_date,
+      pd.play_date - (ROW_NUMBER() OVER (PARTITION BY pd.user_id ORDER BY pd.play_date))::INTEGER AS streak_group
+    FROM play_days pd
+  ),
+  streaks AS (
+    SELECT n.user_id, n.streak_group,
+           COUNT(*)::INTEGER AS streak_len,
+           MAX(n.play_date)  AS last_play
+    FROM numbered n
+    GROUP BY n.user_id, n.streak_group
+  ),
+  current_streaks AS (
+    SELECT s.user_id, s.streak_len AS current_streak
+    FROM streaks s
+    WHERE s.last_play >= ((now() AT TIME ZONE 'UTC')::DATE - INTERVAL '1 day')
+  ),
+  best_current AS (
+    SELECT cs.user_id, MAX(cs.current_streak) AS current_streak
+    FROM current_streaks cs
+    GROUP BY cs.user_id
+  )
+  SELECT
+    bc.user_id,
+    COALESCE(u.name, 'Anonymous')              AS name,
+    u.avatar_url                                AS avatar_url,
+    bc.current_streak,
+    (bc.user_id = v_caller_id)                  AS is_me,
+    DENSE_RANK() OVER (ORDER BY bc.current_streak DESC) AS rank
+  FROM best_current bc
+  JOIN public.users u ON u.id = bc.user_id
+  WHERE bc.current_streak >= 1
+  ORDER BY rank ASC
+  LIMIT v_limit;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.get_streak_leaderboard(INTEGER) TO authenticated;
