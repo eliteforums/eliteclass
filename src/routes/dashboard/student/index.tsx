@@ -17,6 +17,7 @@ import type { AttendanceStatus, StudentAttendanceRecord } from "@/types";
 import { AlertCircle, RefreshCw, Sparkles } from "lucide-react";
 import { StudentLearningSection } from "@/modules/courses/components/student/StudentLearningSection";
 import { GamesHub } from "@/modules/games/components/GamesHub";
+import { GroqKeyGate } from "@/modules/games/components/GroqKeyGate";
 
 const STUDENT_DASHBOARD_TIMEOUT_MS = 15_000;
 
@@ -252,7 +253,9 @@ function StudentDashboard() {
 
         {user?.id ? <StudentLearningSection studentId={user.id} /> : null}
 
-        <GamesHub />
+        <GroqKeyGate>
+          <GamesHub />
+        </GroqKeyGate>
 
         {!activeDashboard && isLoading ? (
           <div className="grid gap-6 xl:grid-cols-2">
