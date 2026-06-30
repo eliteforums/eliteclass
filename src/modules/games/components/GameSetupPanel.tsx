@@ -3,10 +3,14 @@
 // ---------------------------------------------------------------------------
 // Every game starts with this. It collects the topic, difficulty, and
 // optional count, surfaces a missing-API-key warning, and fires `onStart`.
+//
+// When `forcedConfig` is supplied (daily challenge), topic + difficulty are
+// pre-filled and locked so the player can't change them; count is still
+// editable.
 // ---------------------------------------------------------------------------
 
-import { useState } from "react";
-import { Sparkles, KeyRound, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sparkles, KeyRound, Loader2, Calendar, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +25,12 @@ import { Badge } from "@/components/ui/badge";
 import { hasGroqKey } from "../services/gameAI.service";
 import type { Difficulty } from "../types";
 
+export interface SetupConfig {
+  topic: string;
+  difficulty: Difficulty;
+  count: number;
+}
+
 export interface GameSetupPanelProps {
   title: string;
   description: string;
@@ -30,7 +40,12 @@ export interface GameSetupPanelProps {
   countLabel?: string;
   loading?: boolean;
   error?: string | null;
-  onStart: (config: { topic: string; difficulty: Difficulty; count: number }) => void;
+  onStart: (config: SetupConfig) => void;
+  /**
+   * When provided, topic + difficulty are pre-set and read-only (e.g. daily
+   * challenge). Count remains editable.
+   */
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
 }
 
 export function GameSetupPanel({
@@ -43,23 +58,47 @@ export function GameSetupPanel({
   loading = false,
   error = null,
   onStart,
+  forcedConfig,
 }: GameSetupPanelProps) {
-  const [topic, setTopic] = useState("");
-  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [topic, setTopic] = useState(forcedConfig?.topic ?? "");
+  const [difficulty, setDifficulty] = useState<Difficulty>(forcedConfig?.difficulty ?? "medium");
   const [count, setCount] = useState(defaultCount);
   const keyAvailable = hasGroqKey();
 
+  // When forcedConfig changes (rare), reflect it.
+  useEffect(() => {
+    if (forcedConfig) {
+      setTopic(forcedConfig.topic);
+      setDifficulty(forcedConfig.difficulty);
+    }
+  }, [forcedConfig?.topic, forcedConfig?.difficulty]);
+
+  const locked = !!forcedConfig;
   const canStart = topic.trim().length >= 2 && !loading && keyAvailable;
 
   return (
     <div className="space-y-6">
       <div className="space-y-2">
         <Badge variant="outline" className="gap-1.5">
-          <Sparkles className="size-3.5" />
-          AI-Powered
+          {forcedConfig?.isDailyChallenge ? (
+            <>
+              <Calendar className="size-3.5" />
+              Daily Challenge
+            </>
+          ) : (
+            <>
+              <Sparkles className="size-3.5" />
+              AI-Powered
+            </>
+          )}
         </Badge>
         <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
         <p className="text-sm text-muted-foreground">{description}</p>
+        {forcedConfig?.isDailyChallenge && (
+          <p className="text-xs text-amber-700 dark:text-amber-300">
+            Complete this to earn double XP. Resets at midnight.
+          </p>
+        )}
       </div>
 
       {!keyAvailable && (
@@ -77,27 +116,35 @@ export function GameSetupPanel({
 
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="game-topic">Topic</Label>
+          <Label htmlFor="game-topic" className="flex items-center gap-1.5">
+            Topic
+            {locked && <Lock className="size-3 text-muted-foreground" />}
+          </Label>
           <Input
             id="game-topic"
             placeholder="e.g. Photosynthesis, World War II, JavaScript closures"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
-            autoFocus
-            disabled={loading}
+            autoFocus={!locked}
+            disabled={loading || locked}
           />
-          <p className="text-xs text-muted-foreground">
-            Be specific. Better topics make better questions.
-          </p>
+          {!locked && (
+            <p className="text-xs text-muted-foreground">
+              Be specific. Better topics make better questions.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="game-difficulty">Difficulty</Label>
+            <Label htmlFor="game-difficulty" className="flex items-center gap-1.5">
+              Difficulty
+              {locked && <Lock className="size-3 text-muted-foreground" />}
+            </Label>
             <Select
               value={difficulty}
               onValueChange={(v) => setDifficulty(v as Difficulty)}
-              disabled={loading}
+              disabled={loading || locked}
             >
               <SelectTrigger id="game-difficulty">
                 <SelectValue />

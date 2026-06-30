@@ -5,22 +5,22 @@
 // trying to match them. Fewer moves and less time = higher score.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock, RotateCcw, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { generateFlashcards } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, Flashcard, GameResult } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, Flashcard, GameResult } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
 type Stage = "setup" | "playing" | "done";
 
 interface BoardCard {
-  id: string; // unique per rendered tile
-  pairKey: string; // term — same on both halves of a pair
+  id: string;
+  pairKey: string;
   face: "term" | "definition";
   text: string;
   matched: boolean;
@@ -47,7 +47,6 @@ function buildBoard(cards: Flashcard[]): BoardCard[] {
       flipped: false,
     });
   });
-  // Fisher-Yates shuffle
   for (let i = tiles.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
@@ -55,24 +54,36 @@ function buildBoard(cards: Flashcard[]): BoardCard[] {
   return tiles;
 }
 
-export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
+export function FlashcardMatchGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [board, setBoard] = useState<BoardCard[]>([]);
-  const [selected, setSelected] = useState<string[]>([]); // ids
+  const [selected, setSelected] = useState<string[]>([]);
   const [moves, setMoves] = useState(0);
   const [matches, setMatches] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
   const totalPairs = board.length / 2;
 
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const { recordResult, getScore, progress } = useGameScores();
 
-  // Timer
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
   useEffect(() => {
     if (stage !== "playing") return;
     const id = window.setInterval(() => setElapsed(Date.now() - startedAt), 250);
@@ -80,33 +91,44 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
   }, [stage, startedAt]);
 
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const cards = await generateFlashcards(config.topic, config.difficulty, config.count);
+        const cards = await generateFlashcards(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (cards.length < 3) throw new Error("Not enough cards. Try a different topic.");
         setBoard(buildBoard(cards));
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setSelected([]);
         setMoves(0);
         setMatches(0);
         setStartedAt(Date.now());
         setElapsed(0);
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the game.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   const flip = useCallback(
     (id: string) => {
-      if (selected.length === 2) return; // mid-check
+      if (selected.length === 2) return;
       const tile = board.find((t) => t.id === id);
       if (!tile || tile.matched || tile.flipped) return;
 
@@ -138,14 +160,11 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
     [board, selected],
   );
 
-  // Game complete?
   const completed = totalPairs > 0 && matches === totalPairs;
   useEffect(() => {
     if (stage === "playing" && completed) {
       const duration = Date.now() - startedAt;
-      const perfectMoves = totalPairs; // best possible
-      // Score: 10 per pair + bonus for efficiency, minus time penalty
-      const efficiencyBonus = Math.max(0, (perfectMoves * 10) / Math.max(1, moves));
+      const efficiencyBonus = Math.max(0, (totalPairs * 10) / Math.max(1, moves));
       const timePenalty = Math.min(20, Math.floor(duration / 5000));
       const finalScore = Math.max(
         0,
@@ -159,11 +178,13 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
         maxScore: totalPairs * 20,
         durationMs: duration,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
     }
-  }, [completed, stage, startedAt, totalPairs, moves, topic, difficulty, recordResult]);
+  }, [completed, stage, startedAt, totalPairs, moves, topic, difficulty, isDaily, recordResult]);
 
   const finalResult: GameResult = useMemo(
     () => ({
@@ -174,8 +195,9 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
       maxScore: totalPairs * 20,
       durationMs: elapsed,
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     }),
-    [topic, difficulty, matches, totalPairs, moves, elapsed],
+    [topic, difficulty, matches, totalPairs, moves, elapsed, isDaily],
   );
 
   if (stage === "setup") {
@@ -190,6 +212,7 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -199,6 +222,8 @@ export function FlashcardMatchGame({ onClose }: { onClose: () => void }) {
       <GameResultPanel
         result={finalResult}
         highScore={getScore("flashcard-match")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />

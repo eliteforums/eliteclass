@@ -2,7 +2,7 @@
 // True / False Speedrun — Beat the clock answering T/F statements
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Clock, RotateCcw, X, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,21 +10,28 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { generateTrueFalse } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, GameResult, TrueFalseStatement } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, GameResult, TrueFalseStatement } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
-const TOTAL_TIME_MS = 60_000; // 60 seconds total
+const TOTAL_TIME_MS = 60_000;
 
 type Stage = "setup" | "playing" | "done";
 
-export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
+export function TrueFalseSpeedrunGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [statements, setStatements] = useState<TrueFalseStatement[]>([]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -33,9 +40,14 @@ export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
   const [timeLeft, setTimeLeft] = useState(TOTAL_TIME_MS);
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const [startedAt, setStartedAt] = useState(0);
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
 
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const finalizedRef = useRef(false);
+  const { recordResult, getScore, progress } = useGameScores();
   const current = statements[index];
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Global countdown
   useEffect(() => {
@@ -45,58 +57,63 @@ export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
     const id = window.setInterval(() => {
       const remaining = Math.max(0, startTimeLeft - (Date.now() - start));
       setTimeLeft(remaining);
-      if (remaining === 0) {
-        window.clearInterval(id);
-      }
+      if (remaining === 0) window.clearInterval(id);
     }, 100);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
-  // End when time runs out
-  useEffect(() => {
-    if (stage === "playing" && timeLeft === 0) {
+  const finalize = useCallback(
+    (durationMs: number) => {
+      if (finalizedRef.current) return;
+      finalizedRef.current = true;
       const result: GameResult = {
         gameId: "true-false-speedrun",
         topic,
         difficulty,
         score,
         maxScore: statements.length * 10,
-        durationMs: TOTAL_TIME_MS,
+        durationMs,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
-    }
-  }, [timeLeft, stage, score, statements.length, topic, difficulty, recordResult]);
+    },
+    [topic, difficulty, score, statements.length, isDaily, recordResult],
+  );
 
-  // End when all statements answered
   useEffect(() => {
-    if (stage === "playing" && index >= statements.length && statements.length > 0) {
-      const result: GameResult = {
-        gameId: "true-false-speedrun",
-        topic,
-        difficulty,
-        score,
-        maxScore: statements.length * 10,
-        durationMs: Date.now() - startedAt,
-        finishedAt: Date.now(),
-      };
-      recordResult(result);
-      setStage("done");
+    if (stage === "playing" && timeLeft === 0) finalize(TOTAL_TIME_MS);
+  }, [timeLeft, stage, finalize]);
+
+  useEffect(() => {
+    if (stage === "playing" && statements.length > 0 && index >= statements.length) {
+      finalize(Date.now() - startedAt);
     }
-  }, [index, statements.length, stage, score, topic, difficulty, startedAt, recordResult]);
+  }, [index, statements.length, stage, startedAt, finalize]);
 
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const items = await generateTrueFalse(config.topic, config.difficulty, config.count);
+        const items = await generateTrueFalse(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (items.length === 0) throw new Error("Got no statements. Try a different topic.");
+        finalizedRef.current = false;
         setStatements(items);
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setIndex(0);
         setScore(0);
         setStreak(0);
@@ -104,14 +121,16 @@ export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
         setTimeLeft(TOTAL_TIME_MS);
         setFeedback(null);
         setStartedAt(Date.now());
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the game.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   const answer = useCallback(
@@ -149,6 +168,7 @@ export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -162,11 +182,14 @@ export function TrueFalseSpeedrunGame({ onClose }: { onClose: () => void }) {
       maxScore: statements.length * 10,
       durationMs: Math.min(TOTAL_TIME_MS, Date.now() - startedAt),
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     };
     return (
       <GameResultPanel
         result={result}
         highScore={getScore("true-false-speedrun")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />

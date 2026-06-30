@@ -2,16 +2,16 @@
 // Word Scramble — unscramble topic-relevant terms
 // ---------------------------------------------------------------------------
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, Clock, Lightbulb, RotateCcw, Shuffle } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Check, Clock, Lightbulb, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { generateScramble } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, GameResult, ScrambleEntry } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, GameResult, ScrambleEntry } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
 const ROUND_MS = 45_000;
@@ -31,13 +31,20 @@ function scramble(word: string): string {
   return chars.reverse().join("");
 }
 
-export function WordScrambleGame({ onClose }: { onClose: () => void }) {
+export function WordScrambleGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [entries, setEntries] = useState<ScrambleEntry[]>([]);
   const [scrambled, setScrambled] = useState("");
   const [index, setIndex] = useState(0);
@@ -47,10 +54,14 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
 
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const { recordResult, getScore, progress } = useGameScores();
   const current = entries[index];
   const maxScore = entries.length * 20;
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   // Timer per round
   useEffect(() => {
@@ -68,16 +79,25 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
   }, [stage, index, revealed]);
 
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const items = await generateScramble(config.topic, config.difficulty, config.count);
+        const items = await generateScramble(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (items.length === 0) throw new Error("Got no words. Try a different topic.");
         setEntries(items);
         setScrambled(scramble(items[0].word));
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setIndex(0);
         setInput("");
         setScore(0);
@@ -85,14 +105,16 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
         setRevealed(false);
         setHintsUsed(0);
         setStartedAt(Date.now());
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the game.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   const submit = useCallback(() => {
@@ -117,8 +139,10 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
         maxScore,
         durationMs: Date.now() - startedAt,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
       return;
     }
@@ -129,22 +153,18 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
     setTimeLeft(ROUND_MS);
     setRevealed(false);
     setHintsUsed(0);
-  }, [index, entries, score, maxScore, topic, difficulty, startedAt, recordResult]);
+  }, [index, entries, score, maxScore, topic, difficulty, isDaily, startedAt, recordResult]);
 
   const useHint = useCallback(() => {
     if (!current || revealed) return;
     setHintsUsed((h) => h + 1);
-    // Reveal the first unrevealed letter as a placeholder in the input
     setInput((prev) => {
       const target = current.word;
       let revealedSoFar = prev.toUpperCase();
-      // pad to full length
       while (revealedSoFar.length < target.length) revealedSoFar += "?";
       const arr = revealedSoFar.split("");
       const firstUnknown = arr.findIndex((c, i) => c !== target[i]);
-      if (firstUnknown >= 0) {
-        arr[firstUnknown] = target[firstUnknown];
-      }
+      if (firstUnknown >= 0) arr[firstUnknown] = target[firstUnknown];
       return arr.join("").replace(/\?+$/, "");
     });
   }, [current, revealed]);
@@ -158,15 +178,16 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
       maxScore,
       durationMs: Date.now() - startedAt,
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     }),
-    [topic, difficulty, score, maxScore, startedAt],
+    [topic, difficulty, score, maxScore, startedAt, isDaily],
   );
 
   if (stage === "setup") {
     return (
       <GameSetupPanel
         title="Word Scramble"
-        description="Unscramble the topic term before the timer runs out. Use hints sparingly — they cost points."
+        description="Unscramble the topic term before the timer runs out. Hints cost points."
         defaultCount={8}
         countMin={5}
         countMax={15}
@@ -174,6 +195,7 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -183,6 +205,8 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
       <GameResultPanel
         result={finalResult}
         highScore={getScore("word-scramble")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />
@@ -283,11 +307,6 @@ export function WordScrambleGame({ onClose }: { onClose: () => void }) {
           Restart
         </Button>
       </div>
-
-      {/* Reference for unused Shuffle import in icon set future-proofing */}
-      <span className="hidden">
-        <Shuffle />
-      </span>
     </div>
   );
 }

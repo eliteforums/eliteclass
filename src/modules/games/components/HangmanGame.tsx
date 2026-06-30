@@ -5,15 +5,15 @@
 // is lost. Score = correct rounds * 10 + remaining lives bonus.
 // ---------------------------------------------------------------------------
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Lightbulb, RotateCcw, Skull } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { generateHangmanWords } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, GameResult, HangmanWord } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, GameResult, HangmanWord } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
 const MAX_WRONG = 6;
@@ -21,13 +21,20 @@ const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 type Stage = "setup" | "playing" | "done";
 
-export function HangmanGame({ onClose }: { onClose: () => void }) {
+export function HangmanGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [words, setWords] = useState<HangmanWord[]>([]);
   const [roundIndex, setRoundIndex] = useState(0);
   const [guessed, setGuessed] = useState<Set<string>>(new Set());
@@ -35,8 +42,10 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
   const [score, setScore] = useState(0);
   const [startedAt, setStartedAt] = useState(0);
   const [roundState, setRoundState] = useState<"playing" | "won" | "lost">("playing");
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
 
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const { recordResult, getScore, progress } = useGameScores();
 
   const current = words[roundIndex];
   const wordChars = useMemo(() => (current ? current.word.split("") : []), [current]);
@@ -44,33 +53,44 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
     () => wordChars.map((c) => (guessed.has(c) ? c : "_")),
     [wordChars, guessed],
   );
-  const isComplete = current ? wordChars.every((c) => guessed.has(c)) : false;
-  const isDead = wrong >= MAX_WRONG;
+
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const ws = await generateHangmanWords(config.topic, config.difficulty, config.count);
+        const ws = await generateHangmanWords(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (ws.length === 0) throw new Error("Got no words. Try a different topic.");
         setWords(ws);
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setRoundIndex(0);
         setGuessed(new Set());
         setWrong(0);
         setScore(0);
         setRoundState("playing");
         setStartedAt(Date.now());
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the game.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   const guess = useCallback(
@@ -81,11 +101,8 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
       setGuessed(nextGuessed);
 
       const correct = wordChars.includes(letter);
-      if (!correct) {
-        setWrong((w) => w + 1);
-      }
+      if (!correct) setWrong((w) => w + 1);
 
-      // Resolve round
       const won = wordChars.every((c) => nextGuessed.has(c));
       const lost = !correct && wrong + 1 >= MAX_WRONG;
       if (won) {
@@ -109,8 +126,10 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
         maxScore: words.length * (10 + MAX_WRONG * 2),
         durationMs: Date.now() - startedAt,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
       return;
     }
@@ -118,7 +137,7 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
     setGuessed(new Set());
     setWrong(0);
     setRoundState("playing");
-  }, [roundIndex, words.length, score, topic, difficulty, startedAt, recordResult]);
+  }, [roundIndex, words.length, score, topic, difficulty, isDaily, startedAt, recordResult]);
 
   if (stage === "setup") {
     return (
@@ -132,6 +151,7 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -145,11 +165,14 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
       maxScore: words.length * (10 + MAX_WRONG * 2),
       durationMs: Date.now() - startedAt,
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     };
     return (
       <GameResultPanel
         result={result}
         highScore={getScore("hangman")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />
@@ -202,7 +225,9 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
         <HangmanFigure wrong={wrong} />
 
         {roundState === "playing" ? (
-          <div className="grid grid-cols-7 sm:grid-cols-13 gap-1.5">
+          // Explicit 7-column grid on mobile, 13-column on sm+ using arbitrary
+          // value class so Tailwind doesn't drop sm:grid-cols-13 (not in core).
+          <div className="grid grid-cols-7 sm:grid-cols-[repeat(13,minmax(0,1fr))] gap-1.5">
             {ALPHABET.map((l) => {
               const tried = guessed.has(l);
               const isInWord = tried && wordChars.includes(l);
@@ -246,44 +271,22 @@ export function HangmanGame({ onClose }: { onClose: () => void }) {
       </div>
     </div>
   );
-
-  // isDead reference to keep linter quiet — used implicitly via roundState
-  void isDead;
-  void isComplete;
 }
 
 function HangmanFigure({ wrong }: { wrong: number }) {
-  // Render 6 stages of a stick figure as SVG strokes
   return (
     <div className="flex justify-center">
       <svg viewBox="0 0 120 140" className="w-32 h-36 text-foreground/80">
-        {/* Gallows */}
         <line x1="10" y1="130" x2="80" y2="130" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         <line x1="30" y1="130" x2="30" y2="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         <line x1="30" y1="20" x2="80" y2="20" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
         <line x1="80" y1="20" x2="80" y2="35" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-        {/* Head */}
-        {wrong >= 1 && (
-          <circle cx="80" cy="45" r="10" stroke="currentColor" strokeWidth="2.5" fill="none" />
-        )}
-        {/* Body */}
-        {wrong >= 2 && (
-          <line x1="80" y1="55" x2="80" y2="90" stroke="currentColor" strokeWidth="2.5" />
-        )}
-        {/* Arms */}
-        {wrong >= 3 && (
-          <line x1="80" y1="65" x2="65" y2="80" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-        )}
-        {wrong >= 4 && (
-          <line x1="80" y1="65" x2="95" y2="80" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-        )}
-        {/* Legs */}
-        {wrong >= 5 && (
-          <line x1="80" y1="90" x2="65" y2="110" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-        )}
-        {wrong >= 6 && (
-          <line x1="80" y1="90" x2="95" y2="110" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
-        )}
+        {wrong >= 1 && <circle cx="80" cy="45" r="10" stroke="currentColor" strokeWidth="2.5" fill="none" />}
+        {wrong >= 2 && <line x1="80" y1="55" x2="80" y2="90" stroke="currentColor" strokeWidth="2.5" />}
+        {wrong >= 3 && <line x1="80" y1="65" x2="65" y2="80" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />}
+        {wrong >= 4 && <line x1="80" y1="65" x2="95" y2="80" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />}
+        {wrong >= 5 && <line x1="80" y1="90" x2="65" y2="110" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />}
+        {wrong >= 6 && <line x1="80" y1="90" x2="95" y2="110" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />}
       </svg>
     </div>
   );

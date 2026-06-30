@@ -13,8 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { generateQuizQuestions } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, GameResult, QuizQuestion } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, GameResult, QuizQuestion } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
 const PER_QUESTION_MS = 12_000;
@@ -23,13 +23,20 @@ const STREAK_BONUS_POINTS = 2; // +2 every 3 in a row
 
 type Stage = "setup" | "playing" | "done";
 
-export function QuizRushGame({ onClose }: { onClose: () => void }) {
+export function QuizRushGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -40,7 +47,17 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
   const [startedAt, setStartedAt] = useState(0);
 
   const tickRef = useRef<number | null>(null);
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const { recordResult, getScore, progress } = useGameScores();
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
+
+  // Cleanup on unmount: cancel any in-flight Groq fetch.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (tickRef.current) window.clearInterval(tickRef.current);
+    };
+  }, []);
 
   const current = questions[index];
   const maxScore = useMemo(() => {
@@ -48,15 +65,24 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
   }, [questions.length]);
 
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const qs = await generateQuizQuestions(config.topic, config.difficulty, config.count);
+        const qs = await generateQuizQuestions(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (qs.length === 0) throw new Error("Got no questions. Try a different topic.");
         setQuestions(qs);
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setIndex(0);
         setScore(0);
         setStreak(0);
@@ -64,14 +90,16 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
         setPicked(null);
         setTimeLeft(PER_QUESTION_MS);
         setStartedAt(Date.now());
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the quiz.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   // Per-question timer
@@ -123,15 +151,17 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
         maxScore,
         durationMs: Date.now() - startedAt,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
     } else {
       setIndex((i) => i + 1);
       setPicked(null);
       setTimeLeft(PER_QUESTION_MS);
     }
-  }, [index, questions.length, score, maxScore, topic, difficulty, startedAt, recordResult]);
+  }, [index, questions.length, score, maxScore, topic, difficulty, isDaily, startedAt, recordResult]);
 
   if (stage === "setup") {
     return (
@@ -145,6 +175,7 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -158,11 +189,14 @@ export function QuizRushGame({ onClose }: { onClose: () => void }) {
       maxScore,
       durationMs: Date.now() - startedAt,
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     };
     return (
       <GameResultPanel
         result={result}
         highScore={getScore("quiz-rush")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />

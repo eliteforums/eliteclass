@@ -2,7 +2,7 @@
 // Fill in the Blanks — sentence completion
 // ---------------------------------------------------------------------------
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Lightbulb, RotateCcw, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { generateFillBlanks } from "../services/gameAI.service";
 import { useGameScores } from "../hooks/useGameScores";
-import type { Difficulty, FillBlankEntry, GameResult } from "../types";
-import { GameSetupPanel } from "./GameSetupPanel";
+import type { AwardedRewards, Difficulty, FillBlankEntry, GameResult } from "../types";
+import { GameSetupPanel, type SetupConfig } from "./GameSetupPanel";
 import { GameResultPanel } from "./GameResultPanel";
 
 type Stage = "setup" | "playing" | "done";
@@ -24,13 +24,20 @@ function normalize(s: string): string {
     .replace(/\s+/g, " ");
 }
 
-export function FillBlanksGame({ onClose }: { onClose: () => void }) {
+export function FillBlanksGame({
+  onClose,
+  forcedConfig,
+}: {
+  onClose: () => void;
+  forcedConfig?: { topic: string; difficulty: Difficulty; isDailyChallenge?: boolean };
+}) {
   const [stage, setStage] = useState<Stage>("setup");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [isDaily, setIsDaily] = useState(false);
   const [entries, setEntries] = useState<FillBlankEntry[]>([]);
   const [index, setIndex] = useState(0);
   const [input, setInput] = useState("");
@@ -38,35 +45,50 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
   const [revealed, setRevealed] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [startedAt, setStartedAt] = useState(0);
+  const [rewards, setRewards] = useState<AwardedRewards | null>(null);
 
-  const { recordResult, getScore } = useGameScores();
+  const abortRef = useRef<AbortController | null>(null);
+  const { recordResult, getScore, progress } = useGameScores();
   const current = entries[index];
   const maxScore = entries.length * 10;
 
+  useEffect(() => () => abortRef.current?.abort(), []);
+
   const handleStart = useCallback(
-    async (config: { topic: string; difficulty: Difficulty; count: number }) => {
+    async (config: SetupConfig) => {
       setLoading(true);
       setError(null);
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       try {
-        const items = await generateFillBlanks(config.topic, config.difficulty, config.count);
+        const items = await generateFillBlanks(
+          config.topic,
+          config.difficulty,
+          config.count,
+          { signal: controller.signal },
+        );
         if (items.length === 0) throw new Error("Got no items. Try a different topic.");
         setEntries(items);
         setTopic(config.topic);
         setDifficulty(config.difficulty);
+        setIsDaily(!!forcedConfig?.isDailyChallenge);
         setIndex(0);
         setInput("");
         setScore(0);
         setRevealed(false);
         setShowHint(false);
         setStartedAt(Date.now());
+        setRewards(null);
         setStage("playing");
       } catch (e) {
+        if ((e as { name?: string })?.name === "AbortError") return;
         setError(e instanceof Error ? e.message : "Could not start the game.");
       } finally {
         setLoading(false);
       }
     },
-    [],
+    [forcedConfig],
   );
 
   const submit = useCallback(() => {
@@ -90,8 +112,10 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
         maxScore,
         durationMs: Date.now() - startedAt,
         finishedAt: Date.now(),
+        isDailyChallenge: isDaily,
       };
-      recordResult(result);
+      const awarded = recordResult(result);
+      setRewards(awarded);
       setStage("done");
       return;
     }
@@ -99,7 +123,7 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
     setInput("");
     setRevealed(false);
     setShowHint(false);
-  }, [index, entries.length, score, maxScore, topic, difficulty, startedAt, recordResult]);
+  }, [index, entries.length, score, maxScore, topic, difficulty, isDaily, startedAt, recordResult]);
 
   const finalResult: GameResult = useMemo(
     () => ({
@@ -110,8 +134,9 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
       maxScore,
       durationMs: Date.now() - startedAt,
       finishedAt: Date.now(),
+      isDailyChallenge: isDaily,
     }),
-    [topic, difficulty, score, maxScore, startedAt],
+    [topic, difficulty, score, maxScore, startedAt, isDaily],
   );
 
   if (stage === "setup") {
@@ -126,6 +151,7 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
         loading={loading}
         error={error}
         onStart={handleStart}
+        forcedConfig={forcedConfig}
       />
     );
   }
@@ -135,6 +161,8 @@ export function FillBlanksGame({ onClose }: { onClose: () => void }) {
       <GameResultPanel
         result={finalResult}
         highScore={getScore("fill-blanks")}
+        rewards={rewards}
+        progress={progress}
         onPlayAgain={() => setStage("setup")}
         onClose={onClose}
       />
