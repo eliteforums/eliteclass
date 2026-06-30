@@ -309,6 +309,60 @@ export async function createNotification(
   }
 }
 
+// ── broadcastNotification (bulk via RPC) ─────────────────────────────────────
+/**
+ * Sends a notification to many recipients in a single round-trip via the
+ * `broadcast_notification` SECURITY DEFINER RPC. Returns the count actually
+ * inserted (recipients outside the caller's institute are skipped by the RPC).
+ *
+ * This replaces the N-per-call createNotification loop for the "All Students"
+ * and "Individual" paths, dramatically reducing latency and removing the
+ * silent-partial-failure trap (any single failure used to be swallowed).
+ */
+export async function broadcastNotification(
+  title: string,
+  body: string,
+  recipientUserIds: string[],
+): Promise<ApiResponse<SendBatchNotificationResult>> {
+  if (!supabase) return SUPABASE_NOT_CONFIGURED;
+
+  const validationErrors = validateNotificationFields(title, body);
+  if (validationErrors.length > 0) {
+    return {
+      data: null,
+      error: validationErrors.map((e) => e.message).join(" "),
+      success: false,
+    };
+  }
+
+  // De-dup recipients to avoid double-sending
+  const unique = Array.from(new Set(recipientUserIds.filter(Boolean)));
+  if (unique.length === 0) {
+    return { data: { count: 0 }, error: null, success: true };
+  }
+
+  const { data, error } = await supabase.rpc("broadcast_notification", {
+    p_title: title.trim(),
+    p_body: body.trim(),
+    p_recipient_ids: unique,
+  });
+
+  if (error) {
+    const code = (error as { code?: string }).code;
+    const friendly =
+      code === "42501"
+        ? "You're not allowed to send notifications. Sign in as admin or staff."
+        : code === "22023"
+          ? "Title or body length is invalid."
+          : error.message;
+    return { data: null, error: friendly, success: false };
+  }
+
+  const count =
+    typeof data === "number" ? data : Number((data as { count?: number })?.count ?? 0);
+  return { data: { count }, error: null, success: true };
+}
+
 // ── sendBatchNotification ────────────────────────────────────────────────────
 /**
  * Sends a notification to all students in a batch.

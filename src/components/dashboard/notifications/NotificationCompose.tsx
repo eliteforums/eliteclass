@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuthStore } from "@/store/authStore";
 import {
-  createNotification,
+  broadcastNotification,
   sendBatchNotification,
   validateNotificationFields,
   type ValidationError,
@@ -86,52 +86,40 @@ export function NotificationCompose() {
 
     try {
       if (recipient.targetType === "all") {
-        // Send to all students in the institute
+        // Resolve every student's auth user_id (recipient_id == users.id).
         const studentsResult = await getAssignableStudents(instituteId);
         if (!studentsResult.success || !studentsResult.data) {
           toast.error(studentsResult.error ?? "Failed to fetch students.");
           setIsSending(false);
           return;
         }
-
-        const allStudents = studentsResult.data;
-        if (allStudents.length === 0) {
+        if (studentsResult.data.length === 0) {
           toast.error("No students found in your institute.");
           setIsSending(false);
           return;
         }
 
-        // Create individual notifications for each student
-        let sentCount = 0;
-        let lastError: string | null = null;
+        const recipientIds = studentsResult.data
+          .map((s) => s.user_id ?? s.user?.id)
+          .filter((id): id is string => !!id);
 
-        for (const student of allStudents) {
-          const userId = student.user_id ?? student.user?.id;
-          if (!userId) continue;
+        // Single RPC round-trip — bulk insert via SECURITY DEFINER function.
+        const result = await broadcastNotification(title.trim(), body.trim(), recipientIds);
 
-          const result = await createNotification({
-            institute_id: instituteId,
-            sender_id: senderId,
-            title: title.trim(),
-            body: body.trim(),
-            recipient_id: userId,
-          });
-
-          if (result.success) {
-            sentCount++;
+        if (result.success && result.data) {
+          if (result.data.count === 0) {
+            toast.warning(
+              "No notifications were sent. Recipients may be missing from your institute.",
+            );
           } else {
-            lastError = result.error;
+            setSuccessCount(result.data.count);
+            resetForm();
           }
-        }
-
-        if (sentCount > 0) {
-          setSuccessCount(sentCount);
-          resetForm();
         } else {
-          toast.error(lastError ?? "Failed to send notifications.");
+          toast.error(result.error ?? "Failed to send notifications.");
         }
       } else if (recipient.targetType === "batch" && recipient.batchId) {
-        // Send batch notification
+        // Send batch notification (already a single SELECT + INSERT)
         const result = await sendBatchNotification(
           recipient.batchId,
           title.trim(),
@@ -141,8 +129,12 @@ export function NotificationCompose() {
         );
 
         if (result.success && result.data) {
-          setSuccessCount(result.data.count);
-          resetForm();
+          if (result.data.count === 0) {
+            toast.warning("Batch has no active members to notify.");
+          } else {
+            setSuccessCount(result.data.count);
+            resetForm();
+          }
         } else {
           toast.error(result.error ?? "Failed to send batch notification.");
         }
@@ -151,31 +143,23 @@ export function NotificationCompose() {
         recipient.studentIds &&
         recipient.studentIds.length > 0
       ) {
-        // Send to individual students
-        let sentCount = 0;
-        let lastError: string | null = null;
+        // recipient.studentIds is already a list of users.id values
+        // (RecipientSelector resolves student_id → user_id on toggle).
+        const result = await broadcastNotification(
+          title.trim(),
+          body.trim(),
+          recipient.studentIds,
+        );
 
-        for (const studentId of recipient.studentIds) {
-          const result = await createNotification({
-            institute_id: instituteId,
-            sender_id: senderId,
-            title: title.trim(),
-            body: body.trim(),
-            recipient_id: studentId,
-          });
-
-          if (result.success) {
-            sentCount++;
+        if (result.success && result.data) {
+          if (result.data.count === 0) {
+            toast.warning("No notifications were sent. Selected users may be outside your institute.");
           } else {
-            lastError = result.error;
+            setSuccessCount(result.data.count);
+            resetForm();
           }
-        }
-
-        if (sentCount > 0) {
-          setSuccessCount(sentCount);
-          resetForm();
         } else {
-          toast.error(lastError ?? "Failed to send notifications.");
+          toast.error(result.error ?? "Failed to send notifications.");
         }
       }
     } catch (err) {

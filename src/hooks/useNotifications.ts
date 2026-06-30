@@ -10,6 +10,7 @@
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
   getNotifications,
@@ -20,6 +21,43 @@ import {
 } from "@/services/notification.service";
 import { useAuth } from "@/hooks/useAuth";
 import type { RealtimeChannel } from "@supabase/supabase-js";
+
+/**
+ * Best-effort browser-native notification. Silently no-ops when:
+ *   - the Notification API is missing (Safari iOS, locked-down browsers)
+ *   - the user hasn't granted permission yet
+ *   - the page is currently focused (sonner toast handles in-app feedback)
+ */
+function showBrowserNotification(n: Notification) {
+  if (typeof window === "undefined") return;
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible") return;
+  try {
+    const native = new Notification(n.title, {
+      body: n.body,
+      icon: "/favicon.svg",
+      tag: `eliteclass-${n.id}`,
+    });
+    native.onclick = () => {
+      window.focus();
+      native.close();
+    };
+  } catch {
+    // Quota / service worker conflict — fall through silently.
+  }
+}
+
+/** Ask once per session, only if the user is signed in and hasn't decided yet. */
+function maybeRequestNotificationPermission() {
+  if (typeof window === "undefined") return;
+  if (typeof Notification === "undefined") return;
+  if (Notification.permission === "default") {
+    void Notification.requestPermission().catch(() => {
+      // ignore; user can re-enable from browser settings
+    });
+  }
+}
 
 const POLLING_INTERVAL_MS = 30_000; // 30 seconds
 
@@ -50,6 +88,13 @@ export function useNotifications(): UseNotificationsReturn {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPollingRef = useRef(false);
+  // Tracks IDs that have already been surfaced (initial load + previous polls)
+  // so we don't toast the same notification twice when realtime and polling
+  // race to deliver the same row.
+  const seenIdsRef = useRef<Set<string>>(new Set());
+  // First fetch on mount populates the baseline silently — only surface
+  // *new* notifications that arrive after this point.
+  const baselineLoadedRef = useRef(false);
 
   // ── Fetch initial data ──────────────────────────────────────────────────────
 
@@ -62,7 +107,28 @@ export function useNotifications(): UseNotificationsReturn {
     ]);
 
     if (notifResult.success && notifResult.data) {
-      setNotifications(notifResult.data);
+      const fresh = notifResult.data;
+
+      if (!baselineLoadedRef.current) {
+        // First load — record what's already there without firing toasts.
+        fresh.forEach((n) => seenIdsRef.current.add(n.id));
+        baselineLoadedRef.current = true;
+      } else {
+        // Subsequent polls — diff to find genuinely new entries.
+        const newOnes = fresh.filter((n) => !seenIdsRef.current.has(n.id));
+        newOnes.forEach((n) => {
+          seenIdsRef.current.add(n.id);
+          if (!n.is_read) {
+            toast.message(n.title, {
+              description: n.body,
+              duration: 6000,
+            });
+            showBrowserNotification(n);
+          }
+        });
+      }
+
+      setNotifications(fresh);
     }
     if (countResult.success && countResult.data !== null) {
       setUnreadCount(countResult.data);
@@ -109,6 +175,7 @@ export function useNotifications(): UseNotificationsReturn {
     }
 
     loadInitial();
+    maybeRequestNotificationPermission();
 
     // Always start polling as a reliable fallback (every 30s)
     const pollingInterval = setInterval(() => {
@@ -183,16 +250,33 @@ export function useNotifications(): UseNotificationsReturn {
           };
 
           // Prepend new notification (newest first) and avoid duplicates
+          let wasDuplicate = false;
           setNotifications((prev) => {
-            if (prev.some((n) => n.id === newNotification.id)) return prev;
+            if (prev.some((n) => n.id === newNotification.id)) {
+              wasDuplicate = true;
+              return prev;
+            }
             // Keep max 20 notifications in the list
             return [newNotification, ...prev].slice(0, 20);
           });
+
+          if (wasDuplicate) return;
+
+          // Record in the seen-set so a follow-up poll doesn't toast it again.
+          seenIdsRef.current.add(newNotification.id);
 
           // Increment unread count for new unread notifications
           if (!newRow.is_read) {
             setUnreadCount((prev) => prev + 1);
           }
+
+          // In-app toast (always visible) + browser notification (when window
+          // is hidden and permission was granted).
+          toast.message(newNotification.title, {
+            description: newNotification.body,
+            duration: 6000,
+          });
+          showBrowserNotification(newNotification);
         },
       )
       .subscribe((status) => {

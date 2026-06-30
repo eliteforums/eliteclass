@@ -13910,3 +13910,87 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.request_assignment_resubmit(UUID) TO authenticated;
 -- =============================================================================
+
+
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- NOTIFICATIONS — BROADCAST RPC + REALTIME PUBLICATION (added later)
+-- ═══════════════════════════════════════════════════════════════════════════════
+-- Mirror of docs/notifications-fix.sql. Idempotent so re-running setup.sql is
+-- safe. The RPC lets callers send to many recipients in one round-trip; the
+-- publication is required for the in-app realtime bell to receive INSERT
+-- events.
+
+CREATE OR REPLACE FUNCTION public.broadcast_notification(
+  p_title          TEXT,
+  p_body           TEXT,
+  p_recipient_ids  UUID[]
+)
+RETURNS INTEGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_sender_id     UUID := auth.uid();
+  v_role          TEXT;
+  v_institute_id  UUID;
+  v_inserted      INTEGER := 0;
+BEGIN
+  IF v_sender_id IS NULL THEN
+    RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
+  END IF;
+  IF length(coalesce(p_title, '')) < 1 OR length(p_title) > 100 THEN
+    RAISE EXCEPTION 'invalid_title_length' USING ERRCODE = '22023';
+  END IF;
+  IF length(coalesce(p_body, '')) < 1 OR length(p_body) > 500 THEN
+    RAISE EXCEPTION 'invalid_body_length' USING ERRCODE = '22023';
+  END IF;
+  IF p_recipient_ids IS NULL OR array_length(p_recipient_ids, 1) IS NULL THEN
+    RETURN 0;
+  END IF;
+
+  SELECT u.role, u.institute_id
+    INTO v_role, v_institute_id
+    FROM public.users u
+   WHERE u.id = v_sender_id;
+
+  IF v_role IS NULL THEN
+    RAISE EXCEPTION 'sender_profile_missing' USING ERRCODE = '42501';
+  END IF;
+  IF v_role NOT IN ('admin', 'staff', 'super_admin') THEN
+    RAISE EXCEPTION 'role_not_allowed' USING ERRCODE = '42501';
+  END IF;
+
+  IF v_role = 'super_admin' THEN
+    INSERT INTO public.notifications (institute_id, sender_id, recipient_id, title, body)
+    SELECT u.institute_id, v_sender_id, u.id, p_title, p_body
+      FROM public.users u
+     WHERE u.id = ANY(p_recipient_ids)
+       AND u.institute_id IS NOT NULL;
+  ELSE
+    INSERT INTO public.notifications (institute_id, sender_id, recipient_id, title, body)
+    SELECT v_institute_id, v_sender_id, u.id, p_title, p_body
+      FROM public.users u
+     WHERE u.id = ANY(p_recipient_ids)
+       AND u.institute_id = v_institute_id;
+  END IF;
+
+  GET DIAGNOSTICS v_inserted = ROW_COUNT;
+  RETURN v_inserted;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.broadcast_notification(TEXT, TEXT, UUID[]) TO authenticated;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+      FROM pg_publication_tables
+     WHERE pubname = 'supabase_realtime'
+       AND schemaname = 'public'
+       AND tablename = 'notifications'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications';
+  END IF;
+END $$;
